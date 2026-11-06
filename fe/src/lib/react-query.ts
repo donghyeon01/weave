@@ -22,6 +22,7 @@ export const queryKeys = {
   },
   tasks: {
     all: ['tasks'],
+    list: ['tasks', 'list'],
   },
   events: {
     all: ['events'],

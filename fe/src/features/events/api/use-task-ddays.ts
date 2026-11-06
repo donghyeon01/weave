@@ -7,7 +7,7 @@ import type { TaskItem } from '../types'
 // task.dueDate에서 읽는 읽기 전용 카테고리다.
 export function useTaskDdays() {
   return useQuery({
-    queryKey: queryKeys.tasks.all,
+    queryKey: queryKeys.tasks.list,
     queryFn: () => apiFetch<TaskItem[]>('/api/tasks'),
     select: (tasks) => tasks.filter((t) => !t.completed),
   })

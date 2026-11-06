@@ -11,10 +11,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
 
-    // (user_id=:me AND status=:s1) OR (friend_id=:me AND status=:s2) — And가 Or보다 우선한다.
-    // findByUserIdOrFriendIdAndStatus 형태는 status 조건이 friend_id 쪽에만 걸려 회귀 버그였음 (plan T12)
-    List<Friendship> findByUserIdAndStatusOrFriendIdAndStatus(
-            Long me, Status s1, Long me2, Status s2);
+    // ACCEPTED 양방향 조회 — OR 단일 쿼리는 (user_id·friend_id) 양쪽 인덱스를 못 타
+    // 풀스캔(type=ALL)이 된다. EXPLAIN 실측 후 인덱스를 타는 2쿼리 UNION으로 분리 (plan T16).
+    default List<Friendship> findAcceptedFriendships(Long me) {
+        List<Friendship> rows = new java.util.ArrayList<>(
+                findByUserIdAndStatus(me, Status.ACCEPTED));
+        rows.addAll(findByFriendIdAndStatus(me, Status.ACCEPTED));
+        return rows;
+    }
 
     List<Friendship> findByFriendIdAndStatus(Long friendId, Status status);
 

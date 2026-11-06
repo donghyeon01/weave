@@ -108,8 +108,7 @@ public class FriendService {
 
     @Transactional(readOnly = true)
     public List<FriendView> listFriends(Long me) {
-        return toViews(repository.findByUserIdAndStatusOrFriendIdAndStatus(
-                me, Status.ACCEPTED, me, Status.ACCEPTED), me);
+        return toViews(repository.findAcceptedFriendships(me), me);
     }
 
     @Transactional(readOnly = true)

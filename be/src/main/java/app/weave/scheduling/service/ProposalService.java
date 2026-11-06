@@ -210,10 +210,7 @@ public class ProposalService {
     }
 
     private Set<Long> acceptedFriendIds(Long me) {
-        return new HashSet<>(friendshipRepository
-                .findByUserIdAndStatusOrFriendIdAndStatus(me,
-                        app.weave.friend.domain.Friendship.Status.ACCEPTED, me,
-                        app.weave.friend.domain.Friendship.Status.ACCEPTED)
+        return new HashSet<>(friendshipRepository.findAcceptedFriendships(me)
                 .stream().map(f -> f.counterpartyOf(me)).toList());
     }
 

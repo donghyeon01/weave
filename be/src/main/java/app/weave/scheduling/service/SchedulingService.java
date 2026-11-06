@@ -82,8 +82,7 @@ public class SchedulingService {
 
     private Set<Long> resolveParticipants(Long me, List<Long> participantIds) {
         Set<Long> acceptedFriendIds = new HashSet<>(
-                friendshipRepository.findByUserIdAndStatusOrFriendIdAndStatus(
-                        me, Status.ACCEPTED, me, Status.ACCEPTED)
+                friendshipRepository.findAcceptedFriendships(me)
                         .stream().map(f -> f.counterpartyOf(me)).toList());
         if (participantIds == null || participantIds.isEmpty()) {
             // 생략 시 ACCEPTED 친구 전원 — 0명이면 추천 자체가 무의미 (계약 §3.8)

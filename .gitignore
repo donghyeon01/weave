@@ -1,0 +1,26 @@
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Node
+node_modules/
+dist/
+coverage/
+*.local
+
+# Java / Gradle
+.gradle/
+build/
+out/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Logs
+*.log

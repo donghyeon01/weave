@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+/* ============================================================
+ * Weave 디자인 토큰 시스템 v0.3.0
+ * "부드럽지만 또렷하게" — 파스텔캔디 멀티틴트 + 네오-브루탈 포인트
+ *
+ * 원본: all-in-one-scheduler/frontend/src/index.css (SOSO)
+ *   - 레거시 별칭 블록 제거 (신규 코드베이스, 마이그레이션 없음)
+ *   - brand-kakao 추가 (로그인 버튼, 외부 브랜드 색)
+ *
+ * v0.2.0 변경:
+ *   - 파스텔캔디: tint-mint/peach/butter 추가 → 틴트 패밀리 6종
+ *   - accent #7b61ff → #8b74ff (더 부드러운 시그니처)
+ *   - on-tint 추가: 파스텔·브랜드 채움 위 텍스트 (테마 무관 고정)
+ *   - 폰트 이원화: Jua(디스플레이) + Pretendard(본문)
+ *   - 다크 테마 "라이트 스티커" 추가 (.dark 클래스)
+ *   - brutal 섀도우 색 참조 text → border-strong (테마 반전 연동)
+ *
+ * v0.3.0 변경 — WCAG 대비 실패 5건 수정 (accessibility-review):
+ *   - accent-deep #6a4de0 신규: brutal 버튼 채움 전용 (white 5.60:1)
+ *   - text-muted #94a3b8 → #64748b (surface 대비 2.56 → 4.76)
+ *   - warning-text #86640d → #7d5f0b (warning 대비 4.46 → 4.88)
+ *   - input #dbe7ff → #6f83b8 (비텍스트 대비 1.24 → 3.74)
+ *   - 다크: text-muted #7c87a6 → #8894b5 (4.39 → 5.19), input #3a4266 → #6b7bb0 (1.61 → 3.80)
+ * ============================================================ */
+@theme {
+  /* === 배경 레이어 === */
+  --color-background: #f8fbff; /* 전체 배경 */
+  --color-surface: #ffffff; /* 카드/모달 배경 */
+  --color-surface-muted: #edf4ff; /* 섹션 구분 배경 */
+
+  /* === 프라이머리 (블루 계열) === */
+  --color-primary: #c8dbfe; /* 버튼/배지 배경 */
+  --color-primary-hover: #b3ccfa; /* 호버 상태 */
+  --color-primary-dark: #3b568f; /* 보더/텍스트 강조 */
+
+  /* === 액센트 (퍼플 — Weave 시그니처) === */
+  --color-accent: #8b74ff; /* 로고, 활성 상태, 포커스 — 소형 텍스트·버튼 채움 금지 (white 대비 3.48) */
+  --color-accent-deep: #6a4de0; /* brutal 버튼 채움 전용 — white 텍스트 대비 5.60 (v0.3.0) */
+  --color-accent-soft: #dccfff; /* 액센트 배경 */
+  --color-accent-pink: #ffd6e7; /* 핑크 포인트 */
+
+  /* === 파스텔캔디 틴트 (v0.2.0) ===
+   * 틴트 패밀리 6종 = primary + accent-soft + accent-pink + tint-* 3종.
+   * 한 화면에 틴트는 2종 이내 — 무지개 배치 금지 */
+  --color-tint-mint: #c9f2e4; /* 민트 틴트 */
+  --color-tint-peach: #ffe3cc; /* 피치 틴트 */
+  --color-tint-butter: #fff3c4; /* 버터 틴트 */
+
+  /* === 텍스트 === */
+  --color-text: #1e2538; /* 메인 텍스트 */
+  --color-text-secondary: #616b82; /* 서브 텍스트 */
+  --color-text-muted: #64748b; /* 플레이스홀더, 메타 — surface 대비 4.76 (v0.3.0: #94a3b8에서 심화) */
+  --color-on-tint: #1e2538; /* 파스텔·브랜드 채움 위 텍스트 — 테마 무관 고정 */
+
+  /* === 상태 색상 === */
+  --color-success: #9bf78f; /* 성공 배지 */
+  --color-success-soft: #e6f4ea; /* 성공 배경 */
+  --color-success-text: #2b6938; /* 성공 텍스트 */
+  --color-success-light: #cff4de; /* 성공 라이트 (추천 1위 카드용) */
+  --color-warning: #ffe5b8; /* 경고 배지 */
+  --color-warning-text: #7d5f0b; /* 경고 텍스트 — warning 대비 4.88 (v0.3.0: #86640d에서 심화) */
+  --color-danger: #ffd6d6; /* 위험 배지 */
+  --color-danger-text: #b91c1c; /* 위험 텍스트 */
+
+  /* === 보더 === */
+  --color-border: #dbe7ff; /* 기본 보더 */
+  --color-border-strong: #1e2538; /* 네오-브루탈 보더 (라이트=text 동값, 의미 분리) */
+  --color-input: #6f83b8; /* 인풋 보더 — 비텍스트 대비 3.74 (v0.3.0: #dbe7ff에서 심화, border와 분리됨) */
+
+  /* === 외부 브랜드 === */
+  --color-brand-kakao: #fee500; /* 카카오 로그인 버튼 — Kakao 브랜드 가이드 색 */
+
+  /* === 마이크 === */
+  --color-milk-white: #fcfbf7; /* 따뜻한 화이트 포인트 */
+
+  /* === 링 === */
+  --color-ring: #8b74ff; /* 포커스 링 (accent로 통일) */
+
+  /* === 섀도우 === */
+  --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.04); /* 클린 카드 */
+  --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.08); /* 호버 카드 */
+  --shadow-brutal-sm: 2px 2px 0px 0px var(--color-border-strong); /* 네오-브루탈 S */
+  --shadow-brutal-md: 4px 4px 0px 0px var(--color-border-strong); /* 네오-브루탈 M */
+  --shadow-brutal-lg: 6px 6px 0px 0px var(--color-border-strong); /* 네오-브루탈 L */
+  --shadow-brutal-accent: 6px 6px 0px 0px var(--color-accent); /* 네오-브루탈 액센트 */
+
+  /* === 타이포그래피 === */
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
+  --font-display: "Jua", "Pretendard Variable", sans-serif; /* 로고·제목 — 단일 웨이트 400 */
+
+  /* 폰트 웨이트 5단계 (sans 계열 — display는 단일 웨이트) */
+  --font-weight-medium: 500; /* 본문 */
+  --font-weight-semibold: 600; /* 라벨, 강조 본문 */
+  --font-weight-bold: 700; /* 소제목, 버튼 */
+  --font-weight-extrabold: 800; /* 페이지 제목, 카드 타이틀 */
+  --font-weight-black: 900; /* 히어로 타이틀, 로고 (sans 사용 시) */
+
+  /* === 애니메이션 === */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
+}
+
+/* Pretendard 전역 적용 */
+body {
+  font-family: var(--font-sans);
+}
+
+/* ============================================================
+ * 다크 테마 — "라이트 스티커" (v0.2.0)
+ * .dark 클래스로 전환. 배경·텍스트·보더·클린 섀도우만 반전하고
+ * 파스텔 채움·상태색은 라이트와 동일 — 다크 배경에 파스텔
+ * 스티커가 붙는 정체성. hard 섀도우는 border-strong 참조라
+ * 자동으로 밝은 스티커 테두리가 된다.
+ * ============================================================ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+.dark {
+  color-scheme: dark;
+  --color-background: #12162b;
+  --color-surface: #1b2140;
+  --color-surface-muted: #262c4e;
+  --color-primary-dark: #a9c3f5;
+  --color-accent: #9a86ff;
+  --color-ring: #9a86ff;
+  --color-text: #eef1fb;
+  --color-text-secondary: #aab4cf;
+  --color-text-muted: #8894b5; /* surface 대비 5.19 (v0.3.0: #7c87a6에서 밝게) */
+  --color-border: #313a63;
+  --color-border-strong: #dfe6ff;
+  --color-input: #6b7bb0; /* 비텍스트 대비 3.80 (v0.3.0: #3a4266에서 밝게) */
+  /* 유지되는 값: primary·accent-deep·accent-soft·accent-pink·tint-*·success/warning/danger
+     계열·on-tint·brand-kakao·milk-white (파스텔 채움과 그 위 텍스트는 고정) */
+  --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.5);
+}

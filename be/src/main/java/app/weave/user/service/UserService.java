@@ -4,6 +4,9 @@ import app.weave.auth.domain.User;
 import app.weave.auth.domain.UserRepository;
 import app.weave.common.error.BusinessException;
 import app.weave.common.error.ErrorCode;
+import java.util.Collection;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +42,16 @@ public class UserService {
     public User findByEmailStrict(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    /** 친구 목록 등 상대방 표시 정보의 배치 조회 — N+1 방지용. */
+    @Transactional(readOnly = true)
+    public Map<Long, User> findAllByIds(Collection<Long> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
     }
 
     @Transactional

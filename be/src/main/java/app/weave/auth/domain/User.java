@@ -74,6 +74,10 @@ public class User extends BaseTimeEntity {
         return nickname;
     }
 
+    public void changeNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
     public String getProfileImage() {
         return profileImage;
     }

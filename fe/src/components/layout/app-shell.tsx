@@ -1,9 +1,15 @@
-import { Link, Navigate, useOutlet } from 'react-router-dom'
+import { Link, Navigate, NavLink, useOutlet } from 'react-router-dom'
 import { useAuthStore } from '../../stores/auth-store'
 
-// top-nav.md의 메뉴 순서 — 각 라우트는 M3~M5에서 추가되므로 아직 링크가 아닌
-// 비활성 플레이스홀더다 (미구현 라우트 등록 금지 — plan/CONSTRAINTS)
-const NAV_ITEMS = ['할 일', '캘린더', '일기', '친구', '일정 조율', '내 정보'] as const
+// top-nav.md의 메뉴 순서 — 구현된 화면은 링크, 미구현(조율·내 정보)은 플레이스홀더 유지.
+const NAV_ITEMS: { label: string; to?: string }[] = [
+  { label: '할 일', to: '/app/todo' },
+  { label: '캘린더', to: '/app/calendar' },
+  { label: '일기', to: '/app/diary' },
+  { label: '친구', to: '/app/friends' },
+  { label: '일정 조율' },
+  { label: '내 정보' },
+]
 
 // /app 보호 셸 — status가 auth-store의 단일 원천
 export function AppShell() {
@@ -27,16 +33,32 @@ export function AppShell() {
             Weave
           </Link>
           <nav aria-label="주요 화면" className="flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
-              <span
-                key={item}
-                aria-disabled="true"
-                title="다음 마일스톤에서 제공됩니다"
-                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-text-muted"
-              >
-                {item}
-              </span>
-            ))}
+            {NAV_ITEMS.map((item) =>
+              item.to !== undefined ? (
+                <NavLink
+                  key={item.label}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    `rounded-lg px-3 py-1.5 text-sm font-semibold transition duration-150 ${
+                      isActive
+                        ? 'bg-accent-deep text-on-tint'
+                        : 'text-text-secondary hover:bg-surface-muted'
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ) : (
+                <span
+                  key={item.label}
+                  aria-disabled="true"
+                  title="다음 마일스톤에서 제공됩니다"
+                  className="rounded-lg px-3 py-1.5 text-sm font-semibold text-text-muted"
+                >
+                  {item.label}
+                </span>
+              ),
+            )}
           </nav>
         </div>
       </header>

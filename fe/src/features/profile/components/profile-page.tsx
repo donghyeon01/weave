@@ -78,23 +78,32 @@ export function ProfilePage() {
         </form>
       </section>
 
-      {/* danger zone — patterns.md C 레이아웃: ghost 로그아웃 → danger 탈퇴 */}
-      <section className="mt-6 rounded-2xl border-2 border-danger bg-surface p-6">
-        <h2 className="text-sm font-bold text-danger-text">계정</h2>
-        <div className="mt-3 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-text-secondary">이 기기에서 로그아웃합니다.</p>
-            <Button variant="ghost" size="sm" onClick={() => setLogoutOpen(true)}>
-              로그아웃
-            </Button>
-          </div>
-          <div className="flex items-center justify-between border-t border-border pt-3">
-            <p className="text-sm text-text-secondary">
-              계정과 모든 데이터(할 일·일정·일기·친구)를 삭제합니다.
+      {/* danger zone — SYSTEM.md C 레이아웃: 제목 → 설명(전폭) → 버튼 우측 하단 (제목-설명 4px, 설명-버튼 14px, pad 16) */}
+      <section className="mt-6">
+        <h2 className="text-sm font-bold text-text">계정 관리</h2>
+        <div className="mt-3 flex flex-col gap-4">
+          <div className="rounded-2xl border-2 border-border-strong bg-surface p-4 shadow-brutal-sm">
+            <h3 className="text-sm font-bold text-text">현재 기기에서 로그아웃</h3>
+            <p className="mt-1 text-sm text-text-secondary">
+              다시 로그인할 때까지 스마트 일정 동기화가 일시 중지됩니다.
             </p>
-            <Button variant="danger" size="sm" onClick={() => setDeleteOpen(true)}>
-              회원 탈퇴
-            </Button>
+            <div className="mt-3.5 flex justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setLogoutOpen(true)}>
+                로그아웃
+              </Button>
+            </div>
+          </div>
+          <div className="rounded-2xl bg-danger p-4">
+            <h3 className="text-sm font-bold text-danger-text">회원 탈퇴</h3>
+            <p className="mt-1 text-sm text-on-tint">
+              탈퇴 시 동기화된 모든 캘린더와 친구 데이터 및 스마트 제안 히스토리가 즉시 영구
+              삭제됩니다.
+            </p>
+            <div className="mt-3.5 flex justify-end">
+              <Button variant="danger" size="sm" onClick={() => setDeleteOpen(true)}>
+                회원 탈퇴 신청
+              </Button>
+            </div>
           </div>
         </div>
       </section>

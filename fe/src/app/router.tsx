@@ -7,8 +7,10 @@ import { TodoRoute } from './routes/app/todo'
 import { CalendarRoute } from './routes/app/calendar'
 import { DiaryRoute } from './routes/app/diary'
 import { FriendsRoute } from './routes/app/friends'
+import { SchedulingRoute } from './routes/app/scheduling'
+import { ProfileRoute } from './routes/app/profile'
 
-// 미구현 라우트는 등록하지 않는다 — 남은 조율·내 정보는 T15에서 자기 라우트를 추가한다.
+// top-nav.md의 6개 화면 라우트.
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -27,6 +29,8 @@ export const router = createBrowserRouter([
       { path: 'calendar', element: <CalendarRoute /> },
       { path: 'diary', element: <DiaryRoute /> },
       { path: 'friends', element: <FriendsRoute /> },
+      { path: 'scheduling', element: <SchedulingRoute /> },
+      { path: 'profile', element: <ProfileRoute /> },
     ],
   },
 ])

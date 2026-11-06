@@ -1,20 +1,34 @@
+import { useEffect } from 'react'
 import { Link, Navigate, NavLink, useOutlet } from 'react-router-dom'
+import { NotificationBell } from '../../features/notifications/components/notification-bell'
+import {
+  startStompClient,
+  stopStompClient,
+} from '../../features/notifications/stores/stomp-client'
 import { useAuthStore } from '../../stores/auth-store'
 
-// top-nav.md의 메뉴 순서 — 구현된 화면은 링크, 미구현(조율·내 정보)은 플레이스홀더 유지.
-const NAV_ITEMS: { label: string; to?: string }[] = [
+// top-nav.md의 메뉴 순서
+const NAV_ITEMS: { label: string; to: string }[] = [
   { label: '할 일', to: '/app/todo' },
   { label: '캘린더', to: '/app/calendar' },
   { label: '일기', to: '/app/diary' },
   { label: '친구', to: '/app/friends' },
-  { label: '일정 조율' },
-  { label: '내 정보' },
+  { label: '일정 조율', to: '/app/scheduling' },
+  { label: '내 정보', to: '/app/profile' },
 ]
 
 // /app 보호 셸 — status가 auth-store의 단일 원천
 export function AppShell() {
   const status = useAuthStore((s) => s.status)
   const outlet = useOutlet()
+
+  // STOMP는 authed 동안만 유지 — logout·탈퇴 시 해제해 좀비 연결을 막는다
+  useEffect(() => {
+    if (status === 'authed') {
+      startStompClient()
+      return () => stopStompClient()
+    }
+  }, [status])
 
   if (status === 'booting') {
     return (
@@ -33,33 +47,25 @@ export function AppShell() {
             Weave
           </Link>
           <nav aria-label="주요 화면" className="flex items-center gap-1">
-            {NAV_ITEMS.map((item) =>
-              item.to !== undefined ? (
-                <NavLink
-                  key={item.label}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `rounded-lg px-3 py-1.5 text-sm font-semibold transition duration-150 ${
-                      isActive
-                        ? 'bg-accent-deep text-on-tint'
-                        : 'text-text-secondary hover:bg-surface-muted'
-                    }`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              ) : (
-                <span
-                  key={item.label}
-                  aria-disabled="true"
-                  title="다음 마일스톤에서 제공됩니다"
-                  className="rounded-lg px-3 py-1.5 text-sm font-semibold text-text-muted"
-                >
-                  {item.label}
-                </span>
-              ),
-            )}
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.label}
+                to={item.to}
+                className={({ isActive }) =>
+                  `rounded-lg px-3 py-1.5 text-sm font-semibold transition duration-150 ${
+                    isActive
+                      ? 'bg-accent-deep text-on-tint'
+                      : 'text-text-secondary hover:bg-surface-muted'
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
           </nav>
+          <div className="ml-auto flex items-center">
+            <NotificationBell />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-6 py-8">

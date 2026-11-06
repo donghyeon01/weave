@@ -8,6 +8,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:8081',
+      // STOMP raw WebSocket — 계약 §3.9. ws 업그레이드를 명시해야 한다
+      '/ws': { target: 'http://localhost:8081', ws: true },
     },
   },
   test: {

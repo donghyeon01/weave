@@ -1,0 +1,247 @@
+package app.weave.scheduling.service;
+
+import app.weave.auth.domain.User;
+import app.weave.auth.domain.UserRepository;
+import app.weave.common.error.BusinessException;
+import app.weave.common.error.ErrorCode;
+import app.weave.event.domain.Event;
+import app.weave.event.domain.Event.Source;
+import app.weave.event.domain.EventRepository;
+import app.weave.friend.domain.FriendshipRepository;
+import app.weave.notification.service.NotificationPayload;
+import app.weave.notification.service.NotificationPayload.UserRef;
+import app.weave.notification.service.NotificationPublisher;
+import app.weave.scheduling.domain.Mode;
+import app.weave.scheduling.domain.ScheduleProposal;
+import app.weave.scheduling.domain.ScheduleProposal.Status;
+import app.weave.scheduling.domain.ScheduleProposalParticipant;
+import app.weave.scheduling.domain.ScheduleProposalParticipant.Response;
+import app.weave.scheduling.domain.ScheduleProposalParticipantRepository;
+import app.weave.scheduling.domain.ScheduleProposalRepository;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class ProposalService {
+
+    /** 제안 + 응답 현황 + 표시용 사용자 정보 — 컨트롤러가 ProposalResponse로 변환한다. */
+    public record ProposalDetail(ScheduleProposal proposal,
+            List<ScheduleProposalParticipant> participants, User organizer,
+            Map<Long, User> users) {
+    }
+
+    private final ScheduleProposalRepository proposalRepository;
+    private final ScheduleProposalParticipantRepository participantRepository;
+    private final FriendshipRepository friendshipRepository;
+    private final EventRepository eventRepository;
+    private final NotificationPublisher publisher;
+    private final UserRepository userRepository;
+
+    public ProposalService(ScheduleProposalRepository proposalRepository,
+            ScheduleProposalParticipantRepository participantRepository,
+            FriendshipRepository friendshipRepository, EventRepository eventRepository,
+            NotificationPublisher publisher, UserRepository userRepository) {
+        this.proposalRepository = proposalRepository;
+        this.participantRepository = participantRepository;
+        this.friendshipRepository = friendshipRepository;
+        this.eventRepository = eventRepository;
+        this.publisher = publisher;
+        this.userRepository = userRepository;
+    }
+
+    @Transactional
+    public ProposalDetail create(Long me, String title, Slot slot, List<Long> participantIds,
+            String idempotencyKey) {
+        if (idempotencyKey != null) {
+            var existing = proposalRepository.findByOrganizerIdAndIdempotencyKey(me,
+                    idempotencyKey);
+            if (existing.isPresent()) {
+                return detailOf(existing.get());
+            }
+        }
+        if (participantIds == null || participantIds.isEmpty()) {
+            throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+        }
+        if (!acceptedFriendIds(me).containsAll(participantIds)) {
+            throw new BusinessException(ErrorCode.SCHEDULING_NOT_FRIEND);
+        }
+        LocalDateTime[] range = toRange(slot);
+        if (!range[0].isBefore(range[1])) {
+            throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+        }
+        ScheduleProposal proposal = proposalRepository.save(new ScheduleProposal(me, title,
+                modeOf(slot), range[0], range[1], idempotencyKey));
+        participantRepository.saveAll(participantIds.stream()
+                .map(uid -> new ScheduleProposalParticipant(proposal.getId(), uid)).toList());
+
+        User organizer = loadUser(me);
+        var payload = new NotificationPayload.ProposalReceived(proposal.getId(), title,
+                new UserRef(me, organizer.getNickname()), toPayloadSlot(slot));
+        for (Long uid : participantIds) {
+            publisher.publish(uid, payload);
+        }
+        return detailOf(proposal);
+    }
+
+    /**
+     * 응답 — FOR UPDATE 잠금으로 직렬화 (ADR-0004).
+     * 전원 ACCEPTED 시 확정은 단일 트랜잭션: status + 전원 EVENTS + 전원 알림 INSERT가 원자다.
+     * WS push만 AFTER_COMMIT으로 빠진다 (Publisher 내부).
+     */
+    @Transactional
+    public ProposalDetail respond(Long me, Long proposalId, Response response) {
+        ScheduleProposal proposal = proposalRepository.findByIdForUpdate(proposalId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND));
+        if (proposal.getStatus() != Status.PENDING) {
+            throw new BusinessException(ErrorCode.PROPOSAL_NOT_PENDING);
+        }
+        ScheduleProposalParticipant mine = participantRepository
+                .findByProposalIdAndUserId(proposalId, me)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROPOSAL_NOT_PARTICIPANT));
+        mine.respond(response);
+
+        List<ScheduleProposalParticipant> all = participantRepository
+                .findByProposalId(proposalId);
+        if (all.stream().allMatch(r -> r.getResponse() == Response.ACCEPTED)) {
+            proposal.confirm();
+            List<Long> attendeeIds = new ArrayList<>(
+                    all.stream().map(ScheduleProposalParticipant::getUserId).toList());
+            attendeeIds.add(proposal.getOrganizerId());
+            boolean allDay = proposal.getMode() == Mode.DATE;
+            eventRepository.saveAll(attendeeIds.stream()
+                    .map(uid -> new Event(uid, proposal.getTitle(), null,
+                            proposal.getStartTime(), proposal.getEndTime(), null, allDay,
+                            Source.PROPOSAL, null))
+                    .toList());
+            var confirmed = new NotificationPayload.ProposalConfirmed(proposal.getId(),
+                    proposal.getTitle(), toPayloadSlot(proposal.toSlot()));
+            for (Long uid : attendeeIds) {
+                publisher.publish(uid, confirmed);
+            }
+        } else if (all.stream().anyMatch(r -> r.getResponse() == Response.DECLINED)) {
+            proposal.decline();
+            User decliner = loadUser(me);
+            publisher.publish(proposal.getOrganizerId(),
+                    new NotificationPayload.ProposalDeclined(proposal.getId(),
+                            proposal.getTitle(),
+                            new UserRef(me, decliner.getNickname())));
+        }
+        return detailOf(proposal);
+    }
+
+    /** 취소 — respond와 같은 FOR UPDATE 잠금. 확정 직후 취소 덮어쓰기 경합을 잠금으로 직렬화한다. */
+    @Transactional
+    public ProposalDetail cancel(Long me, Long proposalId) {
+        ScheduleProposal proposal = proposalRepository.findByIdForUpdate(proposalId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND));
+        if (!proposal.getOrganizerId().equals(me)) {
+            throw new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND);
+        }
+        if (proposal.getStatus() != Status.PENDING) {
+            throw new BusinessException(ErrorCode.PROPOSAL_NOT_PENDING);
+        }
+        proposal.cancel();
+        return detailOf(proposal);
+    }
+
+    @Transactional(readOnly = true)
+    public ProposalDetail get(Long me, Long proposalId) {
+        ScheduleProposal proposal = proposalRepository.findById(proposalId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND));
+        boolean involved = proposal.getOrganizerId().equals(me)
+                || participantRepository.findByProposalIdAndUserId(proposalId, me).isPresent();
+        if (!involved) {
+            throw new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND);
+        }
+        return detailOf(proposal);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProposalDetail> box(Long me, String box, Pageable pageable) {
+        Page<ScheduleProposal> page = switch (box) {
+            case "received" -> proposalRepository.findReceivedByParticipant(me, pageable);
+            case "sent" -> proposalRepository.findByOrganizerIdOrderByCreatedAtDesc(me, pageable);
+            default -> throw new BusinessException(ErrorCode.COMMON_VALIDATION);
+        };
+        return new PageImpl<>(detailsOf(page.getContent()), pageable, page.getTotalElements());
+    }
+
+    private ProposalDetail detailOf(ScheduleProposal proposal) {
+        List<ScheduleProposalParticipant> participants = participantRepository
+                .findByProposalId(proposal.getId());
+        User organizer = loadUser(proposal.getOrganizerId());
+        Map<Long, User> users = new HashMap<>();
+        userRepository.findAllById(participants.stream()
+                        .map(ScheduleProposalParticipant::getUserId).toList())
+                .forEach(u -> users.put(u.getId(), u));
+        return new ProposalDetail(proposal, participants, organizer, users);
+    }
+
+    /** 목록 페이지용 배치 detail — 행별 N+1을 피하기 위해 참여자·사용자를 일괄 조회한다. */
+    public List<ProposalDetail> detailsOf(List<ScheduleProposal> proposals) {
+        List<Long> ids = proposals.stream().map(ScheduleProposal::getId).toList();
+        Map<Long, List<ScheduleProposalParticipant>> byProposal = new HashMap<>();
+        for (ScheduleProposalParticipant pp : participantRepository.findByProposalIdIn(ids)) {
+            byProposal.computeIfAbsent(pp.getProposalId(), k -> new ArrayList<>()).add(pp);
+        }
+        Set<Long> userIds = new HashSet<>();
+        for (ScheduleProposal p : proposals) {
+            userIds.add(p.getOrganizerId());
+            byProposal.getOrDefault(p.getId(), List.of())
+                    .forEach(pp -> userIds.add(pp.getUserId()));
+        }
+        Map<Long, User> users = new HashMap<>();
+        userRepository.findAllById(userIds).forEach(u -> users.put(u.getId(), u));
+        return proposals.stream()
+                .map(p -> new ProposalDetail(p,
+                        byProposal.getOrDefault(p.getId(), List.of()),
+                        users.get(p.getOrganizerId()), users))
+                .toList();
+    }
+
+    private Set<Long> acceptedFriendIds(Long me) {
+        return new HashSet<>(friendshipRepository
+                .findByUserIdAndStatusOrFriendIdAndStatus(me,
+                        app.weave.friend.domain.Friendship.Status.ACCEPTED, me,
+                        app.weave.friend.domain.Friendship.Status.ACCEPTED)
+                .stream().map(f -> f.counterpartyOf(me)).toList());
+    }
+
+    private User loadUser(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_UNAUTHORIZED));
+    }
+
+    /** API Slot → 행 저장 규약: DATE는 endDate 포함 끝을 +1일 자정 배타 상한으로 저장한다. */
+    private LocalDateTime[] toRange(Slot slot) {
+        return switch (slot) {
+            case Slot.Time t -> new LocalDateTime[]{
+                    t.date().atTime(t.startTime()), t.date().atTime(t.endTime())};
+            case Slot.Days d -> new LocalDateTime[]{
+                    d.startDate().atStartOfDay(), d.endDate().plusDays(1).atStartOfDay()};
+        };
+    }
+
+    private Mode modeOf(Slot slot) {
+        return slot instanceof Slot.Time ? Mode.TIME : Mode.DATE;
+    }
+
+    /** scheduling Slot → 알림 payload Slot 변환 (계약 §3.7 payload와 동형). */
+    private NotificationPayload.Slot toPayloadSlot(Slot slot) {
+        return switch (slot) {
+            case Slot.Time t -> new NotificationPayload.Slot.Time(t.date(), t.startTime(),
+                    t.endTime());
+            case Slot.Days d -> new NotificationPayload.Slot.Days(d.startDate(), d.endDate());
+        };
+    }
+}

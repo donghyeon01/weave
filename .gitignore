@@ -24,3 +24,6 @@ out/
 
 # Logs
 *.log
+
+# Screen snapshots (로컬 임시 보존 — scripts/snapshot_screens.py)
+snapshots/

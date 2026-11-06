@@ -34,7 +34,7 @@ export function Toast({ variant = 'info', message, duration, onClose }: ToastPro
       role={alert ? 'alert' : 'status'}
       aria-live={alert ? 'assertive' : 'polite'}
       className={cx(
-        'fixed left-1/2 top-4 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-xl p-4 text-sm font-semibold shadow-card',
+        'fixed left-1/2 top-4 z-60 flex -translate-x-1/2 items-center gap-3 rounded-xl p-4 text-sm font-semibold shadow-card',
         VARIANTS[variant],
       )}
     >

@@ -68,6 +68,7 @@ public class Event extends BaseTimeEntity {
     }
 
     public Long getId() { return id; }
+    public Long getUserId() { return userId; }
     public String getTitle() { return title; }
     public String getDescription() { return description; }
     public LocalDateTime getStartTime() { return startTime; }

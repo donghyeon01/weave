@@ -13,6 +13,10 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByUserIdAndStartTimeLessThanAndEndTimeGreaterThan(
             Long userId, LocalDateTime endExclusive, LocalDateTime startExclusive);
 
+    /** 조율 추천의 다중 참여자 busy 로드 — 위와 같은 겹침 조건의 IN 버전. */
+    List<Event> findByUserIdInAndStartTimeLessThanAndEndTimeGreaterThan(
+            List<Long> userIds, LocalDateTime endExclusive, LocalDateTime startExclusive);
+
     Optional<Event> findByIdAndUserId(Long id, Long userId);
 
     Optional<Event> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);

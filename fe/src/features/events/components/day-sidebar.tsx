@@ -29,7 +29,7 @@ export function DaySidebar({ date, events, onEventClick, onAddClick }: DaySideba
         </Button>
       </div>
       {sorted.length === 0 ? (
-        <p className="mt-4 rounded-xl border-2 border-dashed border-border bg-surface-muted px-3 py-6 text-center text-sm text-text-muted">
+        <p className="mt-4 rounded-xl border-2 border-dashed border-border bg-surface-muted px-3 py-6 text-center text-sm text-text-secondary">
           선택한 날짜에 일정이 없습니다
         </p>
       ) : (

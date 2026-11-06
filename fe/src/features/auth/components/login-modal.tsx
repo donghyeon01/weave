@@ -55,7 +55,7 @@ export function LoginModal() {
         onClose={close}
         title={
           <div>
-            <p className="font-display text-2xl text-accent">Weave</p>
+            <p className="font-display text-2xl text-accent-deep">Weave</p>
             <p className="mt-1 text-sm text-text-secondary">
               할 일·일정·일기·친구를 하나로 엮다
             </p>

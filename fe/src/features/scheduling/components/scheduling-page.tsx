@@ -152,7 +152,7 @@ export function SchedulingPage() {
                 aria-selected={mode === m}
                 onClick={() => setMode(m)}
                 className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold ${
-                  mode === m ? 'bg-accent-deep text-on-tint' : 'text-text-secondary'
+                  mode === m ? 'bg-accent-deep text-white' : 'text-text-secondary'
                 }`}
               >
                 {m === 'TIME' ? '시간 약속' : '날짜 약속'}
@@ -281,16 +281,16 @@ export function SchedulingPage() {
                     key={`${c.rank}-${formatSlot(c.slot)}`}
                     className={`flex items-center gap-3 rounded-2xl border-2 border-border-strong px-4 py-3 ${
                       c.rank === 1
-                        ? 'bg-accent-deep text-on-tint shadow-brutal-md'
+                        ? 'bg-accent-deep text-white shadow-brutal-md'
                         : 'bg-surface shadow-brutal-sm'
                     }`}
                   >
-                    <span className={`font-display text-lg ${c.rank === 1 ? 'text-on-tint' : 'text-accent-deep'}`}>
+                    <span className={`font-display text-lg ${c.rank === 1 ? 'text-white' : 'text-accent-deep'}`}>
                       {c.rank}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold">{formatSlot(c.slot)}</p>
-                      <p className={`text-xs ${c.rank === 1 ? 'text-on-tint/80' : 'text-text-secondary'}`}>
+                      <p className={`text-xs ${c.rank === 1 ? 'text-white/80' : 'text-text-secondary'}`}>
                         {c.totalCount}명 중 {c.availableCount}명 가능 ({c.percent}%)
                       </p>
                     </div>
@@ -322,7 +322,7 @@ export function SchedulingPage() {
                     setBoxPage(0)
                   }}
                   className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold ${
-                    box === b ? 'bg-accent-deep text-on-tint' : 'text-text-secondary'
+                    box === b ? 'bg-accent-deep text-white' : 'text-text-secondary'
                   }`}
                 >
                   {b === 'received' ? '받은 제안' : '보낸 제안'}
@@ -344,7 +344,7 @@ export function SchedulingPage() {
                   <span
                     className={`rounded-lg px-2 py-0.5 text-xs font-bold ${
                       p.status === 'CONFIRMED'
-                        ? 'bg-accent-deep text-on-tint'
+                        ? 'bg-accent-deep text-white'
                         : p.status === 'PENDING'
                           ? 'bg-surface-muted text-text-secondary'
                           : 'bg-danger text-danger-text'

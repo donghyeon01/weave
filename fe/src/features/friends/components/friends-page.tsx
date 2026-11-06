@@ -48,7 +48,7 @@ function Avatar({ user }: { user: FriendshipItem['user'] }) {
   return (
     <span
       aria-hidden="true"
-      className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-border-strong bg-accent-deep font-display text-on-tint"
+      className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-border-strong bg-accent-deep font-display text-white"
     >
       {user.nickname.slice(0, 1)}
     </span>
@@ -168,7 +168,7 @@ export function FriendsPage() {
             onClick={() => setTab(t.key)}
             className={`flex-1 rounded-lg px-4 py-1.5 text-sm font-semibold transition duration-150 ${
               tab === t.key
-                ? 'bg-accent-deep text-on-tint'
+                ? 'bg-accent-deep text-white'
                 : 'text-text-secondary hover:bg-surface-muted'
             }`}
           >

@@ -36,4 +36,5 @@ weave:
 
 app:
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    # 5173=dev, 4173=vite preview (check:preview E2E가 preview에서 인증을 통과해야 한다)
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173}

@@ -140,7 +140,7 @@ export function TodoPage() {
               onClick={() => setFilter(tab.key)}
               className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition duration-150 ${
                 filter === tab.key
-                  ? 'bg-accent-deep text-on-tint'
+                  ? 'bg-accent-deep text-white'
                   : 'text-text-secondary hover:bg-surface-muted'
               }`}
             >
@@ -193,7 +193,7 @@ export function TodoPage() {
                 }`}
               >
                 {task.completed && (
-                  <svg viewBox="0 0 24 24" className="h-4 w-4 text-on-tint" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 text-white" aria-hidden="true">
                     <path
                       d="M5 12l5 5L20 7"
                       stroke="currentColor"
@@ -219,7 +219,7 @@ export function TodoPage() {
                     : left < 0
                       ? 'bg-danger text-danger-text'
                       : left === 0
-                        ? 'bg-accent-deep text-on-tint'
+                        ? 'bg-accent-deep text-white'
                         : 'bg-surface-muted text-text-secondary'
                 }`}
               >

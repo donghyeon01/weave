@@ -23,7 +23,7 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
             className={cx(
               'rounded-full border-2 px-3 py-1 text-xs font-semibold transition duration-150',
               active
-                ? 'border-border-strong bg-accent-soft text-accent-deep shadow-brutal-sm'
+                ? 'border-border-strong bg-accent-soft text-on-tint shadow-brutal-sm'
                 : 'border-border bg-surface text-text-secondary hover:border-primary-dark',
             )}
           >

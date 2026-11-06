@@ -12,6 +12,13 @@ export default defineConfig({
       '/ws': { target: 'http://localhost:8081', ws: true },
     },
   },
+  // preview는 server.proxy를 물려받지 않는다 — check:preview E2E에서도 동일 프록시가 필요
+  preview: {
+    proxy: {
+      '/api': 'http://localhost:8081',
+      '/ws': { target: 'http://localhost:8081', ws: true },
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/testing/setup.ts'],

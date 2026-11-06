@@ -42,11 +42,12 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-background text-text">
       <header className="sticky top-0 z-40 border-b border-border bg-surface">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-8 px-6">
-          <Link to="/app" className="font-display text-xl text-accent">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-8 sm:px-6">
+          <Link to="/app" className="shrink-0 font-display text-xl text-accent-deep">
             Weave
           </Link>
-          <nav aria-label="주요 화면" className="flex items-center gap-1">
+          {/* 좁은 뷰포트에서 nav가 헤더를 밀지 않도록 수축+내부 스크롤 */}
+          <nav aria-label="주요 화면" className="flex min-w-0 items-center gap-1 overflow-x-auto">
             {NAV_ITEMS.map((item) => (
               <NavLink
                 key={item.label}
@@ -54,7 +55,7 @@ export function AppShell() {
                 className={({ isActive }) =>
                   `rounded-lg px-3 py-1.5 text-sm font-semibold transition duration-150 ${
                     isActive
-                      ? 'bg-accent-deep text-on-tint'
+                      ? 'bg-accent-deep text-white'
                       : 'text-text-secondary hover:bg-surface-muted'
                   }`
                 }

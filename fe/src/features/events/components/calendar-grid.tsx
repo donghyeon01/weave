@@ -73,7 +73,8 @@ export function CalendarGrid({
                 type="button"
                 onClick={() => onSelectDate(ymd)}
                 aria-pressed={selected}
-                aria-label={`${ymd} 선택`}
+                // 표시 숫자가 aria-label의 공백 토큰으로 존재해야 voice-control("1 클릭")과 일치한다 — "1일"은 한 단어라 불일치 (axe label-content-name-mismatch)
+                aria-label={`${day.getDate()} ${ymd} 선택`}
                 className={cx(
                   'inline-flex h-6 w-6 items-center justify-center self-start rounded-full text-xs font-bold',
                   ymd === today
@@ -115,7 +116,7 @@ export function CalendarGrid({
                   </span>
                 ))}
               {overflow > 0 && (
-                <span className="px-1 text-[11px] font-semibold text-text-muted">
+                <span className="px-1 text-[11px] font-semibold text-text-secondary">
                   +{overflow} more
                 </span>
               )}

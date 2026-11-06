@@ -147,7 +147,7 @@ export function NotificationBell() {
                       type="button"
                       onClick={() => onAccept(item)}
                       disabled={respond.isPending}
-                      className="rounded-lg border-2 border-border-strong bg-accent-deep px-2.5 py-1 text-xs font-bold text-on-tint transition duration-150 hover:-translate-y-0.5 disabled:opacity-40"
+                      className="rounded-lg border-2 border-border-strong bg-accent-deep px-2.5 py-1 text-xs font-bold text-white transition duration-150 hover:-translate-y-0.5 disabled:opacity-40"
                     >
                       수락
                     </button>

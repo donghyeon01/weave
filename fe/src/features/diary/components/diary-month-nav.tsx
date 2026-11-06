@@ -63,7 +63,7 @@ export function DiaryMonthNav({
                 className={cx(
                   'w-full truncate rounded-lg px-2 py-1.5 text-left text-sm transition duration-150',
                   entry.date === selectedDate
-                    ? 'bg-accent-soft font-semibold text-accent-deep'
+                    ? 'bg-accent-soft font-semibold text-on-tint'
                     : 'text-text-secondary hover:bg-surface-muted',
                 )}
               >

@@ -15,17 +15,20 @@ export function DiaryPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-      <DiaryMonthNav
-        yearMonth={yearMonth}
-        selectedDate={selectedDate}
-        onMonthChange={setYearMonth}
-        onSelectDate={selectDate}
-        onToday={() => selectDate(toYmd(new Date()))}
-      />
-      <section className="rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-brutal-sm">
-        <DiaryEditor date={selectedDate} />
-      </section>
+    <div>
+      <h1 className="font-display text-2xl">일기</h1>
+      <div className="mt-4 grid gap-6 lg:grid-cols-[280px_1fr]">
+        <DiaryMonthNav
+          yearMonth={yearMonth}
+          selectedDate={selectedDate}
+          onMonthChange={setYearMonth}
+          onSelectDate={selectDate}
+          onToday={() => selectDate(toYmd(new Date()))}
+        />
+        <section className="rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-brutal-sm">
+          <DiaryEditor date={selectedDate} />
+        </section>
+      </div>
     </div>
   )
 }

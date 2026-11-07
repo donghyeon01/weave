@@ -1,4 +1,5 @@
 import { render, renderHook, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
@@ -85,9 +86,11 @@ describe('notification-bell', () => {
     })
     const queryClient = createQueryClient()
     render(
-      <QueryClientProvider client={queryClient}>
-        <NotificationBell />
-      </QueryClientProvider>,
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <NotificationBell />
+        </QueryClientProvider>
+      </MemoryRouter>,
     )
 
     await userEvent.click(screen.getByRole('button', { name: /알림/ }))

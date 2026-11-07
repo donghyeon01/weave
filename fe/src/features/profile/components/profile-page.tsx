@@ -310,10 +310,10 @@ export function ProfilePage() {
         <section className={`${cardClass} lg:col-span-5`}>
           <div className={cardHead}>
             <div className="flex items-center gap-2.5">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-danger">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-danger text-on-danger">
                 <svg viewBox="0 0 16 14" className="h-3.5 w-4" aria-hidden="true">
                   <path
-                    fill="#B91C1C"
+                    fill="currentColor"
                     d="M8 0 0 14h16L8 0Zm0 5v4H7V5h1Zm0 6v2H7v-2h1Z"
                   />
                 </svg>

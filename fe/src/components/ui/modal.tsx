@@ -68,9 +68,9 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
       // 포털은 body 끝에 렌더돼 카드에서 벗어난 Tab이 배경 콘텐츠로 빠질 수 있다.
       if (e.key !== 'Tab' || cardRef.current === null) return
       const card = cardRef.current
-      const items = card.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      )
+      const items = [...card.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )].filter((el) => el.getClientRects().length > 0)
       const first = items[0]
       const last = items[items.length - 1]
       const active = document.activeElement

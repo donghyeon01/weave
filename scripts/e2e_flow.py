@@ -113,7 +113,7 @@ def main():
             page.get_by_placeholder('기록하고 싶은 순간을 담아보세요').fill('자동화 검증으로 작성한 일기 본문')
             page.get_by_role('button', name='저장', exact=True).click()
             page.wait_for_timeout(1500)
-            saved = page.get_by_text('저장됐', exact=False).count() > 0 or page.locator('[role="alert"]').count() == 0
+            saved = page.get_by_text('저장했어요', exact=False).count() > 0 or page.locator('[role="alert"]').count() == 0
             r.step('일기 저장', saved)
 
             # ⑥ 친구 — 목록 렌더

@@ -5,11 +5,15 @@ import { queryKeys } from '../../../lib/react-query'
 import { useAuthStore } from '../../../stores/auth-store'
 import type { UserResponse, UserTheme } from '../../../types/auth'
 
-// ['users','me']는 provider·login이 채운다 — 여기선 읽기만 한다.
+// ['users','me']는 provider·login이 채운다 — 캐시가 비어 있으면 queryFn이 자기 복구한다.
+// guest 마운트(랜딩의 ThemeSync 등)에서는 fetch하지 않는다 — 401·queryFn 에러 방지.
 export function useMe() {
+  const authed = useAuthStore((s) => s.status === 'authed')
   return useQuery<UserResponse>({
     queryKey: queryKeys.users.me,
+    queryFn: () => apiFetch<UserResponse>('/api/users/me'),
     staleTime: Infinity,
+    enabled: authed,
   })
 }
 

@@ -189,7 +189,7 @@ export function ProfilePage() {
                 onChange={(e) => setDraft((d) => ({ ...d, nickname: e.target.value }))}
                 aria-label="닉네임"
                 maxLength={20}
-                className="mt-1.5 w-full rounded-xl border-2 border-border-strong bg-surface px-3 py-2.5 text-[15px] font-medium text-text outline-none focus:outline-ring"
+                className="mt-1.5 w-full rounded-xl border-2 border-border-strong bg-surface px-3 py-2.5 text-[15px] font-medium text-text outline-none focus:outline-2 focus:outline-solid focus:outline-ring"
               />
             </label>
             <div>
@@ -202,7 +202,7 @@ export function ProfilePage() {
                 value={me.data?.email ?? ''}
                 readOnly
                 aria-label="이메일"
-                className="mt-1.5 w-full rounded-xl border-2 border-border bg-surface-muted px-3 py-2.5 text-[15px] font-medium text-text-secondary outline-none"
+                className="mt-1.5 w-full rounded-xl border-2 border-border bg-surface-muted px-3 py-2.5 text-[15px] font-medium text-text-secondary outline-none focus:outline-2 focus:outline-solid focus:outline-ring"
               />
             </div>
             <label className="block text-sm font-bold text-text">
@@ -215,7 +215,7 @@ export function ProfilePage() {
                 aria-label="한 줄 소개"
                 rows={2}
                 placeholder="친구에게 보여질 한 줄 소개를 입력하세요"
-                className="mt-1.5 w-full resize-none rounded-xl border-2 border-border-strong bg-surface px-3 py-2.5 text-[15px] font-medium text-text outline-none focus:outline-ring"
+                className="mt-1.5 w-full resize-none rounded-xl border-2 border-border-strong bg-surface px-3 py-2.5 text-[15px] font-medium text-text outline-none focus:outline-2 focus:outline-solid focus:outline-ring"
               />
             </label>
             <p className="text-right text-xs font-medium text-text-muted">
@@ -420,7 +420,7 @@ export function ProfilePage() {
           onChange={(e) => setConfirmInput(e.target.value)}
           placeholder="탈퇴"
           aria-label="탈퇴 확인 입력"
-          className="mt-3 w-full rounded-xl border-2 border-danger bg-surface px-3 py-2 text-sm outline-none focus:outline-ring"
+          className="mt-3 w-full rounded-xl border-2 border-danger bg-surface px-3 py-2 text-sm outline-none focus:outline-2 focus:outline-solid focus:outline-ring"
         />
         <div className="mt-4 flex justify-end gap-2">
           <Button

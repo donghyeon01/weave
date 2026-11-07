@@ -43,6 +43,9 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 앱 설정(jackson·hibernate.jdbc.time_zone·JDBC serverTimezone)이 전부 Asia/Seoul
+    // wall-clock 의미론 — runner JVM TZ(UTC)에 따라 시각 경계가 어긋나는 것을 고정
+    systemProperty 'user.timezone', 'Asia/Seoul'
 }
 
 jacocoTestReport {

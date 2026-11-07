@@ -66,7 +66,8 @@ public class DiaryController {
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @Valid @RequestBody UpdateRequest req) {
         return toResponse(service.update(userId, date, req.getTitle(), req.getContent(),
-                parseMood(req.getMood()), req.getTags(), req.isEventIdSet(), req.getEventId()));
+                parseMood(req.getMood()), req.isMoodSet(), req.getTags(), req.isEventIdSet(),
+                req.getEventId()));
     }
 
     @DeleteMapping("/{date}")
@@ -102,7 +103,7 @@ public class DiaryController {
     }
 
     /**
-     * eventId는 필드 존재 자체가 의미 — 명시적 null은 연결 해제(계약 §3.5)라
+     * eventId·mood는 필드 존재 자체가 의미 — 명시적 null은 해제(계약 §3.5)라
      * "필드 없음(유지)"과 구분해야 해서 setter 플래그를 둔 클래스로 선언한다.
      */
     public static final class UpdateRequest {
@@ -114,13 +115,21 @@ public class DiaryController {
         private List<String> tags;
         private Long eventId;
         private boolean eventIdSet;
+        private boolean moodSet;
 
         public String getTitle() { return title; }
         public void setTitle(String title) { this.title = title; }
         public String getContent() { return content; }
         public void setContent(String content) { this.content = content; }
         public String getMood() { return mood; }
-        public void setMood(String mood) { this.mood = mood; }
+        public boolean isMoodSet() { return moodSet; }
+
+        @JsonProperty("mood")
+        public void setMood(String mood) {
+            this.mood = mood;
+            this.moodSet = true;
+        }
+
         public List<String> getTags() { return tags; }
         public void setTags(List<String> tags) { this.tags = tags; }
         public Long getEventId() { return eventId; }

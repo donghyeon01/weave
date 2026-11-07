@@ -131,6 +131,31 @@ class DiaryControllerTest {
     }
 
     @Test
+    void PATCH에서_mood_명시null은_해제_필드없음은_유지다() throws Exception {
+        mvc.perform(post("/api/diaries")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2027-05-21\",\"content\":\"본문\",\"mood\":\"happy\"}"))
+                .andExpect(status().isCreated());
+
+        // 필드 없음 → 기분 유지
+        mvc.perform(patch("/api/diaries/2027-05-21")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"수정\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mood").value("happy"));
+
+        // 명시적 null → 기분 해제
+        mvc.perform(patch("/api/diaries/2027-05-21")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mood\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mood").doesNotExist());
+    }
+
+    @Test
     void 동일_date_재생성은_409를_반환한다() throws Exception {
         String body = "{\"date\":\"2026-05-20\",\"title\":\"첫 기록\",\"content\":\"오늘의 일기\"}";
         mvc.perform(post("/api/diaries")

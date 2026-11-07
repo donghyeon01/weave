@@ -85,6 +85,11 @@ public class Diary extends BaseTimeEntity {
         }
     }
 
+    /** PATCH에서 mood 필드가 명시적 null로 올 때 — update()의 null=유지와 구분해 해제. */
+    public void clearMood() {
+        this.mood = null;
+    }
+
     /** 일정 연결·해제 — PATCH에서 필드 존재 시 호출, null이면 연결 해제. */
     public void linkEvent(Long eventId) {
         this.eventId = eventId;

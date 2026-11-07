@@ -159,6 +159,17 @@ export function NotificationBell() {
                     </button>
                   </div>
                 )}
+                {item.type.startsWith('PROPOSAL_') && (
+                  <div className="px-4 pb-3">
+                    <Link
+                      to="/app/proposals"
+                      onClick={() => setOpen(false)}
+                      className="text-xs font-semibold text-accent-deep hover:underline"
+                    >
+                      제안 보관함에서 확인 →
+                    </Link>
+                  </div>
+                )}
                 {item.type === 'FRIEND_REQUEST' && (
                   <div className="px-4 pb-3">
                     <Link

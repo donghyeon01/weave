@@ -9,6 +9,7 @@ import { DiaryRoute } from './routes/app/diary'
 import { FriendsRoute } from './routes/app/friends'
 import { SchedulingRoute } from './routes/app/scheduling'
 import { ProfileRoute } from './routes/app/profile'
+import { ProposalsRoute } from './routes/app/proposals'
 
 // top-nav.md의 6개 화면 라우트.
 export const router = createBrowserRouter([
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
       { path: 'friends', element: <FriendsRoute /> },
       { path: 'scheduling', element: <SchedulingRoute /> },
       { path: 'profile', element: <ProfileRoute /> },
+      { path: 'proposals', element: <ProposalsRoute /> },
     ],
   },
 ])

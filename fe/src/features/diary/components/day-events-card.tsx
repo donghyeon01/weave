@@ -16,7 +16,7 @@ export function DayEventsCard({ date }: { date: string }) {
             key={e.id}
             className="flex items-baseline gap-2 rounded-lg bg-surface-muted px-3 py-2 text-sm"
           >
-            <span className="shrink-0 text-xs font-semibold text-text-muted">
+            <span className="shrink-0 text-xs font-semibold text-text-secondary">
               {e.allDay ? '종일' : `${e.startTime.slice(11, 16)} - ${e.endTime.slice(11, 16)}`}
             </span>
             <span className="truncate font-semibold text-text">{e.title}</span>

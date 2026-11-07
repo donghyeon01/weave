@@ -30,10 +30,15 @@ public class AuthController {
 
     private final AuthService authService;
     private final SessionService sessionService;
+    // cross-site 배포(fe와 API가 다른 도메인)는 None 필수 — dev/prod 분기는 env로 주입한다
+    private final String cookieSameSite;
 
-    public AuthController(AuthService authService, SessionService sessionService) {
+    public AuthController(AuthService authService, SessionService sessionService,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${weave.cookie-samesite:Strict}") String cookieSameSite) {
         this.authService = authService;
         this.sessionService = sessionService;
+        this.cookieSameSite = cookieSameSite;
     }
 
     @PostMapping("/oauth/kakao")
@@ -89,7 +94,7 @@ public class AuthController {
         return ResponseCookie.from(REFRESH_COOKIE, raw)
                 .httpOnly(true)
                 .secure(true)
-                .sameSite("Strict")
+                .sameSite(cookieSameSite)
                 .path("/api/auth")
                 .maxAge(REFRESH_MAX_AGE)
                 .build();
@@ -97,7 +102,7 @@ public class AuthController {
 
     private ResponseCookie expireCookie() {
         return ResponseCookie.from(REFRESH_COOKIE, "")
-                .httpOnly(true).secure(true).sameSite("Strict")
+                .httpOnly(true).secure(true).sameSite(cookieSameSite)
                 .path("/api/auth").maxAge(0)
                 .build();
     }

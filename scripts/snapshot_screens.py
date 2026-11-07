@@ -33,10 +33,11 @@ SCREENS = [
     {'name': 'friends', 'path': '/app/friends', 'auth': True, 'route_file': 'src/app/routes/app/friends.tsx', 'feature': 'friends', 'nav': '친구'},
     {'name': 'scheduling', 'path': '/app/scheduling', 'auth': True, 'route_file': 'src/app/routes/app/scheduling.tsx', 'feature': 'scheduling', 'nav': '일정 조율'},
     {'name': 'profile', 'path': '/app/profile', 'auth': True, 'route_file': 'src/app/routes/app/profile.tsx', 'feature': 'profile', 'nav': '내 프로필'},
+    {'name': 'proposals', 'path': '/app/proposals', 'auth': True, 'route_file': 'src/app/routes/app/proposals.tsx', 'feature': 'scheduling'},
 ]
 
 SHARED_DIRS = ['src/components/ui', 'src/components/layout', 'src/styles']
-DEMO_LOGIN_TEXT = '데모 계정으로 둘러보기'
+DEMO_LOGIN_TEXT = '데모로 둘러보기'
 BOOTING_TEXT = '세션을 복원하고 있어요'
 
 
@@ -84,7 +85,7 @@ def main():
         for screen in SCREENS:
             url = args.base_url + screen['path']
             # 외부 폰트 CDN·WS 연결로 networkidle이 안정되지 않아 load+정착 대기로 잡는다
-            if screen['auth'] and authed:
+            if screen['auth'] and authed and 'nav' in screen:
                 # 인증 화면 이동은 SPA nav 클릭 — 하드 리로드는 refresh 회전 경합으로
                 # 세션을 폐기시킬 수 있다 (구 토큰 중복 전송 → REUSED 판정)
                 page.get_by_role('link', name=screen['nav'], exact=True).click()

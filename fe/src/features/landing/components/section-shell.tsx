@@ -1,49 +1,67 @@
 import type { ReactNode } from 'react'
+import { Badge } from '../../../components/ui/badge'
 import { cx } from '../../../utils/cx'
 
-// patterns.md §랜딩 구성 패턴 — 섹션 구분은 배경 교대(muted/white) + 2px border-strong 경계선
+// patterns.md §랜딩 구성 패턴 — 섹션 구분은 배경 교대 + 2px border-strong 경계선
 export function LandingSection({
   tone,
+  id,
   children,
 }: {
-  tone: 'white' | 'muted'
+  tone: 'white' | 'muted' | 'background' | 'accent'
+  id?: string
   children: ReactNode
 }) {
   return (
     <section
+      id={id}
       className={cx(
         'border-b-2 border-border-strong',
-        tone === 'muted' ? 'bg-surface-muted' : 'bg-surface',
+        tone === 'muted'
+          ? 'bg-surface-muted'
+          : tone === 'background'
+            ? 'bg-background'
+            : tone === 'accent'
+              ? 'bg-accent-soft'
+              : 'bg-surface',
       )}
     >
-      <div className="mx-auto max-w-6xl px-6 py-16">{children}</div>
+      <div className="mx-auto max-w-[1280px] px-6 py-12">{children}</div>
     </section>
   )
 }
 
-// 섹션 배지(badge.md: surface-muted + 2px border + text-secondary) + h2(display 26px)
-export function SectionHeading({ badge, title }: { badge: string; title: ReactNode }) {
+// 섹션 헤더: accent 배지 + Jua 30px 타이틀 (+선택 서브 카피) — Figma 151:1001·4:2381
+export function SectionHeading({
+  badge,
+  title,
+  sub,
+}: {
+  badge: string
+  title: ReactNode
+  sub?: ReactNode
+}) {
   return (
-    <div className="mb-10 text-center">
-      <span className="inline-block rounded-lg border-2 border-border bg-surface-muted px-3 py-1 text-sm font-semibold text-text-secondary">
-        {badge}
-      </span>
-      <h2 className="mt-4 font-display text-[26px] leading-[34px]">{title}</h2>
+    <div className="mb-10 flex flex-col items-center gap-2 text-center">
+      <Badge variant="accent">{badge}</Badge>
+      <h2 className="font-display text-[30px] leading-normal">{title}</h2>
+      {sub && <p className="text-base font-medium text-text-secondary">{sub}</p>}
     </div>
   )
 }
 
+// 네오-브루탈 카드 (Problem·Process): 2px border-strong + 4px 하드 섀도우 + 16px 반경
 export function BrutalCard({
   title,
   desc,
 }: {
   title: string
-  desc: string
+  desc: ReactNode
 }) {
   return (
-    <div className="rounded-2xl border-2 border-border-strong bg-surface p-5 shadow-brutal-sm">
-      <p className="font-semibold">{title}</p>
-      <p className="mt-2 text-sm text-text-secondary">{desc}</p>
+    <div className="flex flex-col gap-2 rounded-2xl border-2 border-border-strong bg-surface px-5 pb-4 pt-5 shadow-brutal-md">
+      <p className="font-bold">{title}</p>
+      <p className="text-sm font-medium text-text-secondary">{desc}</p>
     </div>
   )
 }

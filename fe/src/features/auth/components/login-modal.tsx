@@ -57,10 +57,10 @@ export function LoginModal() {
         titleClassName="px-8 text-center"
         title={
           <>
-            <span className="inline-flex items-center gap-1 rounded-full border-2 border-border bg-accent-soft px-3 py-1 text-sm font-bold text-primary">
+            <span className="inline-flex items-center gap-1 rounded-full border-2 border-border bg-accent-soft px-3 py-1 text-sm font-bold text-accent">
               간편하게 3초 만에 시작하기
             </span>
-            <p className="mt-3 font-display text-[32px] leading-10 text-primary">Weave</p>
+            <p className="mt-3 font-display text-[32px] leading-10 text-accent">Weave</p>
             <p className="mt-1 text-base font-medium text-text-secondary">
               시간을 함께 엮어보세요
             </p>

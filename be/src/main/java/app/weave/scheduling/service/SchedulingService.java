@@ -74,10 +74,15 @@ public class SchedulingService {
                     e.isAllDay() ? day.plusDays(1).atStartOfDay() : e.getEndTime()));
         }
 
+        LocalTime ws = windowStart != null ? windowStart : DEFAULT_WINDOW_START;
+        LocalTime we = windowEnd != null ? windowEnd : DEFAULT_WINDOW_END;
+        // 역창(종료≤시작)은 계약 미정의 — 빈 후보 반환 대신 명시적 400으로 거부
+        if (!we.isAfter(ws)) {
+            throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+        }
+
         return recommender.recommend(mode, rangeStart, rangeEnd,
-                windowStart != null ? windowStart : DEFAULT_WINDOW_START,
-                windowEnd != null ? windowEnd : DEFAULT_WINDOW_END,
-                slotMinutes, durationDays, busyByUser);
+                ws, we, slotMinutes, durationDays, busyByUser);
     }
 
     private Set<Long> resolveParticipants(Long me, List<Long> participantIds) {

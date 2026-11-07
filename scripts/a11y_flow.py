@@ -4,6 +4,7 @@
 결과 JSON은 snapshots/a11y-<timestamp>.json.
 """
 
+import argparse
 import json
 import sys
 from datetime import datetime
@@ -37,6 +38,11 @@ def report(mark, name, detail=''):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--base-url', default='http://localhost:5173')
+    args = ap.parse_args()
+    global BASE
+    BASE = args.base_url
     results = []
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)

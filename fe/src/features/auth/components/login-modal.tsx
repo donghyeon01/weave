@@ -69,7 +69,7 @@ export function LoginModal() {
       >
         <div className="mt-2 space-y-3">
           <Button variant="kakao" size="lg" fullWidth className="h-14" onClick={handleKakao}>
-            <svg viewBox="0 0 19 18.17" className="h-[18px] w-[19px]" aria-hidden="true">
+            <svg viewBox="0 0 19 18.17" className="h-4.5 w-4.75" aria-hidden="true">
               <path
                 fill="currentColor"
                 d="M9.83333 2.12372C5.23083 2.12372 1.5 5.02122 1.5 8.59622C1.5 10.8962 3.05833 12.9162 5.42 14.0579L4.42333 17.7145C4.33667 18.0329 4.70083 18.287 4.9675 18.1104L9.32417 15.2204C9.76 15.267 10.2058 15.2912 10.6667 15.2912C15.2692 15.2912 19 12.3937 19 8.81871C18.1667 5.02121 14.4358 2.12372 9.83333 2.12372V2.12372Z"
@@ -93,7 +93,7 @@ export function LoginModal() {
         </div>
         <div className="mt-4 flex items-center justify-center gap-1 text-xs font-medium">
           <span className="text-text-secondary">로그인에 어려움이 있으신가요?</span>
-          <span className="text-[#3b568f] underline">고객센터 문의</span>
+          <span className="text-primary-dark underline">고객센터 문의</span>
         </div>
         <div className="mt-6 border-t border-border pt-4 text-center text-xs text-text-muted">
           가입하면 <span className="text-text-secondary underline">이용약관</span> 및{' '}

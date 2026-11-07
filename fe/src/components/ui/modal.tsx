@@ -56,7 +56,7 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative w-full max-w-[448px] rounded-xl border-2 border-border-strong bg-surface px-6 py-5 shadow-brutal-md outline-none"
+        className="relative w-full max-w-md rounded-xl border-2 border-border-strong bg-surface px-6 py-5 shadow-brutal-md outline-none"
       >
         <button
           type="button"

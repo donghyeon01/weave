@@ -2,7 +2,7 @@
 export function LandingFooter() {
   return (
     <footer className="border-t-2 border-border-strong bg-surface-muted">
-      <div className="mx-auto flex max-w-[1280px] items-center justify-between px-6 py-8">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-8">
         <div className="flex items-center gap-3">
           <span className="font-display text-xl text-accent">Weave</span>
           <p className="text-xs font-medium text-text-secondary">

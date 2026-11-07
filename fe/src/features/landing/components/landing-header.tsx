@@ -5,8 +5,8 @@ import { Link } from 'react-router-dom'
 export function LandingHeader() {
   return (
     <header className="border-b-2 border-border-strong bg-background shadow-[0px_2px_0px_#1e2538]">
-      <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between px-6">
-        <Link to="/" className="font-display text-[26px] leading-[34px] text-accent">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+        <Link to="/" className="font-display text-[26px] leading-8.5 text-accent">
           Weave
         </Link>
         <nav className="flex items-center gap-6" aria-label="랜딩 섹션">
@@ -22,7 +22,7 @@ export function LandingHeader() {
         </nav>
         <Link
           to="/login"
-          className="inline-flex h-[30px] items-center gap-1.5 rounded-full border-2 border-primary bg-surface-muted px-3 text-xs font-bold text-text transition duration-200 hover:bg-surface"
+          className="inline-flex h-7.5 items-center gap-1.5 rounded-full border-2 border-primary bg-surface-muted px-3 text-xs font-bold text-text transition duration-200 hover:bg-surface"
         >
           <svg viewBox="0 0 14.5 14.5" className="h-3.5 w-3.5" aria-hidden="true">
             <path

@@ -67,7 +67,7 @@ export function Sidebar() {
       <div className="flex flex-col gap-5">
         <Link to="/app" className="flex items-center gap-3 px-2 pt-2">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent drop-shadow-sm">
-            <SparklesIcon className="size-[22px] text-white" />
+            <SparklesIcon className="size-5.5 text-white" />
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="flex items-center gap-1.5">
@@ -132,7 +132,7 @@ export function Sidebar() {
           <SettingsIcon className="shrink-0" />
           설정
         </Link>
-        <div className="flex items-center justify-between rounded-xl border border-border bg-surface-muted p-[11px]">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-surface-muted p-2.75">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-text">
               {avatarText || '—'}
@@ -148,7 +148,7 @@ export function Sidebar() {
             type="button"
             aria-label="로그아웃"
             onClick={() => setLogoutOpen(true)}
-            className="flex size-[30px] shrink-0 items-center justify-center rounded-md p-1 text-text-secondary transition duration-150 hover:bg-surface hover:text-text"
+            className="flex size-7.5 shrink-0 items-center justify-center rounded-md p-1 text-text-secondary transition duration-150 hover:bg-surface hover:text-text"
           >
             <LogoutIcon />
           </button>

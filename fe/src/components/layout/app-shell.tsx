@@ -41,7 +41,7 @@ export function AppShell() {
           <Sidebar />
           <div className="flex min-w-0 flex-1 flex-col">
             <ContentHeader />
-            <main className="mx-auto w-full max-w-[60rem] px-4 py-8 sm:px-8">
+            <main className="mx-auto w-full max-w-240 px-4 py-8 sm:px-8">
               {outlet ?? (
                 // 셸의 기본 빈 상태 — 자식 라우트가 아직 없는 동안만 표시된다
                 <div className="rounded-2xl border-2 border-dashed border-border bg-surface p-16 text-center">

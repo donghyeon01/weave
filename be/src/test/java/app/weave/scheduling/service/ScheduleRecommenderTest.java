@@ -1,6 +1,7 @@
 package app.weave.scheduling.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import app.weave.scheduling.domain.Mode;
 import app.weave.scheduling.service.ScheduleRecommender.BusyInterval;
@@ -134,5 +135,36 @@ class ScheduleRecommenderTest {
                         LocalTime.of(12, 0), LocalTime.of(22, 0), 120, null, busy));
 
         assertThat(out).hasSize(3); // 상위 3개만 반환
+    }
+
+    @Test
+    void 참여자가_없으면_계약_위반이다() {
+        assertThatThrownBy(() -> recommender.recommend(Mode.TIME, d1, d1,
+                LocalTime.of(9, 0), LocalTime.of(12, 0), 60, null, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void 역창_범위는_계약_위반이다() {
+        Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
+        assertThatThrownBy(() -> recommender.recommend(Mode.TIME, d2, d1,
+                LocalTime.of(9, 0), LocalTime.of(12, 0), 60, null, busy))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void DATE_모드의_durationDays_누락은_계약_위반이다() {
+        Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
+        assertThatThrownBy(() -> recommender.recommend(Mode.DATE, d1, d2,
+                null, null, null, null, busy))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void slotMinutes가_있으면_유효_창이_필수다() {
+        Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
+        assertThatThrownBy(() -> recommender.recommend(Mode.TIME, d1, d1,
+                LocalTime.of(12, 0), LocalTime.of(9, 0), 60, null, busy))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

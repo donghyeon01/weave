@@ -5,7 +5,11 @@ import { apiFetch } from '../lib/api-client'
 import { queryClient, queryKeys } from '../lib/react-query'
 import { ensureFreshToken } from '../lib/refresh'
 import { useAuthStore } from '../stores/auth-store'
+import { startSyncTracking } from '../stores/sync-store'
 import type { UserResponse } from '../types/auth'
+
+// REST 성공 시각 추적 — 콘텐츠 헤더의 cloud-sync-status가 읽는다
+startSyncTracking()
 
 // 부팅 시 쿠키의 refresh 토큰으로 세션 복원 — status는 'booting'에서 시작해
 // 복원 결과에 따라 'authed' 또는 'guest'로 전이한다 (Task 6 라우터가 이 값으로 게이트).

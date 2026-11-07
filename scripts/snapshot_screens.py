@@ -32,7 +32,7 @@ SCREENS = [
     {'name': 'diary', 'path': '/app/diary', 'auth': True, 'route_file': 'src/app/routes/app/diary.tsx', 'feature': 'diary', 'nav': '일기'},
     {'name': 'friends', 'path': '/app/friends', 'auth': True, 'route_file': 'src/app/routes/app/friends.tsx', 'feature': 'friends', 'nav': '친구'},
     {'name': 'scheduling', 'path': '/app/scheduling', 'auth': True, 'route_file': 'src/app/routes/app/scheduling.tsx', 'feature': 'scheduling', 'nav': '일정 조율'},
-    {'name': 'profile', 'path': '/app/profile', 'auth': True, 'route_file': 'src/app/routes/app/profile.tsx', 'feature': 'profile', 'nav': '내 정보'},
+    {'name': 'profile', 'path': '/app/profile', 'auth': True, 'route_file': 'src/app/routes/app/profile.tsx', 'feature': 'profile', 'nav': '내 프로필'},
 ]
 
 SHARED_DIRS = ['src/components/ui', 'src/components/layout', 'src/styles']

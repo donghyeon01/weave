@@ -92,10 +92,9 @@ export function NotificationBell() {
             strokeLinejoin="round"
           />
         </svg>
+        {/* 미읽음 표시는 dot 8px — 카운트 배지는 nav 항목 전용 (top-nav.md·시안 벨 실측) */}
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-danger-text">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
+          <span className="absolute right-0.5 top-0.5 size-2 rounded-full bg-danger-text ring-2 ring-surface" />
         )}
       </button>
 

@@ -56,7 +56,7 @@ describe('login-modal', () => {
 
     renderModal()
     await userEvent.click(
-      screen.getByRole('button', { name: '데모 계정으로 둘러보기' }),
+      screen.getByRole('button', { name: '데모로 둘러보기' }),
     )
 
     await waitFor(() => expect(useAuthStore.getState().status).toBe('authed'))
@@ -80,7 +80,7 @@ describe('login-modal', () => {
 
     renderModal()
     await userEvent.click(
-      screen.getByRole('button', { name: '데모 계정으로 둘러보기' }),
+      screen.getByRole('button', { name: '데모로 둘러보기' }),
     )
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()

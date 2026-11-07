@@ -6,12 +6,14 @@ interface ModalProps {
   open: boolean
   onClose: () => void
   title: ReactNode
+  // 중앙 정렬 등 타이틀 블록 추가 클래스 — 닫기 버튼 여백(pr-8)은 유지된다
+  titleClassName?: string
   children: ReactNode
 }
 
-// modal.md — surface 카드 + 2px border-strong + 24px 반경 + brutal-md, backdrop은 text 40% 디밍.
+// modal.md — surface 카드 + 2px border-strong + 12px 반경 + brutal-md, backdrop은 text 40% 디밍 + blur.
 // Esc·backdrop 클릭·X로 닫히고 열릴 때 카드로 포커스 이동, 닫히면 이전 요소로 복귀한다.
-export function Modal({ open, onClose, title, children }: ModalProps) {
+export function Modal({ open, onClose, title, titleClassName, children }: ModalProps) {
   const titleId = useId()
   const cardRef = useRef<HTMLDivElement>(null)
   // onClose를 deps에 두면 부모 재렌더마다 focus가 재실행돼 포커스를 뺏으므로 ref로 최신값만 참조
@@ -43,7 +45,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-text/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-text/40 p-4 backdrop-blur"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCloseRef.current()
       }}
@@ -54,7 +56,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative w-full max-w-[480px] rounded-3xl border-2 border-border-strong bg-surface p-6 shadow-brutal-md outline-none"
+        className="relative w-full max-w-[448px] rounded-xl border-2 border-border-strong bg-surface px-6 py-5 shadow-brutal-md outline-none"
       >
         <button
           type="button"
@@ -71,7 +73,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
             />
           </svg>
         </button>
-        <div id={titleId} className="pr-8">
+        <div id={titleId} className={titleClassName ?? 'pr-8'}>
           {title}
         </div>
         <div className="mt-5">{children}</div>

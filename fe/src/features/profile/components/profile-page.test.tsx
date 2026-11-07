@@ -42,7 +42,7 @@ describe('profile-page', () => {
   it('탈퇴 모달은 "탈퇴" 입력 전 danger 버튼이 비활성이다', async () => {
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: '회원 탈퇴 신청' }))
+    await userEvent.click(screen.getByRole('button', { name: '회원 탈퇴' }))
     const dialog = await screen.findByRole('dialog')
     const deleteButton = screen.getByRole('button', { name: '탈퇴하기' })
     expect(deleteButton).toBeDisabled()
@@ -59,7 +59,7 @@ describe('profile-page', () => {
 
   it('닉네임 변경 전에는 저장이 비활성이다', async () => {
     renderPage()
-    const save = screen.getByRole('button', { name: '저장' })
+    const save = screen.getByRole('button', { name: '저장하기' })
     expect(save).toBeDisabled()
 
     await userEvent.type(screen.getByLabelText('닉네임'), '새닉')

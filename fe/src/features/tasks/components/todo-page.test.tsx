@@ -86,7 +86,10 @@ describe('todo-page', () => {
   it('삭제는 ConfirmModal 확인을 거쳐야만 DELETE가 호출된다', async () => {
     renderPage()
 
-    await userEvent.click(await screen.findByRole('button', { name: '리포트 작성 삭제' }))
+    await userEvent.click(
+      await screen.findByRole('button', { name: '리포트 작성 옵션' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: '삭제' }))
     // 확인 전에는 DELETE가 나가지 않는다
     expect(apiFetchMock).not.toHaveBeenCalledWith(
       '/api/tasks/1',
@@ -111,8 +114,8 @@ describe('todo-page', () => {
 
     const stats = screen.getByLabelText('할 일 통계')
     // 전체=1, 진행중=1, 완료=0 — '0'은 유일하다
-    expect(within(stats).getByText('0')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: '전체' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(stats).getByText('0% 달성')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /전체/ })).toHaveAttribute('aria-selected', 'true')
 
     await userEvent.type(screen.getByLabelText('할 일 검색'), '없는것')
     expect(

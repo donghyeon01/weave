@@ -59,6 +59,7 @@ def main():
     ap.add_argument('--tag', default=None, help='실행 폴더명에 붙일 라벨 (예: before-redesign)')
     ap.add_argument('--width', type=int, default=1440)
     ap.add_argument('--height', type=int, default=900)
+    ap.add_argument('--dark', action='store_true', help='prefers-color-scheme: dark 컨텍스트로 캡처')
     args = ap.parse_args()
 
     run_id = datetime.now().strftime('%Y%m%d-%H%M%S') + (f'-{args.tag}' if args.tag else '')
@@ -80,7 +81,10 @@ def main():
     authed = False
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(viewport={'width': args.width, 'height': args.height})
+        context = browser.new_context(
+            viewport={'width': args.width, 'height': args.height},
+            color_scheme='dark' if args.dark else 'light',
+        )
         page = context.new_page()
         for screen in SCREENS:
             url = args.base_url + screen['path']

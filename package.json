@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "check:fast": "cd fe && npm run typecheck && npm run lint && cd .. && gitleaks detect --redact && cd be && call .\\gradlew.bat compileJava",
-    "check:full": "cd fe && npm run typecheck && npm run lint && npm run test && npm run build && size-limit && cd .. && gitleaks detect --redact && osv-scanner -r . && cd be && call .\\gradlew.bat test jacocoTestReport"
+    "check:full": "cd fe && npm run typecheck && npm run lint && npm run test && npm run build && npx size-limit && cd .. && gitleaks detect --redact && osv-scanner -r . && cd be && call .\\gradlew.bat test jacocoTestReport"
   },
   "devDependencies": {}
 }

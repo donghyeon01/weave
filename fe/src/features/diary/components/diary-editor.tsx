@@ -9,10 +9,8 @@ import { useDeleteDiary } from '../api/use-delete-diary'
 import { useSaveDiary } from '../api/use-save-diary'
 import { clearDraft, readDraft, writeDraft } from '../draft'
 import type { DiaryResponse } from '../types'
-import { DayEventsCard } from './day-events-card'
 import { MoodPicker } from './mood-picker'
 import { TagInput } from './tag-input'
-import { formatDateHeading } from '../utils'
 
 const INPUT_CLASS =
   'w-full rounded-xl border-2 border-input bg-surface px-3 py-2 text-sm text-text outline-none transition duration-150 focus:border-accent'
@@ -20,6 +18,15 @@ const INPUT_CLASS =
 // "오후 10:42에 자동 임시저장됨" 표시용
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' })
+}
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const
+
+// 시안 4:366 날짜 행 — "2025년 5월 16일 금요일"
+function formatDateLine(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number)
+  const weekday = WEEKDAYS[new Date(y, m - 1, d).getDay()]
+  return `${y}년 ${m}월 ${d}일 ${weekday}요일`
 }
 
 interface EditorInitial {
@@ -139,39 +146,29 @@ function DiaryEditorForm({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-display text-xl">{formatDateHeading(date)}</h2>
-        {lastDraftAt !== null && (
-          <span className="text-xs text-text-muted">
-            {formatTime(lastDraftAt)}에 자동 임시저장됨
-          </span>
-        )}
-      </div>
-
-      {draftNotice && (
-        <p className="rounded-xl border-2 border-border bg-warning px-3 py-2 text-xs font-semibold text-warning-text">
-          임시저장본을 불러왔어요. 저장을 눌러 확정해 주세요.
-        </p>
-      )}
-
-      <label className="flex flex-col gap-1 text-sm font-semibold text-text">
-        제목
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => {
-            markDirty()
-            setTitle(e.target.value)
-          }}
-          maxLength={100}
-          placeholder="오늘 하루를 한 줄로"
-          className={INPUT_CLASS}
-        />
-      </label>
-
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-semibold text-text">기분</span>
+    <div className="flex flex-col gap-8">
+      {/* 시안 헤더 — 날짜 행 + H1 + 부카피 | 우측 Mood Selector (날씨 배지는 V2 이연) */}
+      <div className="flex items-end justify-between border-b border-border pb-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <svg viewBox="0 0 12 13" className="h-[13px] w-3" aria-hidden="true">
+              <path
+                fill="#616b82"
+                d="M4 0v1.5h4V0h1v1.5h1.5A1.5 1.5 0 0 1 12 3v8.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 0 11.5V3a1.5 1.5 0 0 1 1.5-1.5H3V0h1Zm6.5 5h-9v6.5h9V5Z"
+              />
+            </svg>
+            <span className="text-xs text-text-secondary">{formatDateLine(date)}</span>
+            {lastDraftAt !== null && (
+              <span className="text-xs text-text-muted">
+                • {formatTime(lastDraftAt)}에 자동 임시저장됨
+              </span>
+            )}
+          </div>
+          <h1 className="font-display text-[32px] leading-10">오늘의 일기</h1>
+          <p className="text-base font-medium text-text-secondary">
+            소중했던 순간과 감정을 기록해 보세요 ✨
+          </p>
+        </div>
         <MoodPicker
           value={mood}
           onChange={(m) => {
@@ -181,56 +178,89 @@ function DiaryEditorForm({
         />
       </div>
 
-      <label className="flex flex-col gap-1 text-sm font-semibold text-text">
-        본문 *
-        <textarea
-          value={content}
-          onChange={(e) => {
-            markDirty()
-            setContent(e.target.value)
-          }}
-          rows={12}
-          placeholder="오늘 있었던 일을 기록해 보세요"
-          className={cx(INPUT_CLASS, 'resize-y leading-relaxed')}
-        />
-      </label>
-
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-semibold text-text">태그</span>
-        <TagInput
-          tags={tags}
-          onChange={(t) => {
-            markDirty()
-            setTags(t)
-          }}
-        />
-      </div>
-
-      {error !== null && (
-        <p role="alert" className="text-sm font-semibold text-danger-text">
-          {error}
+      {draftNotice && (
+        <p className="rounded-xl border-2 border-border bg-warning px-3 py-2 text-xs font-semibold text-warning-text">
+          임시저장본을 불러왔어요. 저장을 눌러 확정해 주세요.
         </p>
       )}
 
-      <div className="flex items-center justify-end gap-2">
-        {hasRecord && (
-          <Button variant="danger" onClick={() => setConfirmOpen(true)}>
-            삭제
-          </Button>
-        )}
-        <Button variant="brutal" onClick={handleSave} disabled={saveDiary.isPending}>
-          {saveDiary.isPending ? '저장 중…' : '저장'}
-        </Button>
-      </div>
+      {/* 작성 카드 — 시안 Main Writing Card: surface + border + soft shadow */}
+      <div className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-6 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+        <label className="flex flex-col gap-1.5 text-sm font-bold text-text">
+          일기 제목
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => {
+              markDirty()
+              setTitle(e.target.value)
+            }}
+            maxLength={100}
+            placeholder="오늘 하루를 한 줄로"
+            className={INPUT_CLASS}
+          />
+        </label>
 
-      <DayEventsCard date={date} />
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-bold text-text">태그</span>
+          <TagInput
+            tags={tags}
+            onChange={(t) => {
+              markDirty()
+              setTags(t)
+            }}
+          />
+        </div>
+
+        <label className="flex flex-col gap-1.5 text-sm font-bold text-text">
+          오늘의 이야기
+          <textarea
+            value={content}
+            onChange={(e) => {
+              markDirty()
+              setContent(e.target.value)
+            }}
+            rows={12}
+            placeholder="기록하고 싶은 순간을 담아보세요"
+            className={cx(INPUT_CLASS, 'resize-y leading-relaxed')}
+          />
+        </label>
+
+        {error !== null && (
+          <p role="alert" className="text-sm font-semibold text-danger-text">
+            {error}
+          </p>
+        )}
+
+        <div className="flex items-center justify-end gap-3">
+          {hasRecord && (
+            <Button variant="danger" size="sm" onClick={() => setConfirmOpen(true)}>
+              삭제
+            </Button>
+          )}
+          <Button
+            variant="primary"
+            size="md"
+            onClick={handleSave}
+            disabled={saveDiary.isPending}
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="m6.1 12.2-3.4-3.4 1.4-1.4 2 2 5.9-5.9 1.4 1.4-7.3 7.3Z"
+              />
+            </svg>
+            {saveDiary.isPending ? '저장 중…' : '저장'}
+          </Button>
+        </div>
+      </div>
 
       <ConfirmModal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleDelete}
         title="일기를 삭제할까요?"
-        description={`${formatDateHeading(date)}의 기록이 영구적으로 삭제됩니다.`}
+        description={`${formatDateLine(date)}의 기록이 영구적으로 삭제됩니다.`}
         confirmLabel="삭제"
         tone="danger"
         pending={deleteDiary.isPending}

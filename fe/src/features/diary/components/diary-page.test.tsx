@@ -53,7 +53,7 @@ describe('diary-page', () => {
     renderPage()
 
     const textarea = await screen.findByPlaceholderText(
-      '오늘 있었던 일을 기록해 보세요',
+      '기록하고 싶은 순간을 담아보세요',
     )
     expect(textarea).toHaveValue('')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -65,7 +65,7 @@ describe('diary-page', () => {
   it('입력 후 debounce 1s로 localStorage draft가 기록된다', async () => {
     renderPage()
     const textarea = await screen.findByPlaceholderText(
-      '오늘 있었던 일을 기록해 보세요',
+      '기록하고 싶은 순간을 담아보세요',
     )
 
     vi.useFakeTimers()

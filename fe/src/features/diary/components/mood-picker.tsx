@@ -1,7 +1,12 @@
 import { cx } from '../../../utils/cx'
 
-// 서버는 mood를 자유 문자열(≤20자)로 저장한다 — UI는 소수 옵션 배지로 제한한다.
-const MOOD_OPTIONS = ['기쁨', '보통', '우울', '화남', '피곤'] as const
+// 계약 분류는 정확히 happy|calm|busy|tired — 한국어 라벨과 이모지는 시안 4:366 매핑.
+export const MOOD_OPTIONS = [
+  { value: 'happy', emoji: '😊', label: '행복해요' },
+  { value: 'calm', emoji: '😌', label: '평온해요' },
+  { value: 'busy', emoji: '😅', label: '바빴어요' },
+  { value: 'tired', emoji: '😔', label: '힘들었어요' },
+] as const
 
 interface MoodPickerProps {
   value: string | null
@@ -10,24 +15,30 @@ interface MoodPickerProps {
 
 export function MoodPicker({ value, onChange }: MoodPickerProps) {
   return (
-    <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="기분 선택">
+    <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="오늘의 기분">
+      <span className="pr-1 text-xs font-medium text-text-secondary">오늘의 기분:</span>
       {MOOD_OPTIONS.map((mood) => {
-        const active = value === mood
+        const active = value === mood.value
         return (
           <button
-            key={mood}
+            key={mood.value}
             type="button"
             role="radio"
             aria-checked={active}
-            onClick={() => onChange(active ? null : mood)}
+            onClick={() => onChange(active ? null : mood.value)}
             className={cx(
-              'rounded-full border-2 px-3 py-1 text-xs font-semibold transition duration-150',
+              'flex h-10 items-center gap-1.5 rounded-full px-3.5 transition duration-150',
               active
-                ? 'border-border-strong bg-accent-soft text-on-tint shadow-brutal-sm'
-                : 'border-border bg-surface text-text-secondary hover:border-primary-dark',
+                ? 'border-2 border-border-strong bg-tint-peach shadow-sm'
+                : 'border border-border bg-surface text-text-secondary hover:border-primary-dark',
             )}
           >
-            {mood}
+            <span className="text-base font-bold">{mood.emoji}</span>
+            <span
+              className={cx('text-sm', active ? 'font-medium text-text' : 'font-medium')}
+            >
+              {mood.label}
+            </span>
           </button>
         )
       })}

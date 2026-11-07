@@ -1,33 +1,25 @@
 import { useState } from 'react'
 import { DiaryEditor } from './diary-editor'
-import { DiaryMonthNav } from './diary-month-nav'
+import { DayEventsCard } from './day-events-card'
+import { RecentDiariesCard } from './recent-diaries-card'
 import { toYmd } from '../utils'
 
+// Figma 4:366 — 2/3 작성 카드 + 1/3 우측 레일(연결된 일정·지난 일기). 월 네비는 시안에 없어 제거.
 export function DiaryPage() {
   const today = toYmd(new Date())
   const [selectedDate, setSelectedDate] = useState(today)
-  const [yearMonth, setYearMonth] = useState(today.slice(0, 7))
-
-  // 다른 달의 기록을 목록에서 고르면 네비게이터 표시 월도 그 달로 맞춘다.
-  const selectDate = (date: string) => {
-    setSelectedDate(date)
-    setYearMonth(date.slice(0, 7))
-  }
 
   return (
-    <div>
-      <h1 className="font-display text-2xl">일기</h1>
-      <div className="mt-4 grid gap-6 lg:grid-cols-[280px_1fr]">
-        <DiaryMonthNav
-          yearMonth={yearMonth}
-          selectedDate={selectedDate}
-          onMonthChange={setYearMonth}
-          onSelectDate={selectDate}
-          onToday={() => selectDate(toYmd(new Date()))}
-        />
-        <section className="rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-brutal-sm">
-          <DiaryEditor date={selectedDate} />
-        </section>
+    <div className="mx-auto w-full max-w-[1280px] p-8">
+      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+        <DiaryEditor date={selectedDate} />
+        <aside className="flex flex-col gap-6">
+          <DayEventsCard date={selectedDate} />
+          <RecentDiariesCard
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+          />
+        </aside>
       </div>
     </div>
   )

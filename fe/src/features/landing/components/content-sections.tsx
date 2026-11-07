@@ -125,7 +125,7 @@ export function FeaturesSection() {
             <>
               <MiniRow>
                 <span className="flex items-center gap-1.5">
-                  <span className="flex size-4 items-center justify-center rounded bg-accent-deep text-[10px] font-medium text-surface">
+                  <span className="flex size-4 items-center justify-center rounded bg-accent-deep text-[10px] font-medium text-white">
                     ✓
                   </span>
                   <span className="text-xs font-medium text-text">모임 장소 예약하기</span>
@@ -206,7 +206,7 @@ export function ProcessSection() {
             key={s.title}
             className="flex flex-col gap-2 rounded-2xl border-2 border-border-strong bg-surface p-4 shadow-brutal-md"
           >
-            <span className="flex size-10 items-center justify-center rounded-full border-2 border-border-strong bg-accent-soft font-display text-lg">
+            <span className="flex size-10 items-center justify-center rounded-full border-2 border-border-strong bg-accent-soft font-display text-lg text-on-tint">
               {String(i + 1).padStart(2, '0')}
             </span>
             <p className="text-[15px] font-bold">{s.title}</p>

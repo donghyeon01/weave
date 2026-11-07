@@ -30,6 +30,16 @@
  *     (white/milk-white 대비 5.60) — accent 채움은 로고·아이콘·테두리 전용
  *   - 틴트·파스텔 채움 위 소형 텍스트는 on-tint 고정 (기존 규약 재확인)
  *   - 틴트 채움 위 text-muted(4.3 미달) → text-secondary(4.8)
+ *
+ * v0.3.2 변경 — check:preview --dark 대비 실패 교정:
+ *   - on-success/on-danger 신규: success·danger 파스텔 채움 위 고정 텍스트
+ *     (테마 무관 — 채움이 고정이므로 대응 텍스트도 고정)
+ *   - 다크에서 success-text #7fc98e·danger-text #f87171: 중성(surface) 위
+ *     상태 텍스트 전용 (surface 대비 7.9/5.7) — 파스텔 채움 위에는 on-* 사용
+ *   - 파스텔 채움(bg-primary 등) 위 text-primary-dark·text-text 금지 → on-tint
+ *   - bg-accent-deep 위 text-surface 금지 → text-white (다크에서 surface가
+ *     어두워지므로 채움 위 텍스트는 고정 토큰 사용)
+ *   - bg-accent-soft/40 반투명 워시 위는 text-text만 허용
  * ============================================================ */
 @theme {
   /* === 배경 레이어 === */
@@ -61,16 +71,18 @@
   --color-text-secondary: #616b82; /* 서브 텍스트 */
   --color-text-muted: #64748b; /* 플레이스홀더, 메타 — surface 대비 4.76 (v0.3.0: #94a3b8에서 심화) */
   --color-on-tint: #1e2538; /* 파스텔·브랜드 채움 위 텍스트 — 테마 무관 고정 */
+  --color-on-success: #2b6938; /* bg-success 등 성공 채움 위 텍스트 — 테마 무관 고정 (v0.3.2) */
+  --color-on-danger: #b91c1c; /* bg-danger 채움 위 텍스트 — 테마 무관 고정 (v0.3.2) */
 
   /* === 상태 색상 === */
   --color-success: #9bf78f; /* 성공 배지 */
   --color-success-soft: #e6f4ea; /* 성공 배경 */
-  --color-success-text: #2b6938; /* 성공 텍스트 */
+  --color-success-text: #2b6938; /* 중성 배경 위 성공 텍스트 — 파스텔 채움 위는 on-success */
   --color-success-light: #cff4de; /* 성공 라이트 (추천 1위 카드용) */
   --color-warning: #ffe5b8; /* 경고 배지 */
   --color-warning-text: #7d5f0b; /* 경고 텍스트 — warning 대비 4.88 (v0.3.0: #86640d에서 심화) */
   --color-danger: #ffd6d6; /* 위험 배지 */
-  --color-danger-text: #b91c1c; /* 위험 텍스트 */
+  --color-danger-text: #b91c1c; /* 중성 배경 위 위험 텍스트 — 파스텔 채움 위는 on-danger */
 
   /* === 보더 === */
   --color-border: #dbe7ff; /* 기본 보더 */
@@ -140,8 +152,12 @@ body {
   --color-border: #313a63;
   --color-border-strong: #dfe6ff;
   --color-input: #6b7bb0; /* 비텍스트 대비 3.80 (v0.3.0: #3a4266에서 밝게) */
+  /* 중성 배경 위 상태 텍스트 — 다크 표면 대비 success 7.9 / danger 5.7 (v0.3.2) */
+  --color-success-text: #7fc98e;
+  --color-danger-text: #f87171;
   /* 유지되는 값: primary·accent-deep·accent-soft·accent-pink·tint-*·success/warning/danger
-     계열·on-tint·brand-kakao·milk-white (파스텔 채움과 그 위 텍스트는 고정) */
+     계열 채움·on-tint·on-success·on-danger·brand-kakao·milk-white
+     (파스텔 채움과 그 위 텍스트는 고정) */
   --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35);
   --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.5);
 }

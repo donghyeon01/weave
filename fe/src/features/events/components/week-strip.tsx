@@ -68,7 +68,7 @@ export function WeekStrip({
                   aria-label={`${day.getDate()} ${ymd} 선택`}
                   className={cx(
                     'inline-flex h-6 w-6 items-center justify-center rounded-full text-sm font-bold',
-                    isToday ? 'bg-accent-deep text-surface' : 'text-text',
+                    isToday ? 'bg-accent-deep text-white' : 'text-text',
                   )}
                 >
                   {day.getDate()}

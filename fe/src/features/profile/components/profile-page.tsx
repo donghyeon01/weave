@@ -168,7 +168,7 @@ export function ProfilePage() {
           </div>
 
           <div className="mt-6 flex items-center gap-5 rounded-xl border border-border bg-background px-4 py-4">
-            <span className="flex size-20 items-center justify-center rounded-full border-2 border-surface bg-primary font-display text-2xl shadow-sm">
+            <span className="flex size-20 items-center justify-center rounded-full border-2 border-surface bg-primary font-display text-2xl text-on-tint shadow-sm">
               {(me.data?.nickname ?? '?').slice(0, 1)}
             </span>
             <div className="flex flex-col gap-1.5">
@@ -279,7 +279,7 @@ export function ProfilePage() {
             <span className="text-xs font-bold" aria-hidden="true">
               !
             </span>
-            <p className="text-xs font-medium text-text">
+            <p className="text-xs font-medium text-on-tint">
               개인 정보를 노출하지 않습니다. 공개 범위는 언제든 다시 조정할 수 있어요.
             </p>
           </div>
@@ -341,7 +341,7 @@ export function ProfilePage() {
             </div>
             <div className="flex flex-col items-end gap-3.5 rounded-xl bg-danger p-4">
               <div className="w-full">
-                <h3 className="text-sm font-bold text-danger-text">회원 탈퇴</h3>
+                <h3 className="text-sm font-bold text-on-danger">회원 탈퇴</h3>
                 <p className="mt-1 text-xs font-medium text-on-tint">
                   탈퇴 시 동기화된 모든 캘린더와 친구 데이터 및 스마트 제안 히스토리가 즉시
                   영구 삭제됩니다.

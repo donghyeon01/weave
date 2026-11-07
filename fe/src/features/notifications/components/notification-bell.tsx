@@ -164,7 +164,7 @@ export function NotificationBell() {
                     <Link
                       to="/app/proposals"
                       onClick={() => setOpen(false)}
-                      className="text-xs font-semibold text-accent-deep hover:underline"
+                      className="text-xs font-semibold text-accent-text hover:underline"
                     >
                       제안 보관함에서 확인 →
                     </Link>
@@ -175,7 +175,7 @@ export function NotificationBell() {
                     <Link
                       to="/app/friends"
                       onClick={() => setOpen(false)}
-                      className="text-xs font-semibold text-accent-deep hover:underline"
+                      className="text-xs font-semibold text-accent-text hover:underline"
                     >
                       친구 탭에서 확인 →
                     </Link>

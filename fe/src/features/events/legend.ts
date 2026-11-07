@@ -2,9 +2,9 @@ import type { EventItem } from './types'
 
 // 범례 카테고리(Figma 확정) — 칩 색상은 여기 상수가 유일한 원천이다.
 export const CHIP_STYLES: Record<EventItem['source'] | 'dday', string> = {
-  manual: 'bg-primary text-primary-dark',
+  manual: 'bg-primary text-on-tint',
   proposal: 'bg-accent-soft text-on-tint',
-  dday: 'bg-danger text-danger-text',
+  dday: 'bg-danger text-on-danger',
 } as const
 
 export const SOURCE_LABEL: Record<EventItem['source'], string> = {

@@ -4,12 +4,12 @@ import { cx } from '../../utils/cx'
 export type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'accent'
 
 // badge.md — 읽기 전용 필라 칩: pill + 2px border + 14px/600.
-// 상태 variant는 배경 * 와 대응 *-text 토큰을 짝으로 쓴다 (파스텔 위 흰색 금지).
+// 상태 variant는 고정 파스텔 채움 위 고정 on-* 토큰을 짝으로 쓴다 (파스텔 위 흰색 금지).
 const VARIANTS: Record<BadgeVariant, string> = {
   default: 'bg-surface-muted text-text-secondary',
-  success: 'bg-success text-success-text',
+  success: 'bg-success text-on-success',
   warning: 'bg-warning text-warning-text',
-  danger: 'bg-danger text-danger-text',
+  danger: 'bg-danger text-on-danger',
   accent: 'bg-accent-soft text-on-tint',
 }
 

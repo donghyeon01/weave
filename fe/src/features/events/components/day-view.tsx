@@ -79,9 +79,9 @@ export function DayView({ date, events, onEventClick, onDoubleClickTime }: DayVi
                 className="absolute left-1 right-2 flex flex-col items-start justify-center gap-0.5 overflow-hidden rounded-lg bg-accent-deep px-2 text-left shadow-sm transition duration-150 hover:brightness-105"
                 style={{ top, height }}
               >
-                <span className="truncate text-[13px] font-bold text-surface">{e.title}</span>
+                <span className="truncate text-[13px] font-bold text-white">{e.title}</span>
                 {height >= 36 && (
-                  <span className="text-[11px] font-medium text-surface/85">
+                  <span className="text-[11px] font-medium text-white">
                     {timePart(e.startTime)}-{timePart(e.endTime)}
                   </span>
                 )}

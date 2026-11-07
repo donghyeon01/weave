@@ -123,7 +123,7 @@ export function HeroSection() {
     <section className="relative overflow-clip border-b-2 border-border-strong bg-primary">
       <div
         aria-hidden="true"
-        className="absolute inset-0 opacity-10 [background-image:radial-gradient(circle,color-mix(in_srgb,var(--color-text)_70%,transparent)_1.5px,transparent_1.5px)] [background-size:24px_24px]"
+        className="absolute inset-0 opacity-10 bg-[radial-gradient(circle,color-mix(in_srgb,var(--color-text)_70%,transparent)_1.5px,transparent_1.5px)] [background-size:24px_24px]"
       />
       <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-6 pb-12 pt-12 md:grid-cols-2">
         <div className="flex flex-col items-start gap-4">

@@ -128,7 +128,7 @@ export function ProfilePage() {
     'flex items-center justify-between border-b border-border pb-4'
 
   return (
-    <div className="mx-auto max-w-[1152px] px-8 pb-32 pt-8">
+    <div className="mx-auto max-w-6xl px-8 pb-32 pt-8">
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
@@ -229,7 +229,7 @@ export function ProfilePage() {
           <div className={cardHead}>
             <div className="flex items-center gap-2.5">
               <span className="flex size-8 items-center justify-center rounded-lg bg-tint-butter text-on-tint">
-                <svg viewBox="0 0 18 13" className="h-3 w-[18px]" aria-hidden="true">
+                <svg viewBox="0 0 18 13" className="h-3 w-4.5" aria-hidden="true">
                   <path
                     fill="currentColor"
                     d="M13.5 4.5A4.5 4.5 0 0 0 9 0a4.5 4.5 0 0 0-4.5 4.5A4.5 4.5 0 0 0 0 9h18a4.5 4.5 0 0 0-4.5-4.5Z"
@@ -290,7 +290,7 @@ export function ProfilePage() {
           <div className={cardHead}>
             <div className="flex items-center gap-2.5">
               <span className="flex size-8 items-center justify-center rounded-lg bg-surface-muted">
-                <svg viewBox="0 0 15 15" className="size-[15px]" aria-hidden="true">
+                <svg viewBox="0 0 15 15" className="size-3.75" aria-hidden="true">
                   <path
                     fill="currentColor"
                     d="M7.5 9.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-2c0-.5-.1-1-.2-1.5l1.4-1.1-1.5-2.6-1.7.7A5.5 5.5 0 0 0 9.9 2L9.7.2H5.9l-.2 1.8a5.5 5.5 0 0 0-1.6 1L2.4 2.3.9 4.9 2.3 6a5.6 5.6 0 0 0 0 3l-1.4 1.1 1.5 2.6 1.7-.7a5.5 5.5 0 0 0 1.6 1l.2 1.8h3.8l.2-1.8a5.5 5.5 0 0 0 1.6-1l1.7.7 1.5-2.6-1.4-1.1c.1-.5.2-1 .2-1.5Z"

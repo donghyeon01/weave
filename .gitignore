@@ -27,3 +27,9 @@ out/
 
 # Screen snapshots (로컬 임시 보존 — scripts/snapshot_screens.py)
 snapshots/
+
+# Gradle IDE output
+bin/
+
+# Python
+__pycache__/

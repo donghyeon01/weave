@@ -24,7 +24,7 @@ export function RecentDiariesCard({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="text-sm font-bold text-accent hover:underline"
+            className="text-sm font-bold text-accent-text hover:underline"
           >
             {expanded ? '접기' : '전체보기'}
           </button>
@@ -51,7 +51,7 @@ export function RecentDiariesCard({
                   d.date === selectedDate && 'bg-surface-muted/50',
                 )}
               >
-                <span className="shrink-0 text-xs font-bold text-accent">{label}</span>
+                <span className="shrink-0 text-xs font-bold text-accent-text">{label}</span>
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-text">
                   {d.title ?? '(제목 없음)'}
                 </span>

@@ -125,7 +125,7 @@ export function FeaturesSection() {
             <>
               <MiniRow>
                 <span className="flex items-center gap-1.5">
-                  <span className="flex size-4 items-center justify-center rounded bg-accent text-[10px] font-medium text-surface">
+                  <span className="flex size-4 items-center justify-center rounded bg-accent-deep text-[10px] font-medium text-surface">
                     ✓
                   </span>
                   <span className="text-xs font-medium text-text">모임 장소 예약하기</span>
@@ -141,7 +141,7 @@ export function FeaturesSection() {
                     카페 후보 리스트업
                   </span>
                 </span>
-                <span className="text-[11px] font-medium text-text-muted">완료</span>
+                <span className="text-[11px] font-medium text-text-secondary">완료</span>
               </MiniRow>
             </>
           }
@@ -181,7 +181,7 @@ export function FeaturesSection() {
             <>
               <MiniRow>
                 <span className="text-xs font-medium text-text">📸 연남동 모임 아카이브</span>
-                <span className="text-[11px] font-medium text-text-muted">어제</span>
+                <span className="text-[11px] font-medium text-text-secondary">어제</span>
               </MiniRow>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge>#행복가득</Badge>
@@ -225,7 +225,7 @@ export function ExampleSection() {
       <div className="mx-auto flex w-full max-w-[460px] flex-col gap-2.5 rounded-2xl border-[3px] border-border-strong bg-success-light px-6 py-[18px] shadow-brutal-accent text-on-tint">
         <div className="flex items-center gap-2">
           <Badge variant="success">추천도 100%</Badge>
-          <span className="text-sm font-bold text-accent">★ 최적의 선택</span>
+          <span className="text-sm font-bold text-on-tint">★ 최적의 선택</span>
         </div>
         <p className="font-display text-[26px] leading-normal">5월 23일 금요일 19:00 – 21:00</p>
         <div className="flex items-center justify-between">

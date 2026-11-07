@@ -128,7 +128,7 @@ function TimetablePreview({
           </tbody>
         </table>
       </div>
-      <p className="mt-3 rounded-lg bg-accent-soft px-3 py-2 text-sm font-bold text-accent-deep">
+      <p className="mt-3 rounded-lg bg-accent-soft px-3 py-2 text-sm font-bold text-on-tint">
         {slot.startTime.slice(0, 5)} ~ {slot.endTime.slice(0, 5)} 구간: 모두 비어있는 최적 골든 슬롯!
       </p>
     </section>
@@ -264,15 +264,15 @@ export function SchedulingPage() {
               <span
                 className={cx(
                   'flex size-8 items-center justify-center rounded-lg text-sm font-medium',
-                  state === 'done' && 'bg-surface-muted text-accent',
-                  state === 'active' && 'bg-accent text-surface',
-                  state === 'next' && 'bg-surface-muted text-text-muted',
+                  state === 'done' && 'bg-surface-muted text-accent-text',
+                  state === 'active' && 'bg-accent-deep text-surface',
+                  state === 'next' && 'bg-surface-muted text-text-secondary',
                 )}
               >
                 {state === 'done' ? '✓' : `0${n}`}
               </span>
               <div>
-                <p className="text-[10px] font-medium text-text-muted">STEP 0{n}</p>
+                <p className="text-[10px] font-medium text-text-secondary">STEP 0{n}</p>
                 <p className="text-sm font-bold text-text">{label}</p>
               </div>
             </div>
@@ -316,7 +316,7 @@ export function SchedulingPage() {
                           {f.user.email}
                         </span>
                       </span>
-                      {checked && <span className="text-xs font-bold text-accent">선택됨</span>}
+                      {checked && <span className="text-xs font-bold text-on-tint">선택됨</span>}
                     </label>
                   </li>
                 )
@@ -345,7 +345,7 @@ export function SchedulingPage() {
                     className={cx(
                       'flex-1 rounded-lg px-3 py-2 text-sm font-bold',
                       mode === m
-                        ? 'border border-border bg-surface-muted text-accent'
+                        ? 'border border-border bg-surface-muted text-accent-text'
                         : 'text-text-secondary hover:text-text',
                     )}
                   >
@@ -387,7 +387,7 @@ export function SchedulingPage() {
                           className={cx(
                             'flex-1 rounded-lg border px-2 py-2 text-sm font-bold',
                             durationMin === d.minutes
-                              ? 'border-accent bg-accent-soft text-accent'
+                              ? 'border-accent bg-accent-soft text-on-tint'
                               : 'border-border text-text-secondary hover:text-text',
                           )}
                         >
@@ -415,7 +415,7 @@ export function SchedulingPage() {
                             className={cx(
                               'rounded-lg border px-2 py-2 text-sm font-bold',
                               on
-                                ? 'border-accent bg-accent-soft text-accent'
+                                ? 'border-accent bg-accent-soft text-on-tint'
                                 : 'border-border text-text-secondary hover:text-text',
                             )}
                           >
@@ -439,7 +439,7 @@ export function SchedulingPage() {
                         className={cx(
                           'flex-1 rounded-lg border px-2 py-2 text-sm font-bold',
                           durationDays === d
-                            ? 'border-accent bg-accent-soft text-accent'
+                            ? 'border-accent bg-accent-soft text-on-tint'
                             : 'border-border text-text-secondary hover:text-text',
                         )}
                       >
@@ -479,7 +479,7 @@ export function SchedulingPage() {
         <div className="lg:col-span-7">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-2xl">스마트 AI 추천 시간대</h2>
-            <Link to="/app/proposals" className="text-sm font-bold text-accent hover:underline">
+            <Link to="/app/proposals" className="text-sm font-bold text-accent-text hover:underline">
               제안 보관함 →
             </Link>
           </div>

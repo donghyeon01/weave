@@ -44,7 +44,7 @@ function TimetableCard() {
               key={d}
               className={`flex-1 rounded py-1 text-center text-xs font-bold ${
                 d.startsWith('토')
-                  ? 'border border-border-strong bg-primary text-accent'
+                  ? 'border border-border-strong bg-primary text-on-tint'
                   : 'text-text'
               }`}
             >
@@ -57,7 +57,7 @@ function TimetableCard() {
             <div key={d} className="flex-1">
               {i === 3 ? (
                 <div className="flex h-full items-end justify-center rounded border border-dashed border-accent bg-primary px-1 pb-2">
-                  <span className="text-center text-[11px] font-bold text-accent">
+                  <span className="text-center text-[11px] font-bold text-on-tint">
                     오후 전원 여유
                   </span>
                 </div>
@@ -79,7 +79,7 @@ function TimetableCard() {
             </div>
           ))}
         </div>
-        <div className="mt-1 flex items-center justify-between rounded-lg border-2 border-border-strong bg-accent p-3.5 shadow-brutal-md">
+        <div className="mt-1 flex items-center justify-between rounded-lg border-2 border-border-strong bg-accent-deep p-3.5 shadow-brutal-md">
           <div className="flex items-center gap-2">
             <svg viewBox="0 0 32 32" className="size-8" aria-hidden="true">
               <rect x="1" y="1" width="30" height="30" rx="15" fill="#C8DBFE" />
@@ -91,7 +91,7 @@ function TimetableCard() {
             </svg>
             <div>
               <p className="text-sm font-bold text-milk-white">3명 모두 가능한 최적 시간 발견!</p>
-              <p className="text-xs font-medium text-primary">
+              <p className="text-xs font-medium text-milk-white">
                 목요일 18:00 - 20:00 · 홍대입구 연남동
               </p>
             </div>

@@ -76,7 +76,7 @@ export function DayView({ date, events, onEventClick, onDoubleClickTime }: DayVi
                 key={e.id}
                 type="button"
                 onClick={() => onEventClick(e)}
-                className="absolute left-1 right-2 flex flex-col items-start justify-center gap-0.5 overflow-hidden rounded-lg bg-accent px-2 text-left shadow-sm transition duration-150 hover:brightness-105"
+                className="absolute left-1 right-2 flex flex-col items-start justify-center gap-0.5 overflow-hidden rounded-lg bg-accent-deep px-2 text-left shadow-sm transition duration-150 hover:brightness-105"
                 style={{ top, height }}
               >
                 <span className="truncate text-[13px] font-bold text-surface">{e.title}</span>

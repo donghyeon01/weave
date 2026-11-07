@@ -22,6 +22,14 @@
  *   - warning-text #86640d → #7d5f0b (warning 대비 4.46 → 4.88)
  *   - input #dbe7ff → #6f83b8 (비텍스트 대비 1.24 → 3.74)
  *   - 다크: text-muted #7c87a6 → #8894b5 (4.39 → 5.19), input #3a4266 → #6b7bb0 (1.61 → 3.80)
+ *
+ * v0.3.1 변경 — check:preview axe 대비 실패 교정:
+ *   - accent-text 신규: 중성(surface/surface-muted/background) 위 액센트 강조
+ *     소형 텍스트 전용 — 라이트 #6a4de0(5.62), 다크 #9a86ff
+ *   - accent 채움 + 소형 텍스트 조합은 accent 채움을 accent-deep으로 교체
+ *     (white/milk-white 대비 5.60) — accent 채움은 로고·아이콘·테두리 전용
+ *   - 틴트·파스텔 채움 위 소형 텍스트는 on-tint 고정 (기존 규약 재확인)
+ *   - 틴트 채움 위 text-muted(4.3 미달) → text-secondary(4.8)
  * ============================================================ */
 @theme {
   /* === 배경 레이어 === */
@@ -36,7 +44,8 @@
 
   /* === 액센트 (퍼플 — Weave 시그니처) === */
   --color-accent: #8b74ff; /* 로고, 활성 상태, 포커스 — 소형 텍스트·버튼 채움 금지 (white 대비 3.48) */
-  --color-accent-deep: #6a4de0; /* brutal 버튼 채움 전용 — white 텍스트 대비 5.60 (v0.3.0) */
+  --color-accent-deep: #6a4de0; /* 소형 텍스트를 싣는 브랜드 채움 — white 대비 5.60 (v0.3.0) */
+  --color-accent-text: #6a4de0; /* 중성 배경 위 액센트 강조 텍스트 — surface 대비 5.62 (v0.3.1) */
   --color-accent-soft: #dccfff; /* 액센트 배경 */
   --color-accent-pink: #ffd6e7; /* 핑크 포인트 */
 
@@ -123,6 +132,7 @@ body {
   --color-surface-muted: #262c4e;
   --color-primary-dark: #a9c3f5;
   --color-accent: #9a86ff;
+  --color-accent-text: #9a86ff; /* 다크 표면 위 강조 텍스트는 밝은 accent 재사용 */
   --color-ring: #9a86ff;
   --color-text: #eef1fb;
   --color-text-secondary: #aab4cf;

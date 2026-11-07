@@ -149,7 +149,7 @@ export function CalendarPage() {
                   className={cx(
                     'rounded-lg px-3 py-1.5 text-sm font-bold transition duration-150',
                     mode === t.key
-                      ? 'border border-border bg-surface text-accent shadow-sm'
+                      ? 'border border-border bg-surface text-accent-text shadow-sm'
                       : 'text-text-secondary hover:text-text',
                   )}
                 >

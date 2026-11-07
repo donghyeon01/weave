@@ -19,7 +19,7 @@ function AccentBadge({ children }: { children: string }) {
   return (
     <span
       aria-hidden="true"
-      className="inline-flex items-center rounded-full border-2 border-border bg-accent-soft px-3 py-1 text-sm font-bold text-accent"
+      className="inline-flex items-center rounded-full border-2 border-border bg-accent-soft px-3 py-1 text-sm font-bold text-on-tint"
     >
       {children}
     </span>
@@ -98,7 +98,7 @@ export function Sidebar() {
                 cx(
                   'flex h-11 items-center gap-3 rounded-lg py-3 pr-4 text-sm font-bold transition duration-150',
                   isActive
-                    ? 'border-l-4 border-accent bg-surface-muted pl-5 text-accent'
+                    ? 'border-l-4 border-accent bg-surface-muted pl-5 text-accent-text'
                     : 'pl-4 text-text-secondary hover:bg-surface-muted/60 hover:text-text',
                 )
               }

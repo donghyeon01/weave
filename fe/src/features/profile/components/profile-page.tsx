@@ -48,12 +48,13 @@ const SHARE_ROWS: {
   },
 ]
 
-function Switch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+function Switch({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
+      aria-label={label}
       onClick={onToggle}
       className={cx(
         'flex h-6 w-12 shrink-0 items-center rounded-full p-1 transition duration-150',
@@ -255,6 +256,7 @@ export function ProfilePage() {
                     </div>
                     <Switch
                       on={on}
+                      label={row.label}
                       onToggle={() =>
                         setDraft((d) => ({
                           ...d,

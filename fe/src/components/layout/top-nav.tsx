@@ -11,7 +11,7 @@ export function TopNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface md:hidden">
       <div className="flex h-14 items-center gap-3 px-4">
-        <Link to="/app" className="shrink-0 font-display text-xl text-accent">
+        <Link to="/app" className="shrink-0 font-display text-xl text-accent-text">
           Weave
         </Link>
         {/* 좁은 뷰포트에서 nav가 헤더를 밀지 않도록 수축+내부 스크롤 */}

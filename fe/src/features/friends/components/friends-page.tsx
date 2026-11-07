@@ -218,7 +218,7 @@ export function FriendsPage() {
             className={cx(
               'rounded-lg px-4 py-2 text-sm font-bold transition duration-150',
               tab === t.key
-                ? 'border border-border bg-surface-muted text-accent shadow-sm'
+                ? 'border border-border bg-surface-muted text-accent-text shadow-sm'
                 : 'text-text-secondary hover:text-text',
             )}
           >

@@ -68,13 +68,13 @@ export function WeekStrip({
                   aria-label={`${day.getDate()} ${ymd} 선택`}
                   className={cx(
                     'inline-flex h-6 w-6 items-center justify-center rounded-full text-sm font-bold',
-                    isToday ? 'bg-accent text-surface' : 'text-text',
+                    isToday ? 'bg-accent-deep text-surface' : 'text-text',
                   )}
                 >
                   {day.getDate()}
                 </button>
                 {isToday && (
-                  <span className="rounded bg-accent-soft px-1 py-0.5 text-[10px] font-bold text-accent">
+                  <span className="rounded bg-accent-soft px-1 py-0.5 text-[10px] font-bold text-on-tint">
                     오늘
                   </span>
                 )}

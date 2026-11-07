@@ -10,7 +10,7 @@ const VARIANTS: Record<BadgeVariant, string> = {
   success: 'bg-success text-success-text',
   warning: 'bg-warning text-warning-text',
   danger: 'bg-danger text-danger-text',
-  accent: 'bg-accent-soft text-accent',
+  accent: 'bg-accent-soft text-on-tint',
 }
 
 export function Badge({

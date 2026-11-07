@@ -168,7 +168,7 @@ export function TodoPage() {
               className={cx(
                 'rounded-lg px-4 py-2 text-sm font-bold transition duration-150',
                 filter === t.key
-                  ? 'border border-border bg-surface-muted text-accent shadow-sm'
+                  ? 'border border-border bg-surface-muted text-accent-text shadow-sm'
                   : 'text-text-secondary hover:text-text',
               )}
             >
@@ -320,6 +320,7 @@ export function TodoPage() {
         </div>
         <div
           role="progressbar"
+          aria-label="일일 달성도"
           aria-valuenow={rate}
           aria-valuemin={0}
           aria-valuemax={100}

@@ -127,12 +127,12 @@ export function ProposalsPage() {
             className={cx(
               'rounded-md px-4 py-1.5 text-sm font-bold transition duration-150',
               box === t.key
-                ? 'border border-border bg-surface text-accent shadow-sm'
+                ? 'border border-border bg-surface text-accent-text shadow-sm'
                 : 'text-text-secondary hover:text-text',
             )}
           >
             {t.label}{' '}
-            <span className={box === t.key ? 'text-accent' : 'text-text-muted'}>
+            <span className={box === t.key ? 'text-accent-text' : 'text-text-muted'}>
               ({t.count})
             </span>
           </button>
@@ -145,91 +145,94 @@ export function ProposalsPage() {
         message="제안을 불러오지 못했어요. 다시 시도해 주세요."
       />
 
-      <ul className="mt-6 flex flex-col gap-3">
-        {items.map((p) => {
-          const meta = STATUS_META[p.status]
-          return (
-            <li
-              key={p.id}
-              className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-[0_2px_10px_rgba(0,0,0,0.04)]"
-            >
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex items-center gap-2">
-                  <p className="truncate text-base font-bold text-text">{p.title}</p>
-                  <Badge variant={meta.variant}>{meta.label}</Badge>
+      {items.length > 0 && (
+        <ul className="mt-6 flex flex-col gap-3">
+          {items.map((p) => {
+            const meta = STATUS_META[p.status]
+            return (
+              <li
+                key={p.id}
+                className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-[0_2px_10px_rgba(0,0,0,0.04)]"
+              >
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-base font-bold text-text">{p.title}</p>
+                    <Badge variant={meta.variant}>{meta.label}</Badge>
+                  </div>
+                  <p className="text-sm font-medium text-text-secondary">
+                    {formatSlotHuman(p.slot)}
+                    {box === 'received' && ` · ${p.organizer.nickname} 님의 제안`}
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <Badge>
+                      수락 {p.acceptCount}/{p.totalCount}
+                    </Badge>
+                  </div>
                 </div>
-                <p className="text-sm font-medium text-text-secondary">
-                  {formatSlotHuman(p.slot)}
-                  {box === 'received' && ` · ${p.organizer.nickname} 님의 제안`}
-                </p>
-                <div className="flex items-center gap-1.5">
-                  <Badge>
-                    수락 {p.acceptCount}/{p.totalCount}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {box === 'received' && p.status === 'PENDING' && (
-                  <>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => accept(p)}
-                      disabled={respond.isPending}
-                    >
-                      <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="m5.4 10.7-2.8-2.8 1.1-1.1 1.7 1.6 4.9-4.9 1.1 1.2-6 6Z"
-                        />
-                      </svg>
-                      수락
-                    </Button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {box === 'received' && p.status === 'PENDING' && (
+                    <>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => accept(p)}
+                        disabled={respond.isPending}
+                      >
+                        <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="m5.4 10.7-2.8-2.8 1.1-1.1 1.7 1.6 4.9-4.9 1.1 1.2-6 6Z"
+                          />
+                        </svg>
+                        수락
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfirmAction({ kind: 'decline', id: p.id })}
+                      >
+                        거절
+                      </Button>
+                    </>
+                  )}
+                  {box === 'sent' && p.status === 'PENDING' && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setConfirmAction({ kind: 'decline', id: p.id })}
+                      onClick={() => setConfirmAction({ kind: 'cancel', id: p.id })}
                     >
-                      거절
+                      제안 취소
                     </Button>
-                  </>
-                )}
-                {box === 'sent' && p.status === 'PENDING' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setConfirmAction({ kind: 'cancel', id: p.id })}
-                  >
-                    제안 취소
+                  )}
+                  {p.status !== 'PENDING' && (
+                    <span className="text-[13px] font-medium text-text-muted">
+                      {p.status === 'CONFIRMED'
+                        ? '확정된 약속'
+                        : p.status === 'DECLINED'
+                          ? '거절된 제안'
+                          : '취소한 제안'}
+                    </span>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => setDetailId(p.id)}>
+                    상세
                   </Button>
-                )}
-                {p.status !== 'PENDING' && (
-                  <span className="text-[13px] font-medium text-text-muted">
-                    {p.status === 'CONFIRMED'
-                      ? '확정된 약속'
-                      : p.status === 'DECLINED'
-                        ? '거절된 제안'
-                        : '취소한 제안'}
-                  </span>
-                )}
-                <Button variant="ghost" size="sm" onClick={() => setDetailId(p.id)}>
-                  상세
-                </Button>
-              </div>
-            </li>
-          )
-        })}
-        {proposalsQuery.data !== undefined && items.length === 0 && (
-          <EmptyState
-            title={box === 'received' ? '받은 제안이 없어요' : '보낸 제안이 없어요'}
-            description={
-              box === 'received'
-                ? '친구가 보낸 일정 제안이 여기에 도착합니다'
-                : '일정 조율에서 제안을 보내면 여기에 표시됩니다'
-            }
-          />
-        )}
-      </ul>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {proposalsQuery.data !== undefined && items.length === 0 && (
+        <EmptyState
+          className="mt-6"
+          title={box === 'received' ? '받은 제안이 없어요' : '보낸 제안이 없어요'}
+          description={
+            box === 'received'
+              ? '친구가 보낸 일정 제안이 여기에 도착합니다'
+              : '일정 조율에서 제안을 보내면 여기에 표시됩니다'
+          }
+        />
+      )}
 
       {proposalsQuery.data !== undefined && proposalsQuery.data.totalPages > 1 && (
         <div className="mt-4 flex items-center justify-center gap-3">

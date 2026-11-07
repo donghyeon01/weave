@@ -12,7 +12,7 @@ export function LandingHeader() {
         <nav className="flex items-center gap-6" aria-label="랜딩 섹션">
           <a
             href="#features"
-            className="border-b-2 border-accent pb-1.5 text-base font-medium text-accent"
+            className="border-b-2 border-accent pb-1.5 text-base font-medium text-accent-text"
           >
             기능 소개
           </a>

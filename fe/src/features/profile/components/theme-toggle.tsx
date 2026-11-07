@@ -78,7 +78,7 @@ export function ThemeToggle() {
                 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                 'disabled:cursor-not-allowed disabled:opacity-60',
                 active
-                  ? 'border border-border bg-surface text-accent drop-shadow-sm'
+                  ? 'border border-border bg-surface text-accent-text drop-shadow-sm'
                   : 'text-text-secondary hover:text-text',
               )}
             >

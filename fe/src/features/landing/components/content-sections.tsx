@@ -50,7 +50,7 @@ function CalendarIcon() {
 
 function DiaryIcon() {
   return (
-    <svg viewBox="0 0 17.33 22.47" className="h-[22px] w-[17px]" aria-hidden="true">
+    <svg viewBox="0 0 17.33 22.47" className="h-5.5 w-4.25" aria-hidden="true">
       <path
         fill="#1E2538"
         d="M2.16667 21.6667C1.57083 21.6667 1.06076 21.4545 0.636458 21.0302C0.212153 20.6059 0 20.0958 0 19.5V2.16667C0 1.57083 0.212153 1.06076 0.636458 0.636458C1.06076 0.212153 1.57083 0 2.16667 0H15.1667C15.7625 0 16.2726 0.212153 16.6969 0.636458C17.1212 1.06076 17.3333 1.57083 17.3333 2.16667V19.5C17.3333 20.0958 17.1212 20.6059 16.6969 21.0302C16.2726 21.4545 15.7625 21.6667 15.1667 21.6667H2.16667V21.6667M2.16667 19.5H15.1667V19.5V2.16667V2.16667V2.16667H13V9.75L10.2917 8.125L7.58333 9.75V2.16667H2.16667V2.16667V2.16667V19.5V19.5V19.5V19.5M7.58333 9.75L10.2917 8.125L13 9.75V9.75L10.2917 8.125L7.58333 9.75V9.75"
@@ -79,7 +79,7 @@ function FeatureCard({
       >
         {icon}
       </div>
-      <h3 className="pt-2 font-display text-xl leading-[27px]">{title}</h3>
+      <h3 className="pt-2 font-display text-xl leading-6.75">{title}</h3>
       <p className="text-base font-medium leading-[26px] text-text-secondary">{desc}</p>
       <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">{widget}</div>
     </div>

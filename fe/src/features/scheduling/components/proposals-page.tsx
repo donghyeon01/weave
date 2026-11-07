@@ -89,7 +89,7 @@ export function ProposalsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1024px] p-8">
+    <div className="mx-auto w-full max-w-5xl p-8">
       <div className="flex flex-col gap-2.5">
         <div className="flex items-center gap-3">
           <h1 className="font-display text-[32px] leading-normal">제안 보관함</h1>
@@ -152,7 +152,7 @@ export function ProposalsPage() {
             return (
               <li
                 key={p.id}
-                className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-[0_2px_10px_rgba(0,0,0,0.04)]"
+                className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-card"
               >
                 <div className="flex min-w-0 flex-col gap-1.5">
                   <div className="flex items-center gap-2">

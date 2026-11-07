@@ -22,6 +22,7 @@ interface CalendarGridProps {
   ddayTasks: TaskItem[]
   onSelectDate: (ymd: string) => void
   onEventClick: (event: EventItem) => void
+  onDoubleClickDate?: (ymd: string) => void
 }
 
 export function CalendarGrid({
@@ -33,6 +34,7 @@ export function CalendarGrid({
   ddayTasks,
   onSelectDate,
   onEventClick,
+  onDoubleClickDate,
 }: CalendarGridProps) {
   const days = monthGridDays(year, month)
 
@@ -62,6 +64,7 @@ export function CalendarGrid({
             <div
               key={ymd}
               onClick={() => onSelectDate(ymd)}
+              onDoubleClick={() => onDoubleClickDate?.(ymd)}
               className={cx(
                 'flex min-h-24 cursor-pointer flex-col items-stretch gap-0.5 border-b border-border p-1.5 transition duration-150 hover:bg-surface-muted',
                 (i + 1) % 7 !== 0 && 'border-r',

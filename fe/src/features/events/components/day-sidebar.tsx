@@ -1,4 +1,5 @@
 import type { EventItem } from '../types'
+import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { cx } from '../../../utils/cx'
 import { CHIP_STYLES } from '../legend'
@@ -21,11 +22,14 @@ export function DaySidebar({ date, events, onEventClick, onAddClick }: DaySideba
   const sorted = sortByStart(events)
 
   return (
-    <aside className="rounded-2xl border-2 border-border-strong bg-surface p-4 shadow-brutal-sm">
+    <aside className="w-[320px] shrink-0 rounded-2xl border border-border bg-surface p-4 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-lg">{formatHeading(date)}</h2>
-        <Button variant="ghost" size="sm" onClick={onAddClick}>
-          + 일정 추가
+        <div className="flex items-center gap-2">
+          <h2 className="font-display text-lg">{formatHeading(date)} 일정</h2>
+          {sorted.length > 0 && <Badge>오늘 일정 {sorted.length}개</Badge>}
+        </div>
+        <Button variant="ghost" size="sm" onClick={onAddClick} aria-label="일정 추가">
+          +
         </Button>
       </div>
       {sorted.length === 0 ? (

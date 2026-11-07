@@ -238,7 +238,7 @@ export function SchedulingPage() {
         </div>
         <div className="flex items-center gap-2">
           <span className="rounded-xl border border-border bg-surface px-4 py-2.5 text-sm shadow-sm">
-            선택된 친구 <span className="font-bold text-accent-deep">{selectedIds.length}명</span>
+            선택된 친구 <span className="font-bold text-accent-text">{selectedIds.length}명</span>
           </span>
           <span className="rounded-xl border border-border bg-surface px-4 py-2.5 text-sm shadow-sm">
             발견된 슬롯{' '}
@@ -265,14 +265,22 @@ export function SchedulingPage() {
                 className={cx(
                   'flex size-8 items-center justify-center rounded-lg text-sm font-medium',
                   state === 'done' && 'bg-surface-muted text-accent-text',
-                  state === 'active' && 'bg-accent-deep text-surface',
+                  state === 'active' && 'bg-accent-deep text-white',
                   state === 'next' && 'bg-surface-muted text-text-secondary',
                 )}
               >
                 {state === 'done' ? '✓' : `0${n}`}
               </span>
               <div>
-                <p className="text-[10px] font-medium text-text-secondary">STEP 0{n}</p>
+                <p
+                  className={cx(
+                    'text-[10px] font-medium',
+                    // active 단계는 accent-soft/40 워시 위 — text만 대비 통과
+                    state === 'active' ? 'text-text' : 'text-text-secondary',
+                  )}
+                >
+                  STEP 0{n}
+                </p>
                 <p className="text-sm font-bold text-text">{label}</p>
               </div>
             </div>
@@ -305,18 +313,23 @@ export function SchedulingPage() {
                         onChange={() => toggleParticipant(f.user.id)}
                         className="h-4 w-4 accent-accent"
                       />
-                      <span className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-dark">
+                      <span className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-on-tint">
                         {f.user.nickname.slice(0, 1)}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-bold text-text">
                           {f.user.nickname}
                         </span>
-                        <span className="block truncate text-xs text-text-secondary">
+                        <span
+                          className={cx(
+                            'block truncate text-xs',
+                            checked ? 'text-text' : 'text-text-secondary',
+                          )}
+                        >
                           {f.user.email}
                         </span>
                       </span>
-                      {checked && <span className="text-xs font-bold text-on-tint">선택됨</span>}
+                      {checked && <span className="text-xs font-bold text-text">선택됨</span>}
                     </label>
                   </li>
                 )
@@ -524,11 +537,24 @@ export function SchedulingPage() {
                     <Badge>대안 슬롯 #{c.rank}</Badge>
                   )}
                   {c.percent === 100 && (
-                    <span className="text-xs font-bold text-success-text">100% 매칭</span>
+                    <span
+                      className={cx(
+                        'text-xs font-bold',
+                        // rank 1 카드는 accent-soft/40 워시 위 — text만 대비 통과
+                        c.rank === 1 ? 'text-text' : 'text-success-text',
+                      )}
+                    >
+                      100% 매칭
+                    </span>
                   )}
                 </div>
                 <p className="mt-2 font-display text-2xl leading-8">{formatSlotHuman(c.slot)}</p>
-                <p className="mt-1 text-sm font-medium text-text-secondary">
+                <p
+                  className={cx(
+                    'mt-1 text-sm font-medium',
+                    c.rank === 1 ? 'text-text' : 'text-text-secondary',
+                  )}
+                >
                   참여율 {c.availableCount}/{c.totalCount}
                   {c.availableCount === c.totalCount ? ' (전원 참석)' : ' — 조율 필요 인원 포함'}
                 </p>
@@ -537,7 +563,7 @@ export function SchedulingPage() {
                     {selectedFriends.slice(0, 5).map((f) => (
                       <span
                         key={f.friendshipId}
-                        className="flex size-7 items-center justify-center rounded-full border-2 border-surface bg-primary text-[11px] font-bold text-primary-dark"
+                        className="flex size-7 items-center justify-center rounded-full border-2 border-surface bg-primary text-[11px] font-bold text-on-tint"
                         title={f.user.nickname}
                       >
                         {f.user.nickname.slice(0, 1)}

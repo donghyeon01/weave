@@ -134,7 +134,7 @@ export function Sidebar() {
         </Link>
         <div className="flex items-center justify-between rounded-xl border border-border bg-surface-muted p-2.75">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-text">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-on-tint">
               {avatarText || '—'}
             </span>
             <span className="min-w-0">

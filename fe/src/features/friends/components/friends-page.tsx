@@ -52,7 +52,7 @@ function Avatar({ user, size = 'md' }: { user: FriendshipItem['user']; size?: 'm
   return (
     <span
       aria-hidden="true"
-      className={`flex ${cls} items-center justify-center rounded-full border-2 border-surface bg-primary font-bold text-primary-dark`}
+      className={`flex ${cls} items-center justify-center rounded-full border-2 border-surface bg-primary font-bold text-on-tint`}
     >
       {user.nickname.slice(0, 1)}
     </span>
@@ -345,7 +345,7 @@ export function FriendsPage() {
                     />
                   </svg>
                   {f.nextEvent ? (
-                    <span className="rounded-md bg-tint-mint px-2.5 py-1 text-xs font-bold text-success-text">
+                    <span className="rounded-md bg-tint-mint px-2.5 py-1 text-xs font-bold text-on-success">
                       {new Date(f.nextEvent.startTime).toLocaleDateString('ko-KR', {
                         month: 'numeric',
                         day: 'numeric',

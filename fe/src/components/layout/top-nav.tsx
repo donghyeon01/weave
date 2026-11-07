@@ -40,7 +40,7 @@ export function TopNav() {
           <Link
             to="/app/profile"
             aria-label="내 프로필"
-            className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-text"
+            className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-on-tint"
           >
             {avatarText || '—'}
           </Link>

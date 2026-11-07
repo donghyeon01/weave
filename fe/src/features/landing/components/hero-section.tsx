@@ -6,11 +6,12 @@ import { buttonClasses } from '../../../components/ui/button-styles'
 // 좌: 배지·헤드라인(밑줄 강조)·서브·CTA·신뢰 배지 / 우: 주간 타임테이블 목업 카드.
 const DAYS = ['수 (14)', '목 (15)', '금 (16)', '토 (17)', '일 (18)'] as const
 
-const BLOCKS: { day: number; top: string; bg: string; title: string; time: string }[] = [
-  { day: 0, top: 'pt-0', bg: 'bg-primary', title: '민지의 수업', time: '10:00-12:00' },
-  { day: 1, top: 'pt-8', bg: 'bg-accent-soft', title: '지우 운동', time: '14:00-16:00' },
-  { day: 2, top: 'pt-3', bg: 'bg-surface', title: '서준 알바', time: '12:00-18:00' },
-  { day: 4, top: 'pt-6', bg: 'bg-primary', title: '팀 프로젝트', time: '15:00-17:00' },
+const BLOCKS: { day: number; top: string; bg: string; fg: string; title: string; time: string }[] = [
+  { day: 0, top: 'pt-0', bg: 'bg-primary', fg: 'text-on-tint', title: '민지의 수업', time: '10:00-12:00' },
+  { day: 1, top: 'pt-8', bg: 'bg-accent-soft', fg: 'text-on-tint', title: '지우 운동', time: '14:00-16:00' },
+  // bg-surface는 테마 연동 채움 — 고정 on-tint 대신 text를 쓴다
+  { day: 2, top: 'pt-3', bg: 'bg-surface', fg: 'text-text', title: '서준 알바', time: '12:00-18:00' },
+  { day: 4, top: 'pt-6', bg: 'bg-primary', fg: 'text-on-tint', title: '팀 프로젝트', time: '15:00-17:00' },
 ]
 
 function TimetableCard() {
@@ -69,8 +70,8 @@ function TimetableCard() {
                       <div
                         className={`rounded border border-border-strong px-1.5 py-1 ${b.bg}`}
                       >
-                        <p className="text-[11px] font-medium text-on-tint">{b.title}</p>
-                        <p className="text-[10px] font-medium text-on-tint">{b.time}</p>
+                        <p className={`text-[11px] font-medium ${b.fg}`}>{b.title}</p>
+                        <p className={`text-[10px] font-medium ${b.fg}`}>{b.time}</p>
                       </div>
                     </div>
                   ) : null

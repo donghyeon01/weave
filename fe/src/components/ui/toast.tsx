@@ -14,8 +14,8 @@ interface ToastProps {
 
 const VARIANTS: Record<ToastVariant, string> = {
   info: 'bg-accent text-white',
-  success: 'bg-success text-success-text',
-  danger: 'bg-danger text-danger-text',
+  success: 'bg-success text-on-success',
+  danger: 'bg-danger text-on-danger',
 }
 
 // toast.md — 상단 중앙 고정, 동시 1개(부모가 교체 제어), danger는 role=alert+assertive.

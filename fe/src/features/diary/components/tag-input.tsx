@@ -34,14 +34,14 @@ export function TagInput({ tags, onChange }: TagInputProps) {
       {tags.map((tag) => (
         <span
           key={tag}
-          className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-dark"
+          className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-on-tint"
         >
           {tag}
           <button
             type="button"
             onClick={() => onChange(tags.filter((t) => t !== tag))}
             aria-label={`태그 ${tag} 제거`}
-            className="rounded-full text-primary-dark transition duration-150 hover:opacity-60"
+            className="rounded-full text-on-tint transition duration-150 hover:opacity-60"
           >
             ×
           </button>

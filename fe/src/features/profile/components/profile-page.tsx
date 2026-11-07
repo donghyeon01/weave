@@ -6,6 +6,7 @@ import { Modal } from '../../../components/ui/modal'
 import { Toast } from '../../../components/ui/toast'
 import { ApiError } from '../../../lib/api-client'
 import { useDeleteAccount, useLogout, useMe, useUpdateNickname } from '../api/use-profile'
+import { ThemeToggle } from './theme-toggle'
 
 const CONFIRM_WORD = '탈퇴'
 
@@ -76,6 +77,14 @@ export function ProfilePage() {
             저장
           </Button>
         </form>
+      </section>
+
+      {/* 앱 설정 — 시안 4:187 카드: 화면 테마 (UI·알림 환경은 V2 이연) */}
+      <section className="mt-6 rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-brutal-sm">
+        <h2 className="text-sm font-bold text-text">앱 설정</h2>
+        <div className="mt-4">
+          <ThemeToggle />
+        </div>
       </section>
 
       {/* danger zone — SYSTEM.md C 레이아웃: 제목 → 설명(전폭) → 버튼 우측 하단 (제목-설명 4px, 설명-버튼 14px, pad 16) */}

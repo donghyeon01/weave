@@ -1,6 +1,7 @@
 import { create } from 'zustand'
+import { apiFetch } from '../lib/api-client'
 import { queryClient, queryKeys } from '../lib/react-query'
-import type { TokenResponse } from '../types/auth'
+import type { TokenResponse, UserResponse } from '../types/auth'
 
 export type AuthStatus = 'booting' | 'guest' | 'authed'
 
@@ -26,6 +27,11 @@ export const useAuthStore = create<AuthState>()((set) => ({
   login: (response) => {
     set({ accessToken: response.accessToken, status: 'authed' })
     queryClient.setQueryData(queryKeys.users.me, response.user)
+    // 로그인 응답의 user는 V3 필드(theme·bio·share_*)를 싣지 않는다.
+    // useMe는 queryFn 없는 읽기 전용 캐시라 invalidate가 못 채우므로 직접 재조회한다.
+    void apiFetch<UserResponse>('/api/users/me')
+      .then((me) => queryClient.setQueryData(queryKeys.users.me, me))
+      .catch(() => {})
   },
 
   logout: () => {

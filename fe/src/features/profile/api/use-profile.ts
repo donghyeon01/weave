@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../../lib/api-client'
 import { queryKeys } from '../../../lib/react-query'
 import { useAuthStore } from '../../../stores/auth-store'
-import type { UserResponse } from '../../../types/auth'
+import type { UserResponse, UserTheme } from '../../../types/auth'
 
 // ['users','me']는 provider·login이 채운다 — 여기선 읽기만 한다.
 export function useMe() {
@@ -26,6 +26,18 @@ export function useUpdateNickname() {
 }
 
 // 탈퇴는 성공 즉시 guest 전이 — 호출부는 "탈퇴" 입력 확인 모달을 거친다.
+export function useUpdateTheme() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (theme: UserTheme) =>
+      apiFetch<UserResponse>('/api/users/me', {
+        method: 'PATCH',
+        body: { theme },
+      }),
+    onSuccess: (user) => queryClient.setQueryData(queryKeys.users.me, user),
+  })
+}
+
 export function useDeleteAccount() {
   const logout = useAuthStore((s) => s.logout)
   return useMutation({

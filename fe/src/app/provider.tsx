@@ -7,6 +7,7 @@ import { ensureFreshToken } from '../lib/refresh'
 import { useAuthStore } from '../stores/auth-store'
 import { startSyncTracking } from '../stores/sync-store'
 import type { UserResponse } from '../types/auth'
+import { ThemeSync } from './theme-sync'
 
 // REST 성공 시각 추적 — 콘텐츠 헤더의 cloud-sync-status가 읽는다
 startSyncTracking()
@@ -32,5 +33,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void restoreSession()
   }, [])
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeSync />
+      {children}
+    </QueryClientProvider>
+  )
 }

@@ -80,7 +80,7 @@ function FeatureCard({
         {icon}
       </div>
       <h3 className="pt-2 font-display text-xl leading-6.75">{title}</h3>
-      <p className="text-base font-medium leading-[26px] text-text-secondary">{desc}</p>
+      <p className="text-base font-medium leading-6.5 text-text-secondary">{desc}</p>
       <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">{widget}</div>
     </div>
   )
@@ -222,7 +222,7 @@ export function ExampleSection() {
   return (
     <LandingSection tone="background">
       <SectionHeading badge="추천 예시" title="실제로 이렇게 추천돼요" />
-      <div className="mx-auto flex w-full max-w-[460px] flex-col gap-2.5 rounded-2xl border-[3px] border-border-strong bg-success-light px-6 py-[18px] shadow-brutal-accent text-on-tint">
+      <div className="mx-auto flex w-full max-w-115 flex-col gap-2.5 rounded-2xl border-[3px] border-border-strong bg-success-light px-6 py-4.5 shadow-brutal-accent text-on-tint">
         <div className="flex items-center gap-2">
           <Badge variant="success">추천도 100%</Badge>
           <span className="text-sm font-bold text-on-tint">★ 최적의 선택</span>

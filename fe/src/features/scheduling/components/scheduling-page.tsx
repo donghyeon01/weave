@@ -14,6 +14,7 @@ import { useFriendBlocks } from '../api/use-friend-blocks'
 import { useRecommend } from '../api/use-recommend'
 import { useCreateProposal } from '../api/use-proposal-mutations'
 import { EmptyState } from '../../../components/ui/empty-state'
+import { InlineError } from '../../../components/ui/inline-error'
 
 function todayPlus(days: number): string {
   const d = new Date()
@@ -174,8 +175,7 @@ export function SchedulingPage() {
     )
   }
 
-  const runRecommend = (e: FormEvent) => {
-    e.preventDefault()
+  const submitRecommend = () => {
     setFormError(null)
     recommend.mutate(
       {
@@ -199,6 +199,13 @@ export function SchedulingPage() {
       },
     )
   }
+
+  const runRecommend = (e: FormEvent) => {
+    e.preventDefault()
+    submitRecommend()
+  }
+
+  const retryRecommend = () => submitRecommend()
 
   const submitProposal = (e: FormEvent) => {
     e.preventDefault()
@@ -446,11 +453,7 @@ export function SchedulingPage() {
               <p className="text-xs font-medium text-text-muted">서울 / 한국 표준시 (KST)</p>
             </div>
 
-            {formError !== null && (
-              <p role="alert" className="mt-3 text-sm font-semibold text-danger-text">
-                {formError}
-              </p>
-            )}
+
 
             {/* 시안 유일의 네오 브루탈 액션 버튼 */}
             <Button
@@ -481,6 +484,13 @@ export function SchedulingPage() {
             </Link>
           </div>
 
+          {formError !== null && (
+            <InlineError
+              className="mb-4"
+              message={formError}
+              onRetry={retryRecommend}
+            />
+          )}
           {candidates === null && (
             <EmptyState
               className="mt-4"

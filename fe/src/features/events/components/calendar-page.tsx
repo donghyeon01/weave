@@ -13,8 +13,8 @@ import { DaySidebar } from './day-sidebar'
 import { EventDetailModal } from './event-detail-modal'
 import { EventFormModal } from './event-form-modal'
 import { addDays, addMonths, eventCoversDate, monthGridRange, parseYmd, toYmd } from '../utils'
-import { InlineError } from '../../../components/ui/inline-error'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
+import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 
 type FormTarget = { mode: 'create'; date: string } | { mode: 'edit'; event: EventItem }
 type ViewMode = 'month' | 'week' | 'day'
@@ -169,12 +169,10 @@ export function CalendarPage() {
 
         <div className="mt-5">
           {eventsQuery.isPending && <SkeletonRow rows={4} />}
-          {eventsQuery.isError && (
-            <InlineError
-              message="일정을 불러오지 못했어요"
-              onRetry={() => eventsQuery.refetch()}
-            />
-          )}
+          <QueryErrorToast
+            show={eventsQuery.isError}
+            message="일정을 불러오지 못했어요. 다시 시도해 주세요."
+          />
           {mode === 'month' && (
             <CalendarGrid
               year={view.year}

@@ -9,8 +9,8 @@ import { cx } from '../../../utils/cx'
 import { useProposal, useProposals } from '../api/use-proposals'
 import { useCancelProposal, useRespondProposal } from '../api/use-proposal-mutations'
 import { EmptyState } from '../../../components/ui/empty-state'
-import { InlineError } from '../../../components/ui/inline-error'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
+import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 
 type Box = 'received' | 'sent'
 
@@ -140,13 +140,10 @@ export function ProposalsPage() {
       </div>
 
       {proposalsQuery.isPending && <SkeletonRow rows={3} className="mt-6" />}
-      {proposalsQuery.isError && (
-        <InlineError
-          className="mt-6"
-          message="제안을 불러오지 못했어요"
-          onRetry={() => proposalsQuery.refetch()}
-        />
-      )}
+      <QueryErrorToast
+        show={proposalsQuery.isError}
+        message="제안을 불러오지 못했어요. 다시 시도해 주세요."
+      />
 
       <ul className="mt-6 flex flex-col gap-3">
         {items.map((p) => {

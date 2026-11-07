@@ -20,6 +20,7 @@ import {
 } from '../api/use-friends'
 import type { FriendshipItem } from '../types'
 import { EmptyState } from '../../../components/ui/empty-state'
+import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 
 type Tab = 'all' | 'received' | 'sent'
 
@@ -501,6 +502,10 @@ export function FriendsPage() {
         confirmLabel={pendingAction !== null ? ACTION_TEXT[pendingAction.kind].confirm : '확인'}
         tone="danger"
         pending={deleteFriendship.isPending}
+      />
+      <QueryErrorToast
+        show={friendsQuery.isError}
+        message="친구 목록을 불러오지 못했어요. 다시 시도해 주세요."
       />
       {toast !== null && (
         <Toast variant={toast.variant} message={toast.message} onClose={() => setToast(null)} />

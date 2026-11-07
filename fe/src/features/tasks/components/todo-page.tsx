@@ -14,8 +14,8 @@ import { useDeleteTask } from '../api/use-delete-task'
 import { useTasks } from '../api/use-tasks'
 import { useToggleTask } from '../api/use-toggle-task'
 import { EmptyState } from '../../../components/ui/empty-state'
-import { InlineError } from '../../../components/ui/inline-error'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
+import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 
 type Filter = 'all' | 'active' | 'done'
 type Sort = 'priority' | 'created'
@@ -197,12 +197,11 @@ export function TodoPage() {
         </div>
       </div>
 
-      {tasksQuery.isPending && <SkeletonRow rows={4} className="mt-6" />}
+      {tasksQuery.isPending && <SkeletonRow rows={3} className="mt-6" />}
       {tasksQuery.isError && (
-        <InlineError
-          className="mt-6"
-          message="할 일을 불러오지 못했어요"
-          onRetry={() => tasksQuery.refetch()}
+        <QueryErrorToast
+          show
+          message="할 일을 불러오지 못했어요. 다시 시도해 주세요."
         />
       )}
       {!tasksQuery.isPending && !tasksQuery.isError && visible.length === 0 && (

@@ -279,7 +279,8 @@ export function DiaryEditor({ date }: { date: string }) {
   const diaryQuery = useDiary(date)
 
   if (diaryQuery.isPending) {
-    return <SkeletonRow rows={3} />
+    // 116:5111 — 에디터·레일 크기의 대형 블록 2개
+    return <SkeletonRow rows={2} rowClassName="h-96" />
   }
   if (diaryQuery.isError) {
     return (

@@ -3,6 +3,7 @@ import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
 import { Modal } from '../../../components/ui/modal'
+import { SkeletonRow } from '../../../components/ui/skeleton-row'
 import { Toast } from '../../../components/ui/toast'
 import { ApiError } from '../../../lib/api-client'
 import { cx } from '../../../utils/cx'
@@ -142,6 +143,10 @@ export function ProfilePage() {
         <Badge>마지막 저장: 방금 전</Badge>
       </div>
 
+      {me.isPending ? (
+        // 116:6142 — 카드 블록 4개 스켈레톤 (스티키 저장 바는 하단 고정 노출)
+        <SkeletonRow rows={4} rowClassName="h-24" className="mt-8" />
+      ) : (
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* 프로필 정보 */}
         <section className={`${cardClass} lg:col-span-7`}>
@@ -349,6 +354,7 @@ export function ProfilePage() {
           </div>
         </section>
       </div>
+      )}
 
       {/* 하단 스티키 저장 바 — 시안 4:6: blur + border-t + 암호화 문구 + 변경 취소/저장하기 */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/80 backdrop-blur-[12px] md:left-64">

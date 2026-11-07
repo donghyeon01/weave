@@ -13,7 +13,6 @@ import { DaySidebar } from './day-sidebar'
 import { EventDetailModal } from './event-detail-modal'
 import { EventFormModal } from './event-form-modal'
 import { addDays, addMonths, eventCoversDate, monthGridRange, parseYmd, toYmd } from '../utils'
-import { SkeletonRow } from '../../../components/ui/skeleton-row'
 import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 
 type FormTarget = { mode: 'create'; date: string } | { mode: 'edit'; event: EventItem }
@@ -168,12 +167,19 @@ export function CalendarPage() {
         </div>
 
         <div className="mt-5">
-          {eventsQuery.isPending && <SkeletonRow rows={4} />}
+          {eventsQuery.isPending && (
+            // 116:1199 — 월 그리드 셀 형태 스켈레톤 (7열×3행)
+            <div role="status" aria-label="불러오는 중" className="grid grid-cols-7 gap-1">
+              {Array.from({ length: 21 }, (_, i) => (
+                <div key={i} aria-hidden="true" className="h-20 animate-pulse rounded bg-surface-muted" />
+              ))}
+            </div>
+          )}
           <QueryErrorToast
             show={eventsQuery.isError}
             message="일정을 불러오지 못했어요. 다시 시도해 주세요."
           />
-          {mode === 'month' && (
+          {!eventsQuery.isPending && mode === 'month' && (
             <CalendarGrid
               year={view.year}
               month={view.month}
@@ -186,7 +192,7 @@ export function CalendarPage() {
               onDoubleClickDate={(ymd) => setFormTarget({ mode: 'create', date: ymd })}
             />
           )}
-          {mode === 'week' && (
+          {!eventsQuery.isPending && mode === 'week' && (
             <WeekStrip
               weekStart={weekAnchor}
               selectedDate={selectedDate}
@@ -198,7 +204,7 @@ export function CalendarPage() {
               onDoubleClickDate={(ymd) => setFormTarget({ mode: 'create', date: ymd })}
             />
           )}
-          {mode === 'day' && (
+          {!eventsQuery.isPending && mode === 'day' && (
             <DayView
               date={selectedDate}
               events={selectedDayEvents}

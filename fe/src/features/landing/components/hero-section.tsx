@@ -18,9 +18,9 @@ function TimetableCard() {
   return (
     <div
       aria-hidden="true"
-      className="w-full max-w-128 overflow-clip rounded-xl border-[3px] border-border-strong bg-surface shadow-brutal-lg"
+      className="w-full max-w-128 overflow-clip rounded-xl border-3 border-border-strong bg-surface shadow-brutal-lg"
     >
-      <div className="flex items-center justify-between border-b-[3px] border-border-strong bg-accent-soft px-4 pb-2.5 pt-2">
+      <div className="flex items-center justify-between border-b-3 border-border-strong bg-accent-soft px-4 pb-2.5 pt-2">
         <div className="flex items-center gap-2">
           <span className="size-3 rounded-full bg-border-strong" />
           <span className="font-display text-xl text-on-tint">📅 이번 주 약속 잡기</span>

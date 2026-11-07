@@ -222,7 +222,7 @@ export function ExampleSection() {
   return (
     <LandingSection tone="background">
       <SectionHeading badge="추천 예시" title="실제로 이렇게 추천돼요" />
-      <div className="mx-auto flex w-full max-w-115 flex-col gap-2.5 rounded-2xl border-[3px] border-border-strong bg-success-light px-6 py-4.5 shadow-brutal-accent text-on-tint">
+      <div className="mx-auto flex w-full max-w-115 flex-col gap-2.5 rounded-2xl border-3 border-border-strong bg-success-light px-6 py-4.5 shadow-brutal-accent text-on-tint">
         <div className="flex items-center gap-2">
           <Badge variant="success">추천도 100%</Badge>
           <span className="text-sm font-bold text-on-tint">★ 최적의 선택</span>

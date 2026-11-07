@@ -22,13 +22,13 @@ function TimetableCard() {
       <div className="flex items-center justify-between border-b-[3px] border-border-strong bg-accent-soft px-4 pb-2.5 pt-2">
         <div className="flex items-center gap-2">
           <span className="size-3 rounded-full bg-border-strong" />
-          <span className="font-display text-xl text-text">📅 이번 주 약속 잡기</span>
+          <span className="font-display text-xl text-on-tint">📅 이번 주 약속 잡기</span>
         </div>
         <div className="flex items-center">
           {(['민', '서', '지'] as const).map((initial, i) => (
             <span
               key={initial}
-              className={`-mr-2 flex size-7 items-center justify-center rounded-full border-2 border-border-strong text-xs font-bold last:mr-0 ${
+              className={`-mr-2 flex size-7 items-center justify-center rounded-full border-2 border-border-strong text-xs font-bold text-on-tint last:mr-0 ${
                 ['bg-primary', 'bg-tint-butter', 'bg-tint-mint'][i]
               }`}
             >
@@ -69,8 +69,8 @@ function TimetableCard() {
                       <div
                         className={`rounded border border-border-strong px-1.5 py-1 ${b.bg}`}
                       >
-                        <p className="text-[11px] font-medium text-text">{b.title}</p>
-                        <p className="text-[10px] text-text-secondary">{b.time}</p>
+                        <p className="text-[11px] font-medium text-on-tint">{b.title}</p>
+                        <p className="text-[10px] font-medium text-on-tint">{b.time}</p>
                       </div>
                     </div>
                   ) : null
@@ -90,7 +90,7 @@ function TimetableCard() {
               />
             </svg>
             <div>
-              <p className="text-sm font-bold text-surface">3명 모두 가능한 최적 시간 발견!</p>
+              <p className="text-sm font-bold text-milk-white">3명 모두 가능한 최적 시간 발견!</p>
               <p className="text-xs font-medium text-primary">
                 목요일 18:00 - 20:00 · 홍대입구 연남동
               </p>
@@ -119,7 +119,7 @@ export function HeroSection() {
       <div className="relative mx-auto grid max-w-[1280px] items-center gap-8 px-6 pb-12 pt-12 md:grid-cols-2">
         <div className="flex flex-col items-start gap-4">
           <Badge variant="accent">✨ 스마트 일정 조율 솔루션</Badge>
-          <h1 className="font-display text-[44px] leading-[55px] text-text">
+          <h1 className="font-display text-[44px] leading-[55px] text-on-tint">
             친구와 겹치는 시간을
             <br />
             <span className="text-accent-deep underline decoration-border-strong decoration-4 underline-offset-4">
@@ -128,7 +128,7 @@ export function HeroSection() {
             <br />
             스마트 일정 조율
           </h1>
-          <p className="max-w-[512px] text-base font-medium text-text">
+          <p className="max-w-[512px] text-base font-medium text-on-tint">
             할 일, 캘린더, 일기, 친구까지 하나로 엮다. 복잡한 단톡방 조율 대신 Weave로 한
             번에 약속 시간을 찾아보세요.
           </p>

@@ -222,14 +222,14 @@ export function ExampleSection() {
   return (
     <LandingSection tone="background">
       <SectionHeading badge="추천 예시" title="실제로 이렇게 추천돼요" />
-      <div className="mx-auto flex w-full max-w-[460px] flex-col gap-2.5 rounded-2xl border-[3px] border-border-strong bg-success-light px-6 py-[18px] shadow-brutal-accent">
+      <div className="mx-auto flex w-full max-w-[460px] flex-col gap-2.5 rounded-2xl border-[3px] border-border-strong bg-success-light px-6 py-[18px] shadow-brutal-accent text-on-tint">
         <div className="flex items-center gap-2">
           <Badge variant="success">추천도 100%</Badge>
           <span className="text-sm font-bold text-accent">★ 최적의 선택</span>
         </div>
         <p className="font-display text-[26px] leading-normal">5월 23일 금요일 19:00 – 21:00</p>
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-text-secondary">
+          <p className="text-sm font-medium text-on-tint/70">
             참여 가능 4/4명 · 모두 비어있는 시간
           </p>
           <span className={buttonClasses({ variant: 'primary', size: 'md' })}>

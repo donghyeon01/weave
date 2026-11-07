@@ -230,7 +230,7 @@ export function FriendsPage() {
       {tab === 'all' && (
         <>
           {received.length > 0 && (
-            <div className="mt-6 rounded-xl border border-border bg-tint-peach p-5">
+            <div className="mt-6 rounded-xl border border-border bg-tint-peach p-5 text-on-tint">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <svg viewBox="0 0 20 18" className="h-[18px] w-5" aria-hidden="true">
@@ -241,7 +241,7 @@ export function FriendsPage() {
                   </svg>
                   <h2 className="font-display text-xl">새로운 친구 요청이 {received.length}건 있어요</h2>
                 </div>
-                <span className="text-xs font-medium text-text-secondary">
+                <span className="text-xs font-medium text-on-tint/70">
                   최근 3일 내 도착한 요청
                 </span>
               </div>

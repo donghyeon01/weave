@@ -35,7 +35,7 @@ export function MoodPicker({ value, onChange }: MoodPickerProps) {
           >
             <span className="text-base font-bold">{mood.emoji}</span>
             <span
-              className={cx('text-sm', active ? 'font-medium text-text' : 'font-medium')}
+              className={cx('text-sm', active ? 'font-medium text-on-tint' : 'font-medium')}
             >
               {mood.label}
             </span>

@@ -222,7 +222,7 @@ export function ProfilePage() {
         <section className={`${cardClass} lg:col-span-5`}>
           <div className={cardHead}>
             <div className="flex items-center gap-2.5">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-tint-butter">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-tint-butter text-on-tint">
                 <svg viewBox="0 0 18 13" className="h-3 w-[18px]" aria-hidden="true">
                   <path
                     fill="currentColor"
@@ -268,7 +268,7 @@ export function ProfilePage() {
               )
             })}
           </div>
-          <div className="mt-4 flex items-start gap-2 rounded-xl bg-tint-peach p-3">
+          <div className="mt-4 flex items-start gap-2 rounded-xl bg-tint-peach p-3 text-on-tint">
             <span className="text-xs font-bold" aria-hidden="true">
               !
             </span>

@@ -8,10 +8,10 @@ export function CtaSection() {
     <LandingSection tone="accent">
       <div className="flex items-center justify-between gap-6 py-2">
         <div>
-          <h2 className="font-display text-[26px] leading-[34px]">
+          <h2 className="font-display text-[26px] leading-[34px] text-on-tint">
             단톡방에서 시간 묻지 마세요.
           </h2>
-          <p className="mt-1.5 text-base font-medium text-text-secondary">
+          <p className="mt-1.5 text-base font-medium text-on-tint">
             친구를 초대하고 링크 하나만 공유하면 바로 조율이 끝납니다.
           </p>
         </div>

@@ -13,7 +13,7 @@ interface ToastProps {
 }
 
 const VARIANTS: Record<ToastVariant, string> = {
-  info: 'bg-accent text-white',
+  info: 'bg-accent-deep text-white',
   success: 'bg-success text-on-success',
   danger: 'bg-danger text-on-danger',
 }

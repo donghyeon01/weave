@@ -190,7 +190,7 @@ export function FriendsPage() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="친구 검색..."
               aria-label="친구 검색"
-              className="w-full rounded-lg border border-border bg-surface py-2.5 pl-10 pr-4 text-sm font-bold text-text-secondary outline-none focus:outline-ring"
+              className="w-full rounded-lg border border-border bg-surface py-2.5 pl-10 pr-4 text-sm font-bold text-text-secondary outline-none focus:outline-2 focus:outline-solid focus:outline-ring"
             />
           </div>
           <Button variant="primary" size="sm" onClick={() => setInviteOpen(true)}>
@@ -468,7 +468,7 @@ export function FriendsPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="친구 이메일을 입력하세요"
               aria-label="친구 이메일"
-              className="mt-1.5 w-full rounded-xl border-2 border-border-strong bg-surface px-3 py-2.5 text-[15px] font-medium outline-none focus:outline-ring"
+              className="mt-1.5 w-full rounded-xl border-2 border-border-strong bg-surface px-3 py-2.5 text-[15px] font-medium outline-none focus:outline-2 focus:outline-solid focus:outline-ring"
             />
           </label>
           {emailError !== null && (

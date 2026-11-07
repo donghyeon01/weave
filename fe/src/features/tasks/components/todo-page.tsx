@@ -157,7 +157,7 @@ export function TodoPage() {
         </Button>
       </div>
 
-      <div className="mt-6 flex items-center justify-between gap-3">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <div role="tablist" aria-label="할 일 필터" className="flex items-center gap-2">
           {tabs.map((t) => (
             <button
@@ -176,20 +176,20 @@ export function TodoPage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="할 일 검색…"
             aria-label="할 일 검색"
-            className="w-48 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:outline-ring"
+            className="w-full min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:outline-2 focus:outline-solid focus:outline-ring sm:w-48"
           />
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as Sort)}
             aria-label="정렬"
-            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-bold text-text-secondary outline-none"
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-bold text-text-secondary outline-none focus:outline-2 focus:outline-solid focus:outline-ring"
           >
             <option value="priority">우선순위순</option>
             <option value="created">등록순</option>
@@ -349,7 +349,7 @@ export function TodoPage() {
               onChange={(e) => setTitle(e.target.value)}
               maxLength={100}
               autoFocus
-              className="w-full rounded-xl border-2 border-border-strong bg-surface px-3 py-2 text-sm outline-none focus:outline-ring"
+              className="w-full rounded-xl border-2 border-border-strong bg-surface px-3 py-2 text-sm outline-none focus:outline-2 focus:outline-solid focus:outline-ring"
             />
           </div>
           <div>
@@ -361,7 +361,7 @@ export function TodoPage() {
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full rounded-xl border-2 border-border-strong bg-surface px-3 py-2 text-sm outline-none focus:outline-ring"
+              className="w-full rounded-xl border-2 border-border-strong bg-surface px-3 py-2 text-sm outline-none focus:outline-2 focus:outline-solid focus:outline-ring"
             />
           </div>
           {formError !== null && (

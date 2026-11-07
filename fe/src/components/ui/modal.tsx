@@ -1,6 +1,22 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+
+// 마지막 포커스 요소 추적 — Enter 활성화처럼 React 커밋 전에 포커스가 해제되는 경로에서도
+// 오픈 직전 호출자를 복원 대상으로 잡기 위해 모듈 로드 시 상시 기록한다.
+const lastFocused: { el: HTMLElement | null } = { el: null }
+if (typeof document !== 'undefined') {
+  document.addEventListener(
+    'focusin',
+    (e) => {
+      // dialog 내부 이동(autoFocus·trap)은 복원 대상이 아니다 — 외부 포커스만 기록한다.
+      if (e.target instanceof HTMLElement && e.target.closest('[role="dialog"]') === null) {
+        lastFocused.el = e.target
+      }
+    },
+    true,
+  )
+}
 
 interface ModalProps {
   open: boolean
@@ -16,6 +32,9 @@ interface ModalProps {
 export function Modal({ open, onClose, title, titleClassName, children }: ModalProps) {
   const titleId = useId()
   const cardRef = useRef<HTMLDivElement>(null)
+  // 오픈 직전 포커스 — StrictMode의 setup→cleanup→setup 재실행과 내부 autoFocus 이동에도
+  // 덮어쓰지 않도록 최초 1회만 캡처한다.
+  const previousRef = useRef<HTMLElement | null>(null)
   // onClose를 deps에 두면 부모 재렌더마다 focus가 재실행돼 포커스를 뺏으므로 ref로 최신값만 참조
   const onCloseRef = useRef(onClose)
 
@@ -23,21 +42,63 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
     onCloseRef.current = onClose
   }, [onClose])
 
-  useEffect(() => {
+  // 포커스 캡처·이동은 useLayoutEffect — paint 전에 실행돼 호출자 포커스를 잡는다.
+  // activeElement가 이미 BODY로 해제된 경우(Enter 활성화)는 마지막 포커스 추적으로 복구한다.
+  useLayoutEffect(() => {
     if (!open) return
-    const previous =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    if (previousRef.current === null) {
+      const active = document.activeElement
+      const candidate = active instanceof HTMLElement && active !== document.body
+          && !cardRef.current?.contains(active)
+          ? active
+          : lastFocused.el
+      previousRef.current =
+        candidate !== null && candidate.isConnected && candidate !== document.body
+          ? candidate
+          : null
+    }
     cardRef.current?.focus()
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current()
+      if (e.key === 'Escape') {
+        onCloseRef.current()
+        return
+      }
+      // aria-modal=true 약속 — Tab은 다이얼로그 내부로만 순환한다.
+      // 포털은 body 끝에 렌더돼 카드에서 벗어난 Tab이 배경 콘텐츠로 빠질 수 있다.
+      if (e.key !== 'Tab' || cardRef.current === null) return
+      const card = cardRef.current
+      const items = card.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      )
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement
+      if (first === undefined || last === undefined || active === null) return
+      if (e.shiftKey ? active === first || active === card : active === last) {
+        e.preventDefault()
+        ;(e.shiftKey ? last : first).focus()
+      } else if (!card.contains(active)) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', onKeyDown)
     document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = ''
-      previous?.focus()
+    }
+  }, [open])
+
+  // 닫힐 때 호출자로 포커스 복귀 — cleanup이 아닌 별도 effect여야 StrictMode의
+  // 마운트 cleanup에서 조기 복원되지 않는다.
+  useEffect(() => {
+    if (open) return
+    const prev = previousRef.current
+    previousRef.current = null
+    if (prev !== null && prev.isConnected) {
+      prev.focus()
     }
   }, [open])
 

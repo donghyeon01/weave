@@ -100,9 +100,9 @@ function DiaryEditorForm({
       setError('본문을 입력해 주세요.')
       return
     }
-    // PATCH는 null을 "변경 안 함"으로 해석한다 — title·mood 해제는 빈 문자열로 보낸다.
+    // PATCH에서 mood의 명시적 null은 "해제"다 (계약 §3.5 — eventId와 동일 패턴).
     saveDiary.mutate(
-      { date, title: title.trim(), content, mood: mood ?? '', tags },
+      { date, title: title.trim(), content, mood: mood ?? null, tags },
       {
         onSuccess: () => {
           clearDraft(date)

@@ -6,7 +6,7 @@ export interface DiaryPayload {
   date: string
   title?: string
   content: string
-  mood?: string
+  mood?: string | null
   tags?: string[]
 }
 

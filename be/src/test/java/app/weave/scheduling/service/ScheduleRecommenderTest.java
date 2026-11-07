@@ -108,4 +108,31 @@ class ScheduleRecommenderTest {
 
         assertThat(out).isEmpty();
     }
+
+    @Test
+    void 스텝이_자정을_넘어도_종료한다() {
+        // windowEnd 도달 전 t+step이 자정을 넘어 wrap되면 LocalTime 비교는 영구 거짓 —
+        // 과거 무한 루프로 OOM을 일으킨 입력 (화면 기본값 창 12~22시·120분과 동형).
+        Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
+        List<Candidate> out = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+                java.time.Duration.ofSeconds(10),
+                () -> recommender.recommend(Mode.TIME, d1, d1,
+                        LocalTime.of(22, 0), LocalTime.of(23, 59), 120, null, busy));
+
+        // 22:00 슬롯만 생성 (22:00+120은 익일 → 창 초과로 종료)
+        assertThat(out).isEmpty();
+    }
+
+    @Test
+    void 창이_자정을_걸치지_않으면_끝까지_슬롯을_만든다() {
+        // 12~22시 2시간 스텝 → 12·14·16·18·20시 5슬롯 (20시 슬롯은 정확히 22:00에 맞닿아 포함).
+        // LocalTime 비교라면 22:00 스텝이 익일 00:00으로 wrap돼 무한 루프였다.
+        Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
+        List<Candidate> out = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+                java.time.Duration.ofSeconds(10),
+                () -> recommender.recommend(Mode.TIME, d1, d1,
+                        LocalTime.of(12, 0), LocalTime.of(22, 0), 120, null, busy));
+
+        assertThat(out).hasSize(3); // 상위 3개만 반환
+    }
 }

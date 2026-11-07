@@ -48,13 +48,16 @@ public class DiaryService {
 
     /**
      * 부분 수정 — eventIdSet=true이면 eventId로 덮어쓴다 (null은 연결 해제, 계약 §3.5).
-     * 나머지 필드는 null이면 유지.
+     * moodSet=true이고 mood=null이면 기분 해제. 나머지 필드는 null이면 유지.
      */
     @Transactional
     public Diary update(Long userId, LocalDate date, String title, String content, Diary.Mood mood,
-            List<String> tags, boolean eventIdSet, Long eventId) {
+            boolean moodSet, List<String> tags, boolean eventIdSet, Long eventId) {
         Diary diary = get(userId, date);
         diary.update(title, content, mood, tags);
+        if (moodSet && mood == null) {
+            diary.clearMood();
+        }
         if (eventIdSet) {
             validateEventLink(userId, eventId);
             diary.linkEvent(eventId);

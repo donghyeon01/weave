@@ -96,9 +96,13 @@ public class ScheduleRecommender {
             }
             return out;
         }
-        for (LocalTime t = windowStart; !t.plusMinutes(slotMinutes).isAfter(windowEnd);
-                t = t.plusMinutes(slotMinutes)) {
-            out.add(new LocalDateTime[]{d.atTime(t), d.atTime(t.plusMinutes(slotMinutes))});
+        // LocalTime.plusMinutes는 자정을 넘으면 wrap-around돼 isAfter(windowEnd)가 영구 거짓이 된다.
+        // LocalDateTime으로 걸으면 자정 초과 시 dayEnd를 자연히 넘어 반드시 종료한다.
+        LocalDateTime cursor = d.atTime(windowStart);
+        LocalDateTime dayEnd = d.atTime(windowEnd);
+        for (; !cursor.plusMinutes(slotMinutes).isAfter(dayEnd);
+                cursor = cursor.plusMinutes(slotMinutes)) {
+            out.add(new LocalDateTime[]{cursor, cursor.plusMinutes(slotMinutes)});
         }
         return out;
     }

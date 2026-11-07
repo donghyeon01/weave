@@ -13,6 +13,8 @@ import { DaySidebar } from './day-sidebar'
 import { EventDetailModal } from './event-detail-modal'
 import { EventFormModal } from './event-form-modal'
 import { addDays, addMonths, eventCoversDate, monthGridRange, parseYmd, toYmd } from '../utils'
+import { InlineError } from '../../../components/ui/inline-error'
+import { SkeletonRow } from '../../../components/ui/skeleton-row'
 
 type FormTarget = { mode: 'create'; date: string } | { mode: 'edit'; event: EventItem }
 type ViewMode = 'month' | 'week' | 'day'
@@ -166,13 +168,12 @@ export function CalendarPage() {
         </div>
 
         <div className="mt-5">
-          {eventsQuery.isPending && (
-            <p className="mb-2 text-sm text-text-muted">일정을 불러오는 중…</p>
-          )}
+          {eventsQuery.isPending && <SkeletonRow rows={4} />}
           {eventsQuery.isError && (
-            <p role="alert" className="mb-2 text-sm font-semibold text-danger-text">
-              일정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
-            </p>
+            <InlineError
+              message="일정을 불러오지 못했어요"
+              onRetry={() => eventsQuery.refetch()}
+            />
           )}
           {mode === 'month' && (
             <CalendarGrid

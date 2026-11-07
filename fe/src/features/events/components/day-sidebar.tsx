@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/button'
 import { cx } from '../../../utils/cx'
 import { CHIP_STYLES } from '../legend'
 import { formatEventTime, sortByStart } from '../utils'
+import { EmptyState } from '../../../components/ui/empty-state'
 
 interface DaySidebarProps {
   date: string
@@ -33,9 +34,11 @@ export function DaySidebar({ date, events, onEventClick, onAddClick }: DaySideba
         </Button>
       </div>
       {sorted.length === 0 ? (
-        <p className="mt-4 rounded-xl border-2 border-dashed border-border bg-surface-muted px-3 py-6 text-center text-sm text-text-secondary">
-          선택한 날짜에 일정이 없습니다
-        </p>
+        <EmptyState
+          className="mt-4 min-h-32 px-3 py-6"
+          title="일정이 없습니다"
+          description="날짜 셀을 더블클릭하면 간편 일정이 추가됩니다"
+        />
       ) : (
         <ul className="mt-4 flex flex-col gap-2">
           {sorted.map((e) => (

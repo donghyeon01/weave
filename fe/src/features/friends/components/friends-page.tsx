@@ -19,6 +19,7 @@ import {
   useSentRequests,
 } from '../api/use-friends'
 import type { FriendshipItem } from '../types'
+import { EmptyState } from '../../../components/ui/empty-state'
 
 type Tab = 'all' | 'received' | 'sent'
 
@@ -278,21 +279,25 @@ export function FriendsPage() {
           )}
 
           {filteredFriends.length === 0 && search !== '' && (
-            <div className="mt-6 rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-8 text-center">
-              <p className="text-sm font-semibold text-text-secondary">
-                '{search}'에 대한 결과가 없습니다
-              </p>
-              <Button variant="ghost" size="sm" className="mt-2" onClick={() => setSearch('')}>
-                검색어 지우기
-              </Button>
-            </div>
+            <>
+              <EmptyState
+                className="mt-6"
+                title="검색 결과가 없습니다"
+                description={`'${search}'와 일치하는 친구가 없어요`}
+              />
+              <div className="mt-2 text-center">
+                <Button variant="ghost" size="sm" onClick={() => setSearch('')}>
+                  검색어 지우기
+                </Button>
+              </div>
+            </>
           )}
           {filteredFriends.length === 0 && search === '' && !friendsQuery.isPending && (
-            <div className="mt-6 rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-8 text-center">
-              <p className="text-sm font-semibold text-text-secondary">
-                아직 친구가 없어요. 이메일로 요청을 보내 보세요.
-              </p>
-            </div>
+            <EmptyState
+              className="mt-6"
+              title="아직 친구가 없어요"
+              description="이메일로 요청을 보내 보세요"
+            />
           )}
 
           <ul className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -375,9 +380,7 @@ export function FriendsPage() {
       {tab === 'received' && (
         <ul className="mt-6 space-y-2">
           {received.length === 0 && (
-            <li className="rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-8 text-center text-sm font-semibold text-text-secondary">
-              받은 친구 요청이 없어요.
-            </li>
+            <EmptyState title="받은 친구 요청이 없어요" description="새 요청이 오면 여기에 표시됩니다" />
           )}
           {received.map((r) => (
             <li
@@ -414,9 +417,7 @@ export function FriendsPage() {
       {tab === 'sent' && (
         <ul className="mt-6 space-y-2">
           {sent.length === 0 && (
-            <li className="rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-8 text-center text-sm font-semibold text-text-secondary">
-              보낸 친구 요청이 없어요.
-            </li>
+            <EmptyState title="보낸 친구 요청이 없어요" description="친구 초대로 새 요청을 보내 보세요" />
           )}
           {sent.map((r) => (
             <li

@@ -13,6 +13,7 @@ import { useMe } from '../../profile/api/use-profile'
 import { useFriendBlocks } from '../api/use-friend-blocks'
 import { useRecommend } from '../api/use-recommend'
 import { useCreateProposal } from '../api/use-proposal-mutations'
+import { EmptyState } from '../../../components/ui/empty-state'
 
 function todayPlus(days: number): string {
   const d = new Date()
@@ -314,9 +315,11 @@ export function SchedulingPage() {
                 )
               })}
               {friends.length === 0 && (
-                <li className="rounded-xl border border-dashed border-border-strong p-4 text-center text-sm text-text-secondary">
-                  친구가 없어요 — 친구 탭에서 먼저 추가하세요.
-                </li>
+                <EmptyState
+                  title="친구가 없어요"
+                  description="친구 탭에서 먼저 추가하세요"
+                  className="min-h-24 p-4"
+                />
               )}
             </ul>
           </section>
@@ -479,18 +482,18 @@ export function SchedulingPage() {
           </div>
 
           {candidates === null && (
-            <div className="mt-4 rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-10 text-center">
-              <p className="text-sm font-semibold text-text-secondary">
-                친구와 조건을 고른 뒤 AI 추천 슬롯 찾기를 눌러 보세요.
-              </p>
-            </div>
+            <EmptyState
+              className="mt-4"
+              title="아직 추천 결과가 없어요"
+              description="친구와 조건을 고른 뒤 AI 추천 슬롯 찾기를 눌러 보세요"
+            />
           )}
           {candidates !== null && candidates.length === 0 && (
-            <div className="mt-4 rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-10 text-center">
-              <p className="text-sm font-semibold text-text-secondary">
-                모두 가능한 시간이 없어요. 기간이나 참여자를 조정해 보세요.
-              </p>
-            </div>
+            <EmptyState
+              className="mt-4"
+              title="모두 가능한 시간이 없어요"
+              description="기간이나 참여자를 조정해 보세요"
+            />
           )}
 
           <ol className="mt-4 flex flex-col gap-4">

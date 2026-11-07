@@ -11,6 +11,8 @@ import { clearDraft, readDraft, writeDraft } from '../draft'
 import type { DiaryResponse } from '../types'
 import { MoodPicker } from './mood-picker'
 import { TagInput } from './tag-input'
+import { InlineError } from '../../../components/ui/inline-error'
+import { SkeletonRow } from '../../../components/ui/skeleton-row'
 
 const INPUT_CLASS =
   'w-full rounded-xl border-2 border-input bg-surface px-3 py-2 text-sm text-text outline-none transition duration-150 focus:border-accent'
@@ -277,13 +279,14 @@ export function DiaryEditor({ date }: { date: string }) {
   const diaryQuery = useDiary(date)
 
   if (diaryQuery.isPending) {
-    return <p className="text-sm text-text-muted">일기를 불러오는 중…</p>
+    return <SkeletonRow rows={3} />
   }
   if (diaryQuery.isError) {
     return (
-      <p role="alert" className="text-sm font-semibold text-danger-text">
-        일기를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
-      </p>
+      <InlineError
+        message="일기를 불러오지 못했어요"
+        onRetry={() => diaryQuery.refetch()}
+      />
     )
   }
 

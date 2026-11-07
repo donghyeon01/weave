@@ -8,6 +8,9 @@ import { Toast } from '../../../components/ui/toast'
 import { cx } from '../../../utils/cx'
 import { useProposal, useProposals } from '../api/use-proposals'
 import { useCancelProposal, useRespondProposal } from '../api/use-proposal-mutations'
+import { EmptyState } from '../../../components/ui/empty-state'
+import { InlineError } from '../../../components/ui/inline-error'
+import { SkeletonRow } from '../../../components/ui/skeleton-row'
 
 type Box = 'received' | 'sent'
 
@@ -136,13 +139,13 @@ export function ProposalsPage() {
         ))}
       </div>
 
-      {proposalsQuery.isPending && (
-        <p className="mt-6 text-sm text-text-muted">제안을 불러오는 중…</p>
-      )}
+      {proposalsQuery.isPending && <SkeletonRow rows={3} className="mt-6" />}
       {proposalsQuery.isError && (
-        <p role="alert" className="mt-6 text-sm font-semibold text-danger-text">
-          제안을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
-        </p>
+        <InlineError
+          className="mt-6"
+          message="제안을 불러오지 못했어요"
+          onRetry={() => proposalsQuery.refetch()}
+        />
       )}
 
       <ul className="mt-6 flex flex-col gap-3">
@@ -220,9 +223,14 @@ export function ProposalsPage() {
           )
         })}
         {proposalsQuery.data !== undefined && items.length === 0 && (
-          <li className="rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-10 text-center text-sm font-semibold text-text-secondary">
-            {box === 'received' ? '받은 제안이 없어요.' : '보낸 제안이 없어요.'}
-          </li>
+          <EmptyState
+            title={box === 'received' ? '받은 제안이 없어요' : '보낸 제안이 없어요'}
+            description={
+              box === 'received'
+                ? '친구가 보낸 일정 제안이 여기에 도착합니다'
+                : '일정 조율에서 제안을 보내면 여기에 표시됩니다'
+            }
+          />
         )}
       </ul>
 

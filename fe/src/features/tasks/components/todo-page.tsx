@@ -13,6 +13,9 @@ import { useCreateTask } from '../api/use-create-task'
 import { useDeleteTask } from '../api/use-delete-task'
 import { useTasks } from '../api/use-tasks'
 import { useToggleTask } from '../api/use-toggle-task'
+import { EmptyState } from '../../../components/ui/empty-state'
+import { InlineError } from '../../../components/ui/inline-error'
+import { SkeletonRow } from '../../../components/ui/skeleton-row'
 
 type Filter = 'all' | 'active' | 'done'
 type Sort = 'priority' | 'created'
@@ -194,20 +197,20 @@ export function TodoPage() {
         </div>
       </div>
 
-      {tasksQuery.isPending && (
-        <p className="mt-6 text-sm text-text-muted">할 일을 불러오는 중…</p>
-      )}
+      {tasksQuery.isPending && <SkeletonRow rows={4} className="mt-6" />}
       {tasksQuery.isError && (
-        <p role="alert" className="mt-6 text-sm font-semibold text-danger-text">
-          할 일을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
-        </p>
+        <InlineError
+          className="mt-6"
+          message="할 일을 불러오지 못했어요"
+          onRetry={() => tasksQuery.refetch()}
+        />
       )}
       {!tasksQuery.isPending && !tasksQuery.isError && visible.length === 0 && (
-        <div className="mt-6 rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-10 text-center">
-          <p className="text-sm font-semibold text-text-secondary">
-            새로운 할 일을 등록하고 하루를 시작해 보세요!
-          </p>
-        </div>
+        <EmptyState
+          className="mt-6"
+          title="할 일이 없습니다"
+          description="새로운 할 일을 등록하고 하루를 시작해 보세요!"
+        />
       )}
 
       <ul className="mt-4 flex flex-col gap-3">

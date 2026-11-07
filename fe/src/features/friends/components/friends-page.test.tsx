@@ -106,7 +106,7 @@ describe('friends-page', () => {
     await screen.findByText('지우')
 
     await userEvent.type(screen.getByLabelText('친구 검색'), '없는이름')
-    expect(screen.getByText("'없는이름'에 대한 결과가 없습니다")).toBeInTheDocument()
+    expect(screen.getByText("'없는이름'와 일치하는 친구가 없어요")).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '검색어 지우기' }))
     await screen.findByText('지우')

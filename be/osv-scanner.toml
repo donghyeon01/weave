@@ -5,10 +5,10 @@
 
 [[IgnoredVulns]]
 id = "GHSA-j9f9-w8pj-32f8"
-until = 2027-02-07
+ignoreUntil = 2027-02-07
 reason = "DEP-OSV-001: SSE+view fragment 스트림 오염 — SseEmitter·fragment 미사용 (grep 0건)"
 
 [[IgnoredVulns]]
 id = "GHSA-pc63-qcmh-9cmg"
-until = 2027-02-07
+ignoreUntil = 2027-02-07
 reason = "DEP-OSV-002: XsltView SSRF/RCE — 뷰 리졸버 미구성, '/**' 뷰 렌더링 없음"

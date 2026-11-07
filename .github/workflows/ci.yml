@@ -66,8 +66,10 @@ jobs:
         with:
           fetch-depth: 0 # gitleaks는 이력 전체 스캔 필요
 
-      # 개인 계정 repo라 GITLEAKS_LICENSE 불필요 (org 소속이면 secret 필요)
+      # 개인 계정 repo라 GITLEAKS_LICENSE 불필요 — PR 이벤트는 GITHUB_TOKEN 필수
       - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # 루트 action.yml은 실행 정의 없이 메타뿐 — 실제 액션은 서브디렉터리 경로로 지정
       - uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0

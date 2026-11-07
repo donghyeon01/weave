@@ -6,9 +6,20 @@ export interface FriendUser {
   profileImage: string | null
 }
 
+export interface NextEvent {
+  id: number
+  title: string
+  startTime: string
+  endTime: string
+}
+
 export interface FriendshipItem {
   friendshipId: number
   status: 'PENDING' | 'ACCEPTED'
   user: FriendUser
+  /** 요청 시 첨부된 메시지 (V3 — friendships.message) */
+  message?: string | null
+  /** 이 친구와의 다음 약속 — proposal 출처 미래 일정 (V3) */
+  nextEvent?: NextEvent | null
   createdAt: string
 }

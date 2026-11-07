@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import type { FriendshipItem } from '../types'
+import { useNavigate } from 'react-router-dom'
+import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
+import { Modal } from '../../../components/ui/modal'
 import { Toast } from '../../../components/ui/toast'
 import { ApiError } from '../../../lib/api-client'
+import { cx } from '../../../utils/cx'
 import {
   useAcceptRequest,
   useDeleteFriendship,
@@ -15,14 +18,9 @@ import {
   useReceivedRequests,
   useSentRequests,
 } from '../api/use-friends'
+import type { FriendshipItem } from '../types'
 
 type Tab = 'all' | 'received' | 'sent'
-
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'all', label: '전체' },
-  { key: 'received', label: '받은 요청' },
-  { key: 'sent', label: '보낸 요청' },
-]
 
 type PendingAction =
   | { kind: 'reject'; item: FriendshipItem }
@@ -35,27 +33,55 @@ const ACTION_TEXT: Record<PendingAction['kind'], { title: string; confirm: strin
   delete: { title: '친구 삭제', confirm: '삭제', desc: '친구 목록에서 삭제할까요?' },
 }
 
-function Avatar({ user }: { user: FriendshipItem['user'] }) {
+function Avatar({ user, size = 'md' }: { user: FriendshipItem['user']; size?: 'md' | 'lg' }) {
+  const cls =
+    size === 'lg'
+      ? 'size-12 text-base'
+      : 'size-10 text-sm'
   if (user.profileImage !== null) {
     return (
       <img
         src={user.profileImage}
         alt=""
-        className="h-10 w-10 rounded-full border-2 border-border-strong object-cover"
+        className={`${cls} rounded-full border-2 border-border-strong object-cover`}
       />
     )
   }
   return (
     <span
       aria-hidden="true"
-      className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-border-strong bg-accent-deep font-display text-white"
+      className={`flex ${cls} items-center justify-center rounded-full border-2 border-surface bg-primary font-bold text-primary-dark`}
     >
       {user.nickname.slice(0, 1)}
     </span>
   )
 }
 
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 15 15" className="size-[15px]" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M10.7 9.6a6 6 0 1 0-1.1 1.1L14 15l1-1-4.3-4.4ZM6 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z"
+      />
+    </svg>
+  )
+}
+
+function KebabIcon() {
+  return (
+    <svg viewBox="0 0 4 14" className="h-3.5 w-1" aria-hidden="true">
+      <circle cx="2" cy="2" r="2" fill="currentColor" />
+      <circle cx="2" cy="7" r="2" fill="currentColor" />
+      <circle cx="2" cy="12" r="2" fill="currentColor" />
+    </svg>
+  )
+}
+
+// Figma 4:1215 — 헤더(제목+총N명 배지+검색+친구 초대) · 세그먼트 탭 · 요청 배너 · 3열 친구 카드.
+// 상태 메시지·접속 표시(presence)는 V2 이연이라 렌더하지 않는다 (이탈 원장).
 export function FriendsPage() {
+  const navigate = useNavigate()
   const friendsQuery = useFriends()
   const receivedQuery = useReceivedRequests()
   const sentQuery = useSentRequests()
@@ -64,9 +90,11 @@ export function FriendsPage() {
   const deleteFriendship = useDeleteFriendship()
 
   const [tab, setTab] = useState<Tab>('all')
+  const [inviteOpen, setInviteOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [menuFor, setMenuFor] = useState<number | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [toast, setToast] = useState<{ variant: 'success' | 'danger'; message: string } | null>(null)
 
@@ -93,6 +121,7 @@ export function FriendsPage() {
       onSuccess: () => {
         setEmail('')
         setEmailError(null)
+        setInviteOpen(false)
         setToast({ variant: 'success', message: '친구 요청을 보냈어요.' })
       },
       onError: (err) => {
@@ -134,50 +163,64 @@ export function FriendsPage() {
     })
   }
 
-  return (
-    <div className="mx-auto max-w-3xl">
-      <h1 className="font-display text-2xl">친구</h1>
+  const tabs: { key: Tab; label: string }[] = [
+    { key: 'all', label: `전체 친구 (${friends.length})` },
+    { key: 'received', label: `받은 요청 (${received.length})` },
+    { key: 'sent', label: `보낸 요청 (${sent.length})` },
+  ]
 
-      <form onSubmit={submitRequest} className="mt-4">
-        <div className="flex gap-2">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="친구 이메일로 요청…"
-            aria-label="친구 이메일"
-            className="min-w-0 flex-1 rounded-xl border-2 border-border-strong bg-surface px-3 py-2 text-sm outline-none focus:outline-ring"
-          />
-          <Button variant="primary" type="submit" disabled={sendRequest.isPending}>
-            요청
+  return (
+    <div className="mx-auto w-full max-w-[1280px] px-8 pt-8">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="font-display text-[32px] leading-10">내 친구</h1>
+          <Badge variant="accent">총 {friends.length}명</Badge>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="relative w-72">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">
+              <SearchIcon />
+            </span>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="친구 검색..."
+              aria-label="친구 검색"
+              className="w-full rounded-lg border border-border bg-surface py-2.5 pl-10 pr-4 text-sm font-bold text-text-secondary outline-none focus:outline-ring"
+            />
+          </div>
+          <Button variant="primary" size="sm" onClick={() => setInviteOpen(true)}>
+            <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M9.5 8.5a4 4 0 1 0-4-4H4a4 4 0 0 0 5.5 4ZM2 11c0-2 2-3 4-3s4 1 4 3v2H2v-2Zm10-6h-2V3h-2V1.5h2V-.5h2V1.5h2V3h-2v2Z"
+              />
+            </svg>
+            친구 초대
           </Button>
         </div>
-        {emailError !== null && (
-          <p role="alert" className="mt-1 text-sm font-semibold text-danger-text">
-            {emailError}
-          </p>
-        )}
-      </form>
+      </div>
 
-      <div role="tablist" aria-label="친구 탭" className="mt-5 flex gap-1 rounded-xl border-2 border-border-strong bg-surface p-1">
-        {TABS.map((t) => (
+      <div
+        role="tablist"
+        aria-label="친구 탭"
+        className="mt-6 flex items-center gap-2 border-b border-border pb-3"
+      >
+        {tabs.map((t) => (
           <button
             key={t.key}
             role="tab"
             aria-selected={tab === t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-1 rounded-lg px-4 py-1.5 text-sm font-semibold transition duration-150 ${
+            className={cx(
+              'rounded-lg px-4 py-2 text-sm font-bold transition duration-150',
               tab === t.key
-                ? 'bg-accent-deep text-white'
-                : 'text-text-secondary hover:bg-surface-muted'
-            }`}
+                ? 'border border-border bg-surface-muted text-accent shadow-sm'
+                : 'text-text-secondary hover:text-text',
+            )}
           >
             {t.label}
-            {t.key === 'received' && received.length > 0 && (
-              <span className="ml-1 rounded-full bg-danger px-1.5 text-xs text-danger-text">
-                {received.length}
-              </span>
-            )}
           </button>
         ))}
       </div>
@@ -185,62 +228,144 @@ export function FriendsPage() {
       {tab === 'all' && (
         <>
           {received.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setTab('received')}
-              className="mt-4 w-full rounded-2xl border-2 border-border-strong bg-surface-muted px-4 py-3 text-left text-sm font-semibold text-text shadow-brutal-sm transition duration-150 hover:-translate-y-0.5"
-            >
-              새 친구 요청이 {received.length}건 있어요 — 받은 요청 탭에서 확인하기
-            </button>
+            <div className="mt-6 rounded-xl border border-border bg-tint-peach p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg viewBox="0 0 20 18" className="h-[18px] w-5" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M10 1 0 5.5v2h2v9h16v-9h2v-2L10 1Zm0 3.4L15.6 8H4.4L10 4.4ZM4 9.5h12V15H4V9.5Z"
+                    />
+                  </svg>
+                  <h2 className="font-display text-xl">새로운 친구 요청이 {received.length}건 있어요</h2>
+                </div>
+                <span className="text-xs font-medium text-text-secondary">
+                  최근 3일 내 도착한 요청
+                </span>
+              </div>
+              <ul className="mt-4 flex flex-col gap-3">
+                {received.map((r) => (
+                  <li
+                    key={r.friendshipId}
+                    className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3"
+                  >
+                    <Avatar user={r.user} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-text">{r.user.nickname}</p>
+                      <p className="truncate text-xs text-text-secondary">
+                        {r.message ?? r.user.email}
+                      </p>
+                    </div>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => accept(r)}
+                      disabled={acceptRequest.isPending}
+                    >
+                      수락
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPendingAction({ kind: 'reject', item: r })}
+                    >
+                      거절
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="친구 검색…"
-            aria-label="친구 검색"
-            className="mt-4 w-full rounded-xl border-2 border-border-strong bg-surface px-3 py-2 text-sm outline-none focus:outline-ring"
-          />
+
           {filteredFriends.length === 0 && search !== '' && (
-            <div className="mt-4 rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-8 text-center">
+            <div className="mt-6 rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-8 text-center">
               <p className="text-sm font-semibold text-text-secondary">
                 '{search}'에 대한 결과가 없습니다
               </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-2"
-                onClick={() => setSearch('')}
-              >
+              <Button variant="ghost" size="sm" className="mt-2" onClick={() => setSearch('')}>
                 검색어 지우기
               </Button>
             </div>
           )}
           {filteredFriends.length === 0 && search === '' && !friendsQuery.isPending && (
-            <div className="mt-4 rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-8 text-center">
+            <div className="mt-6 rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-8 text-center">
               <p className="text-sm font-semibold text-text-secondary">
                 아직 친구가 없어요. 이메일로 요청을 보내 보세요.
               </p>
             </div>
           )}
-          <ul className="mt-4 space-y-2">
+
+          <ul className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             {filteredFriends.map((f) => (
               <li
                 key={f.friendshipId}
-                className="flex items-center gap-3 rounded-2xl border-2 border-border-strong bg-surface px-4 py-3 shadow-brutal-sm"
+                className="flex flex-col justify-between rounded-lg border border-border bg-surface p-5 shadow-[0_1px_1px_rgba(0,0,0,0.05)]"
               >
-                <Avatar user={f.user} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-text">{f.user.nickname}</p>
-                  <p className="truncate text-xs text-text-secondary">{f.user.email}</p>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar user={f.user} size="lg" />
+                    <p className="text-sm font-bold text-text">{f.user.nickname}</p>
+                  </div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      aria-label={`${f.user.nickname} 옵션`}
+                      onClick={() => setMenuFor(menuFor === f.friendshipId ? null : f.friendshipId)}
+                      className="flex size-[30px] items-center justify-center rounded-md text-text-secondary hover:bg-surface-muted"
+                    >
+                      <KebabIcon />
+                    </button>
+                    {menuFor === f.friendshipId && (
+                      <div className="absolute right-0 top-8 z-10 w-28 rounded-lg border border-border bg-surface py-1 shadow-md">
+                        <button
+                          type="button"
+                          className="w-full px-3 py-1.5 text-left text-sm text-danger-text hover:bg-surface-muted"
+                          onClick={() => {
+                            setMenuFor(null)
+                            setPendingAction({ kind: 'delete', item: f })
+                          }}
+                        >
+                          친구 끊기
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPendingAction({ kind: 'delete', item: f })}
-                >
-                  삭제
-                </Button>
+                <div className="mt-4 flex items-center gap-2">
+                  <svg viewBox="0 0 12 13" className="h-3.5 w-3" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M4 0v1.5h4V0h1v1.5h1.5A1.5 1.5 0 0 1 12 3v8.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 0 11.5V3a1.5 1.5 0 0 1 1.5-1.5H3V0h1Zm6.5 5h-9v6.5h9V5Z"
+                    />
+                  </svg>
+                  {f.nextEvent ? (
+                    <span className="rounded-md bg-tint-mint px-2.5 py-1 text-xs font-bold text-success-text">
+                      {new Date(f.nextEvent.startTime).toLocaleDateString('ko-KR', {
+                        month: 'numeric',
+                        day: 'numeric',
+                      })}{' '}
+                      {f.nextEvent.title}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-medium text-text-muted">예정된 약속 없음</span>
+                  )}
+                </div>
+                <div className="mt-5 border-t border-border pt-3">
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    fullWidth
+                    onClick={() => navigate('/app/scheduling')}
+                  >
+                    <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M5.33 0v2h5.34V0h1.33v2H13.5A1.5 1.5 0 0 1 15 3.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 14.5v-11A1.5 1.5 0 0 1 2.5 2H4V0h1.33Zm8.17 5.33h-11v9.17h11V5.33Z"
+                      />
+                    </svg>
+                    일정 같이 잡기
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -248,7 +373,7 @@ export function FriendsPage() {
       )}
 
       {tab === 'received' && (
-        <ul className="mt-4 space-y-2">
+        <ul className="mt-6 space-y-2">
           {received.length === 0 && (
             <li className="rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-8 text-center text-sm font-semibold text-text-secondary">
               받은 친구 요청이 없어요.
@@ -262,7 +387,9 @@ export function FriendsPage() {
               <Avatar user={r.user} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-text">{r.user.nickname}</p>
-                <p className="truncate text-xs text-text-secondary">{r.user.email}</p>
+                <p className="truncate text-xs text-text-secondary">
+                  {r.message ?? r.user.email}
+                </p>
               </div>
               <Button
                 variant="primary"
@@ -285,7 +412,7 @@ export function FriendsPage() {
       )}
 
       {tab === 'sent' && (
-        <ul className="mt-4 space-y-2">
+        <ul className="mt-6 space-y-2">
           {sent.length === 0 && (
             <li className="rounded-2xl border-2 border-dashed border-border-strong bg-surface-muted p-8 text-center text-sm font-semibold text-text-secondary">
               보낸 친구 요청이 없어요.
@@ -301,9 +428,7 @@ export function FriendsPage() {
                 <p className="truncate text-sm font-bold text-text">{r.user.nickname}</p>
                 <p className="truncate text-xs text-text-secondary">{r.user.email}</p>
               </div>
-              <span className="rounded-lg bg-surface-muted px-2 py-0.5 text-xs font-bold text-text-secondary">
-                대기중
-              </span>
+              <Badge>대기중</Badge>
               <Button
                 variant="ghost"
                 size="sm"
@@ -315,6 +440,52 @@ export function FriendsPage() {
           ))}
         </ul>
       )}
+
+      {/* 친구 초대 모달 — 이메일 입력 (patterns.md 확정 인터랙션) */}
+      <Modal
+        open={inviteOpen}
+        onClose={() => {
+          setInviteOpen(false)
+          setEmail('')
+          setEmailError(null)
+        }}
+        title={<h2 className="font-display text-lg">친구 초대</h2>}
+      >
+        <form onSubmit={submitRequest}>
+          <label className="block text-sm font-bold text-text">
+            이메일
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="친구 이메일을 입력하세요"
+              aria-label="친구 이메일"
+              className="mt-1.5 w-full rounded-xl border-2 border-border-strong bg-surface px-3 py-2.5 text-[15px] font-medium outline-none focus:outline-ring"
+            />
+          </label>
+          {emailError !== null && (
+            <p role="alert" className="mt-1 text-sm font-semibold text-danger-text">
+              {emailError}
+            </p>
+          )}
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setInviteOpen(false)
+                setEmail('')
+                setEmailError(null)
+              }}
+            >
+              취소
+            </Button>
+            <Button variant="primary" size="sm" type="submit" disabled={sendRequest.isPending}>
+              요청 보내기
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       <ConfirmModal
         open={pendingAction !== null}

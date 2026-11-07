@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -38,9 +39,11 @@ const SENT: FriendshipItem = {
 function renderPage() {
   const queryClient = createQueryClient()
   render(
-    <QueryClientProvider client={queryClient}>
-      <FriendsPage />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <FriendsPage />
+      </QueryClientProvider>
+    </MemoryRouter>,
   )
   return queryClient
 }
@@ -78,7 +81,8 @@ describe('friends-page', () => {
     renderPage()
 
     await screen.findByText('지우')
-    await userEvent.click(screen.getByRole('button', { name: '삭제' }))
+    await userEvent.click(screen.getByRole('button', { name: '지우 옵션' }))
+    await userEvent.click(screen.getByRole('button', { name: '친구 끊기' }))
 
     expect(apiFetchMock).not.toHaveBeenCalledWith(
       '/api/friends/10',
@@ -122,8 +126,9 @@ describe('friends-page', () => {
     })
     renderPage()
 
+    await userEvent.click(screen.getByRole('button', { name: '친구 초대' }))
     await userEvent.type(screen.getByLabelText('친구 이메일'), 'ghost@weave.local')
-    await userEvent.click(screen.getByRole('button', { name: '요청' }))
+    await userEvent.click(screen.getByRole('button', { name: '요청 보내기' }))
 
     expect(await screen.findByText('해당 이메일의 사용자가 없습니다.')).toBeInTheDocument()
   })

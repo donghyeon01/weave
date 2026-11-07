@@ -21,6 +21,7 @@ import {
 import type { FriendshipItem } from '../types'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { QueryErrorToast } from '../../../components/ui/query-error-toast'
+import { SkeletonRow } from '../../../components/ui/skeleton-row'
 
 type Tab = 'all' | 'received' | 'sent'
 
@@ -299,6 +300,11 @@ export function FriendsPage() {
               title="아직 친구가 없어요"
               description="이메일로 요청을 보내 보세요"
             />
+          )}
+
+          {/* Figma 116:2536 — 로딩 중 카드형 스켈레톤 3블록 */}
+          {friendsQuery.isPending && (
+            <SkeletonRow rows={3} rowClassName="h-56 w-72" className="mt-6 gap-6" />
           )}
 
           <ul className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">

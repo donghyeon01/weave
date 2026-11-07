@@ -230,7 +230,7 @@ export function TodoPage() {
                   onClick={() => toggleTask.mutate(task)}
                   className={cx(
                     'flex size-6 shrink-0 items-center justify-center rounded border-2 border-border-strong transition duration-150',
-                    task.completed ? 'bg-accent' : 'bg-surface hover:bg-surface-muted',
+                    task.completed ? 'bg-accent-deep' : 'bg-surface hover:bg-surface-muted',
                   )}
                 >
                   {task.completed && (

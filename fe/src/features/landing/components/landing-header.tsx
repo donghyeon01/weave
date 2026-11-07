@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 // 센터 nav는 섹션 앵커 링크 — "기능 소개"가 활성 밑줄 상태.
 export function LandingHeader() {
   return (
-    <header className="border-b-2 border-border-strong bg-background shadow-[0px_2px_0px_#1e2538]">
+    <header className="border-b-2 border-border-strong bg-background shadow-[0px_2px_0px_var(--color-border-strong)]">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         <Link to="/" className="font-display text-[26px] leading-8.5 text-accent">
           Weave

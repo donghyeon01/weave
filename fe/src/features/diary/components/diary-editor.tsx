@@ -153,9 +153,9 @@ function DiaryEditorForm({
       <div className="flex items-end justify-between border-b border-border pb-4">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <svg viewBox="0 0 12 13" className="h-3.25 w-3" aria-hidden="true">
+            <svg viewBox="0 0 12 13" className="h-3.25 w-3 text-text-secondary" aria-hidden="true">
               <path
-                fill="#616b82"
+                fill="currentColor"
                 d="M4 0v1.5h4V0h1v1.5h1.5A1.5 1.5 0 0 1 12 3v8.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 0 11.5V3a1.5 1.5 0 0 1 1.5-1.5H3V0h1Zm6.5 5h-9v6.5h9V5Z"
               />
             </svg>

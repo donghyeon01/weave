@@ -1,0 +1,14 @@
+# CONSTRAINTS.md Exceptions 테이블 DEP-OSV-001/002와 쌍 — spring-webmvc 6.2.x의
+# 9.8 2건은 6.2 라인 백포트가 없고(7.0.9 전용) Weave의 실행 경로에 도달 불가:
+# 뷰 렌더링을 쓰지 않는 REST JSON + STOMP 전용 API다.
+# 6.2.x 백포트 출시 또는 Boot 4 전환 시 재평가 — 만료 2027-02-07.
+
+[[IgnoredVulns]]
+id = "GHSA-j9f9-w8pj-32f8"
+until = 2027-02-07
+reason = "DEP-OSV-001: SSE+view fragment 스트림 오염 — SseEmitter·fragment 미사용 (grep 0건)"
+
+[[IgnoredVulns]]
+id = "GHSA-pc63-qcmh-9cmg"
+until = 2027-02-07
+reason = "DEP-OSV-002: XsltView SSRF/RCE — 뷰 리졸버 미구성, '/**' 뷰 렌더링 없음"

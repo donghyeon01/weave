@@ -69,7 +69,8 @@ Last reviewed: 2026-11-04 (spec 승인과 동시)
 
 | ID | Rule | Path | Reason | Owner | Expires |
 |----|------|------|--------|-------|---------|
-| — | — | — | 없음 | — | — |
+| DEP-OSV-001 | 보안: 의존성 | `be/gradle.lockfile` (spring-webmvc 6.2.19) | GHSA-j9f9-w8pj-32f8 — SSE+view fragment 스트림 오염. REST JSON 전용이라 SseEmitter·fragment 미사용, 도달 불가. 6.2 백포트·Boot 4 시 재평가 | s_don | 2027-02-07 |
+| DEP-OSV-002 | 보안: 의존성 | `be/gradle.lockfile` (spring-webmvc 6.2.19) | GHSA-pc63-qcmh-9cmg — XsltView SSRF/RCE. 뷰 리졸버 미구성·'/**' 뷰 렌더링 없음, 도달 불가. 6.2 백포트·Boot 4 시 재평가 | s_don | 2027-02-07 |
 
 ## 체크 스크립트 (레포 생성 후 설치)
 

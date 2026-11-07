@@ -79,6 +79,47 @@ class UserControllerTest {
     }
 
     @Test
+    void me는_bio_theme_share_플래그_기본값을_반환한다() throws Exception {
+        mvc.perform(get("/api/users/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.theme").value("system"))
+                .andExpect(jsonPath("$.shareBusyOnly").value(true))
+                .andExpect(jsonPath("$.shareTitles").value(false))
+                .andExpect(jsonPath("$.shareDetails").value(false));
+    }
+
+    @Test
+    void 프로필_설정_부분수정이_반영된다() throws Exception {
+        mvc.perform(patch("/api/users/me")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"새닉\",\"bio\":\"안녕\",\"theme\":\"dark\","
+                                + "\"shareBusyOnly\":false,\"shareTitles\":true,"
+                                + "\"shareDetails\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nickname").value("새닉"))
+                .andExpect(jsonPath("$.bio").value("안녕"))
+                .andExpect(jsonPath("$.theme").value("dark"))
+                .andExpect(jsonPath("$.shareBusyOnly").value(false))
+                .andExpect(jsonPath("$.shareTitles").value(true))
+                .andExpect(jsonPath("$.shareDetails").value(true));
+
+        mvc.perform(get("/api/users/me").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.bio").value("안녕"))
+                .andExpect(jsonPath("$.theme").value("dark"));
+    }
+
+    @Test
+    void enum_외_theme은_400을_반환한다() throws Exception {
+        mvc.perform(patch("/api/users/me")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"theme\":\"neon\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON-VALIDATION"));
+    }
+
+    @Test
     void 탈퇴하면_세션과_사용자가_삭제되고_쿠키가_만료된다() throws Exception {
         Long otherId = jdbc.queryForObject(
                 "SELECT id FROM users WHERE email='other@weave.local'", Long.class);

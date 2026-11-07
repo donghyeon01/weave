@@ -40,14 +40,20 @@ class EventControllerTest {
     JwtProvider jwtProvider;
 
     private Long meId;
+    private Long otherId;
     private String token;
 
     @BeforeEach
     void setUp() {
+        // events.proposal_id → proposals 참조라 자식부터 삭제
+        jdbc.update("DELETE FROM schedule_proposal_participants");
         jdbc.update("DELETE FROM events");
-        jdbc.update("DELETE FROM users WHERE email = 'me@weave.local'");
-        jdbc.update("INSERT INTO users(email,name,nickname,provider) VALUES ('me@weave.local','나','나','demo')");
+        jdbc.update("DELETE FROM schedule_proposals");
+        jdbc.update("DELETE FROM users WHERE email LIKE '%@weave.local'");
+        jdbc.update("INSERT INTO users(email,name,nickname,provider) VALUES "
+                + "('me@weave.local','나','나','demo'),('other@weave.local','타인','타인','demo')");
         meId = jdbc.queryForObject("SELECT id FROM users WHERE email='me@weave.local'", Long.class);
+        otherId = jdbc.queryForObject("SELECT id FROM users WHERE email='other@weave.local'", Long.class);
         token = jwtProvider.createAccessToken(meId, List.of("ROLE_USER"));
     }
 
@@ -112,5 +118,46 @@ class EventControllerTest {
                 .read(second.getResponse().getContentAsString(), "$.id");
 
         assertThat(secondId.longValue()).isEqualTo(firstId.longValue());
+    }
+
+    @Test
+    void manual_일정은_participants가_빈_배열이다() throws Exception {
+        mvc.perform(post("/api/events")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"직접\",\"startTime\":\"2027-05-20T14:00:00\",\"endTime\":\"2027-05-20T15:00:00\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.participants.length()").value(0));
+    }
+
+    @Test
+    void proposal_일정은_로스터에서_본인을_뺀_참여자를_반환한다() throws Exception {
+        // 타인이 주최·본인이 참여자인 확정 제안 → 내 일정의 participants는 [타인]
+        jdbc.update("INSERT INTO schedule_proposals(organizer_id,title,mode,start_time,end_time,status) "
+                + "VALUES (?,'약속','TIME','2027-05-20 14:00:00','2027-05-20 16:00:00','CONFIRMED')",
+                otherId);
+        Long pid = jdbc.queryForObject(
+                "SELECT id FROM schedule_proposals ORDER BY id DESC LIMIT 1", Long.class);
+        jdbc.update("INSERT INTO schedule_proposal_participants(proposal_id,user_id,response) "
+                + "VALUES (?,?,'ACCEPTED')", pid, meId);
+        jdbc.update("INSERT INTO events(user_id,title,start_time,end_time,source,proposal_id) "
+                + "VALUES (?,'약속','2027-05-20 14:00:00','2027-05-20 16:00:00','proposal',?)",
+                meId, pid);
+        Long eventId = jdbc.queryForObject(
+                "SELECT id FROM events WHERE user_id=? LIMIT 1", Long.class, meId);
+
+        mvc.perform(get("/api/events").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].participants.length()").value(1))
+                .andExpect(jsonPath("$[0].participants[0].nickname").value("타인"));
+
+        // PATCH 응답도 같은 계약 — participants 실데이터 유지
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/events/" + eventId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"약속 수정\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participants.length()").value(1));
     }
 }

@@ -1,5 +1,6 @@
 package app.weave.event.api;
 
+import app.weave.auth.domain.User;
 import app.weave.event.domain.Event;
 import app.weave.event.service.EventService;
 import jakarta.validation.Valid;
@@ -10,6 +11,7 @@ import java.net.URI;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -41,12 +43,13 @@ public class EventController {
         Event e = service.create(userId, req.title(), req.description(), req.startTime(),
                 req.endTime(), req.location(), Boolean.TRUE.equals(req.allDay()), idempotencyKey);
         return ResponseEntity.created(URI.create("/api/events/" + e.getId()))
-                .body(toResponse(e));
+                .body(toResponse(userId, e));
     }
 
     @GetMapping
     public List<EventResponse> list(@AuthenticationPrincipal Long userId) {
-        return service.listAll(userId).stream().map(this::toResponse).toList();
+        List<Event> events = service.listAll(userId);
+        return toResponses(userId, events);
     }
 
     /** start·end는 포함 끝 날짜 — end 당일 일정도 포함 (계약 §3.4). */
@@ -54,13 +57,13 @@ public class EventController {
     public List<EventResponse> range(@AuthenticationPrincipal Long userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
-        return service.findRange(userId, start, end).stream().map(this::toResponse).toList();
+        return toResponses(userId, service.findRange(userId, start, end));
     }
 
     @PatchMapping("/{id}")
     public EventResponse update(@AuthenticationPrincipal Long userId, @PathVariable Long id,
             @RequestBody UpdateRequest req) {
-        return toResponse(service.update(userId, id, req.title(), req.description(),
+        return toResponse(userId, service.update(userId, id, req.title(), req.description(),
                 req.startTime(), req.endTime(), req.location(), req.allDay()));
     }
 
@@ -71,10 +74,25 @@ public class EventController {
         return ResponseEntity.noContent().build();
     }
 
-    private EventResponse toResponse(Event e) {
+    private List<EventResponse> toResponses(Long me, List<Event> events) {
+        Map<Long, List<User>> participants = service.participantsOf(me, events);
+        return events.stream().map(e -> toResponse(e, participants.get(e.getId()))).toList();
+    }
+
+    /** 단일 응답도 participants 실데이터 — mutation도 같은 계약 (§3.4). */
+    private EventResponse toResponse(Long me, Event e) {
+        return toResponse(e, service.participantsOf(me, List.of(e)).get(e.getId()));
+    }
+
+    private EventResponse toResponse(Event e, List<User> participants) {
+        List<ParticipantSummary> summaries = participants == null ? List.of()
+                : participants.stream()
+                        .map(u -> new ParticipantSummary(u.getId(), u.getNickname(),
+                                u.getProfileImage()))
+                        .toList();
         return new EventResponse(e.getId(), e.getTitle(), e.getDescription(),
                 e.getStartTime().toString(), e.getEndTime().toString(), e.getLocation(),
-                e.isAllDay(), e.getSource().name().toLowerCase());
+                e.isAllDay(), e.getSource().name().toLowerCase(), summaries);
     }
 
     public record CreateRequest(@NotBlank @Size(max = 255) String title,
@@ -87,7 +105,11 @@ public class EventController {
             Boolean allDay) {
     }
 
+    public record ParticipantSummary(Long id, String nickname, String profileImage) {
+    }
+
     public record EventResponse(Long id, String title, String description, String startTime,
-            String endTime, String location, boolean allDay, String source) {
+            String endTime, String location, boolean allDay, String source,
+            List<ParticipantSummary> participants) {
     }
 }

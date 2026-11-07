@@ -20,4 +20,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     Optional<Event> findByIdAndUserId(Long id, Long userId);
 
     Optional<Event> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
+
+    /** 친구 nextEvent 조합 — proposal 출처 미래 일정을 시작 시각 오름차순으로. */
+    List<Event> findByUserIdAndSourceAndStartTimeGreaterThanOrderByStartTimeAsc(
+            Long userId, Event.Source source, LocalDateTime from);
 }

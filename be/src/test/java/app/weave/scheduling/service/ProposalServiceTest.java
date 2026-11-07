@@ -125,9 +125,13 @@ class ProposalServiceTest {
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
                 .isEqualTo("CONFIRMED");
-        // 전원(주최자+참여자 2명) event — source='proposal'
+        // 전원(주최자+참여자 2명) event — source='proposal' + 원 제안 연결 (계약 §3.4)
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                .isEqualTo(3);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal' AND proposal_id=?",
+                Integer.class, id))
                 .isEqualTo(3);
         // 알림: RECEIVED 2 + CONFIRMED 3
         assertThat(jdbc.queryForObject(

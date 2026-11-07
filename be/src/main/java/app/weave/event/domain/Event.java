@@ -47,6 +47,10 @@ public class Event extends BaseTimeEntity {
     @Column(nullable = false, length = 10)
     private Source source = Source.MANUAL;
 
+    /** source=PROPOSAL일 때 원 제안 — 참여 친구는 schedule_proposal_participants join으로 해결. */
+    @Column(name = "proposal_id")
+    private Long proposalId;
+
     @Column(name = "idempotency_key", length = 64)
     private String idempotencyKey;
 
@@ -55,7 +59,7 @@ public class Event extends BaseTimeEntity {
 
     public Event(Long userId, String title, String description, LocalDateTime startTime,
             LocalDateTime endTime, String location, boolean allDay, Source source,
-            String idempotencyKey) {
+            Long proposalId, String idempotencyKey) {
         this.userId = userId;
         this.title = title;
         this.description = description;
@@ -64,6 +68,7 @@ public class Event extends BaseTimeEntity {
         this.location = location;
         this.allDay = allDay;
         this.source = source != null ? source : Source.MANUAL;
+        this.proposalId = proposalId;
         this.idempotencyKey = idempotencyKey;
     }
 
@@ -76,6 +81,7 @@ public class Event extends BaseTimeEntity {
     public String getLocation() { return location; }
     public boolean isAllDay() { return allDay; }
     public Source getSource() { return source; }
+    public Long getProposalId() { return proposalId; }
 
     public void update(String title, String description, LocalDateTime startTime,
             LocalDateTime endTime, String location, Boolean allDay) {

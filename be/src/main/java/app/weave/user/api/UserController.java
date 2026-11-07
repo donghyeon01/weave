@@ -5,6 +5,7 @@ import app.weave.user.service.UserService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import org.springframework.http.HttpHeaders;
@@ -35,9 +36,11 @@ public class UserController {
     }
 
     @PatchMapping("/me")
-    public UserMeResponse updateNickname(@AuthenticationPrincipal Long userId,
-            @Valid @RequestBody NicknameRequest req) {
-        return toResponse(userService.updateNickname(userId, req.nickname()));
+    public UserMeResponse updateMe(@AuthenticationPrincipal Long userId,
+            @Valid @RequestBody MeUpdateRequest req) {
+        return toResponse(userService.updateMe(userId, req.nickname(), req.bio(),
+                parseTheme(req.theme()), req.shareBusyOnly(), req.shareTitles(),
+                req.shareDetails()));
     }
 
     @GetMapping("/search")
@@ -61,15 +64,25 @@ public class UserController {
 
     private static UserMeResponse toResponse(User u) {
         return new UserMeResponse(u.getId(), u.getEmail(), u.getName(), u.getNickname(),
-                u.getProfileImage(), u.getProvider().name().toLowerCase());
+                u.getProfileImage(), u.getProvider().name().toLowerCase(), u.getBio(),
+                u.getTheme().name().toLowerCase(), u.isShareBusyOnly(), u.isShareTitles(),
+                u.isShareDetails());
     }
 
-    public record NicknameRequest(
-            @NotBlank @Size(min = 2, max = 20) String nickname) {
+    /** @Pattern이 통과한 값만 들어온다 — 소문자 계약 값을 enum으로 변환. */
+    private static User.Theme parseTheme(String theme) {
+        return theme == null ? null : User.Theme.valueOf(theme.toUpperCase());
+    }
+
+    public record MeUpdateRequest(@Size(min = 2, max = 20) String nickname,
+            @Size(max = 60) String bio,
+            @Pattern(regexp = "light|dark|system") String theme,
+            Boolean shareBusyOnly, Boolean shareTitles, Boolean shareDetails) {
     }
 
     public record UserMeResponse(Long id, String email, String name, String nickname,
-            String profileImage, String provider) {
+            String profileImage, String provider, String bio, String theme,
+            boolean shareBusyOnly, boolean shareTitles, boolean shareDetails) {
     }
 
     public record SearchResult(Long id, String nickname, String email, String profileImage) {

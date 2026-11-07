@@ -40,15 +40,94 @@ class DiaryControllerTest {
     JwtProvider jwtProvider;
 
     private Long meId;
+    private Long otherId;
     private String token;
 
     @BeforeEach
     void setUp() {
+        // diaries.event_id → events 참조라 일기부터 삭제
         jdbc.update("DELETE FROM diaries");
-        jdbc.update("DELETE FROM users WHERE email = 'me@weave.local'");
-        jdbc.update("INSERT INTO users(email,name,nickname,provider) VALUES ('me@weave.local','나','나','demo')");
+        jdbc.update("DELETE FROM events");
+        jdbc.update("DELETE FROM users WHERE email LIKE '%@weave.local'");
+        jdbc.update("INSERT INTO users(email,name,nickname,provider) VALUES "
+                + "('me@weave.local','나','나','demo'),('other@weave.local','타인','타인','demo')");
         meId = jdbc.queryForObject("SELECT id FROM users WHERE email='me@weave.local'", Long.class);
+        otherId = jdbc.queryForObject("SELECT id FROM users WHERE email='other@weave.local'", Long.class);
         token = jwtProvider.createAccessToken(meId, List.of("ROLE_USER"));
+    }
+
+    @Test
+    void mood_tags_eventId를_저장하고_응답에_반영한다() throws Exception {
+        jdbc.update("INSERT INTO events(user_id,title,start_time,end_time) "
+                + "VALUES (?,'연결일정','2027-05-20 14:00:00','2027-05-20 15:00:00')", meId);
+        Long eventId = jdbc.queryForObject(
+                "SELECT id FROM events WHERE user_id=? LIMIT 1", Long.class, meId);
+
+        mvc.perform(post("/api/diaries")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2027-05-20\",\"content\":\"본문\",\"mood\":\"happy\","
+                                + "\"tags\":[\"산책\",\"맛집\"],\"eventId\":" + eventId + "}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mood").value("happy"))
+                .andExpect(jsonPath("$.tags[0]").value("산책"))
+                .andExpect(jsonPath("$.eventId").value(eventId));
+    }
+
+    @Test
+    void enum_외_mood는_400을_반환한다() throws Exception {
+        mvc.perform(post("/api/diaries")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2027-05-20\",\"content\":\"본문\",\"mood\":\"great\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON-VALIDATION"));
+    }
+
+    @Test
+    void 타인_일정의_eventId는_400을_반환한다() throws Exception {
+        jdbc.update("INSERT INTO events(user_id,title,start_time,end_time) "
+                + "VALUES (?,'타인일정','2027-05-20 14:00:00','2027-05-20 15:00:00')", otherId);
+        Long otherEventId = jdbc.queryForObject(
+                "SELECT id FROM events WHERE user_id=? LIMIT 1", Long.class, otherId);
+
+        mvc.perform(post("/api/diaries")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2027-05-20\",\"content\":\"본문\",\"eventId\":"
+                                + otherEventId + "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON-VALIDATION"));
+    }
+
+    @Test
+    void PATCH에서_eventId_명시null은_해제_필드없음은_유지다() throws Exception {
+        jdbc.update("INSERT INTO events(user_id,title,start_time,end_time) "
+                + "VALUES (?,'연결일정','2027-05-20 14:00:00','2027-05-20 15:00:00')", meId);
+        Long eventId = jdbc.queryForObject(
+                "SELECT id FROM events WHERE user_id=? LIMIT 1", Long.class, meId);
+        mvc.perform(post("/api/diaries")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2027-05-20\",\"content\":\"본문\",\"eventId\":"
+                                + eventId + "}"))
+                .andExpect(status().isCreated());
+
+        // 필드 없음 → 연결 유지
+        mvc.perform(patch("/api/diaries/2027-05-20")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"수정\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eventId").value(eventId));
+
+        // 명시적 null → 연결 해제
+        mvc.perform(patch("/api/diaries/2027-05-20")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"eventId\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eventId").doesNotExist());
     }
 
     @Test

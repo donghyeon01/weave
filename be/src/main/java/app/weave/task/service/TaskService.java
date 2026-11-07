@@ -20,7 +20,8 @@ public class TaskService {
     }
 
     @Transactional
-    public Task create(Long userId, String title, LocalDate dueDate, String idempotencyKey) {
+    public Task create(Long userId, String title, LocalDate dueDate, Task.Priority priority,
+            String memo, String idempotencyKey) {
         // 멱등키 재요청은 기존 리소스 반환 (uk_tasks_idem)
         if (idempotencyKey != null) {
             Optional<Task> existing = repository.findByUserIdAndIdempotencyKey(userId, idempotencyKey);
@@ -29,7 +30,7 @@ public class TaskService {
             }
         }
         return repository.save(new Task(userId, title,
-                dueDate != null ? dueDate : LocalDate.now(), idempotencyKey));
+                dueDate != null ? dueDate : LocalDate.now(), priority, memo, idempotencyKey));
     }
 
     @Transactional(readOnly = true)
@@ -38,9 +39,10 @@ public class TaskService {
     }
 
     @Transactional
-    public Task update(Long userId, Long id, String title, Boolean completed, LocalDate dueDate) {
+    public Task update(Long userId, Long id, String title, Boolean completed, LocalDate dueDate,
+            Task.Priority priority, String memo) {
         Task task = findOwned(userId, id);
-        task.update(title, completed, dueDate);
+        task.update(title, completed, dueDate, priority, memo);
         return task;
     }
 

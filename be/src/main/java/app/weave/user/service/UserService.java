@@ -25,10 +25,12 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_UNAUTHORIZED));
     }
 
+    /** 프로필·설정 부분 수정 — null 인자는 변경하지 않는다 (계약 §3.2). */
     @Transactional
-    public User updateNickname(Long userId, String nickname) {
+    public User updateMe(Long userId, String nickname, String bio, User.Theme theme,
+            Boolean shareBusyOnly, Boolean shareTitles, Boolean shareDetails) {
         User user = getMe(userId);
-        user.changeNickname(nickname);
+        user.updateProfile(nickname, bio, theme, shareBusyOnly, shareTitles, shareDetails);
         return user;
     }
 

@@ -4,6 +4,7 @@ import app.weave.task.domain.Task;
 import app.weave.task.service.TaskService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.time.LocalDate;
@@ -34,7 +35,8 @@ public class TaskController {
     public ResponseEntity<TaskResponse> create(@AuthenticationPrincipal Long userId,
             @Valid @RequestBody CreateRequest req,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
-        Task task = service.create(userId, req.title(), req.dueDate(), idempotencyKey);
+        Task task = service.create(userId, req.title(), req.dueDate(),
+                parsePriority(req.priority()), req.memo(), idempotencyKey);
         return ResponseEntity.created(URI.create("/api/tasks/" + task.getId()))
                 .body(toResponse(task));
     }
@@ -46,8 +48,9 @@ public class TaskController {
 
     @PatchMapping("/{id}")
     public TaskResponse update(@AuthenticationPrincipal Long userId,
-            @PathVariable Long id, @RequestBody UpdateRequest req) {
-        return toResponse(service.update(userId, id, req.title(), req.completed(), req.dueDate()));
+            @PathVariable Long id, @Valid @RequestBody UpdateRequest req) {
+        return toResponse(service.update(userId, id, req.title(), req.completed(), req.dueDate(),
+                parsePriority(req.priority()), req.memo()));
     }
 
     @DeleteMapping("/{id}")
@@ -57,18 +60,27 @@ public class TaskController {
     }
 
     private TaskResponse toResponse(Task t) {
-        return new TaskResponse(t.getId(), t.getTitle(), t.isCompleted(), t.getDueDate().toString(),
+        return new TaskResponse(t.getId(), t.getTitle(), t.isCompleted(),
+                t.getDueDate().toString(), t.getPriority().name().toLowerCase(), t.getMemo(),
                 t.getCreatedAt().toString());
     }
 
-    public record CreateRequest(@NotBlank @Size(max = 100) String title, LocalDate dueDate) {
+    /** @Pattern이 통과한 값만 들어온다 — 소문자 계약 값을 enum으로 변환. */
+    private static Task.Priority parsePriority(String priority) {
+        return priority == null ? null : Task.Priority.valueOf(priority.toUpperCase());
+    }
+
+    public record CreateRequest(@NotBlank @Size(max = 100) String title, LocalDate dueDate,
+            @Pattern(regexp = "urgent|high|normal|low") String priority,
+            @Size(max = 200) String memo) {
     }
 
     public record UpdateRequest(@Size(max = 100) String title, Boolean completed,
-            LocalDate dueDate) {
+            LocalDate dueDate, @Pattern(regexp = "urgent|high|normal|low") String priority,
+            @Size(max = 200) String memo) {
     }
 
     public record TaskResponse(Long id, String title, boolean completed, String dueDate,
-            String createdAt) {
+            String priority, String memo, String createdAt) {
     }
 }

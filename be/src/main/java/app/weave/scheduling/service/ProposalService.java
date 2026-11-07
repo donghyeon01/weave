@@ -121,7 +121,7 @@ public class ProposalService {
             eventRepository.saveAll(attendeeIds.stream()
                     .map(uid -> new Event(uid, proposal.getTitle(), null,
                             proposal.getStartTime(), proposal.getEndTime(), null, allDay,
-                            Source.PROPOSAL, null))
+                            Source.PROPOSAL, proposal.getId(), null))
                     .toList());
             var confirmed = new NotificationPayload.ProposalConfirmed(proposal.getId(),
                     proposal.getTitle(), toPayloadSlot(proposal.toSlot()));

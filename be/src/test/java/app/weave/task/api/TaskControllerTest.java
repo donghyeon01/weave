@@ -128,4 +128,51 @@ class TaskControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
     }
+
+    @Test
+    void 생성은_priority와_memo를_반영하고_기본값은_normal이다() throws Exception {
+        mvc.perform(post("/api/tasks")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"중요\",\"priority\":\"urgent\",\"memo\":\"메모한줄\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priority").value("urgent"))
+                .andExpect(jsonPath("$.memo").value("메모한줄"));
+
+        mvc.perform(post("/api/tasks")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"기본\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priority").value("normal"));
+    }
+
+    @Test
+    void enum_외_priority는_400을_반환한다() throws Exception {
+        mvc.perform(post("/api/tasks")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"x\",\"priority\":\"urgentt\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON-VALIDATION"));
+    }
+
+    @Test
+    void 수정은_priority와_memo를_반영한다() throws Exception {
+        MvcResult created = mvc.perform(post("/api/tasks")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"수정대상\",\"priority\":\"normal\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        Number id = com.jayway.jsonpath.JsonPath
+                .read(created.getResponse().getContentAsString(), "$.id");
+
+        mvc.perform(patch("/api/tasks/" + id)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\":\"low\",\"memo\":\"바뀐메모\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority").value("low"))
+                .andExpect(jsonPath("$.memo").value("바뀐메모"));
+    }
 }

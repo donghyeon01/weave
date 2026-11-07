@@ -20,6 +20,11 @@ public class User extends BaseTimeEntity {
         KAKAO, DEMO
     }
 
+    /** 화면 테마 — 소문자 저장은 UserThemeConverter 참조 (chk_users_theme). */
+    public enum Theme {
+        LIGHT, DARK, SYSTEM
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -39,6 +44,23 @@ public class User extends BaseTimeEntity {
     /** 소문자 'kakao'/'demo'로 저장 — ProviderConverter 참조. */
     @Column(nullable = false, length = 10)
     private Provider provider;
+
+    /** 한 줄 소개 — 본인 설정 응답에만 노출 (api-contract §3.2). */
+    @Column(length = 60)
+    private String bio;
+
+    /** 친구 일정 공개 수준 — TRUE=바쁜 블록만. share_titles·share_details는 확장용 예약 플래그. */
+    @Column(name = "share_busy_only", nullable = false)
+    private boolean shareBusyOnly = true;
+
+    @Column(name = "share_titles", nullable = false)
+    private boolean shareTitles;
+
+    @Column(name = "share_details", nullable = false)
+    private boolean shareDetails;
+
+    @Column(nullable = false, length = 10)
+    private Theme theme = Theme.SYSTEM;
 
     protected User() {
     }
@@ -74,15 +96,54 @@ public class User extends BaseTimeEntity {
         return nickname;
     }
 
-    public void changeNickname(String nickname) {
-        this.nickname = nickname;
-    }
-
     public String getProfileImage() {
         return profileImage;
     }
 
     public Provider getProvider() {
         return provider;
+    }
+
+    public String getBio() {
+        return bio;
+    }
+
+    public boolean isShareBusyOnly() {
+        return shareBusyOnly;
+    }
+
+    public boolean isShareTitles() {
+        return shareTitles;
+    }
+
+    public boolean isShareDetails() {
+        return shareDetails;
+    }
+
+    public Theme getTheme() {
+        return theme;
+    }
+
+    /** 프로필·설정 부분 수정 — null 인자는 변경하지 않는다. */
+    public void updateProfile(String nickname, String bio, Theme theme,
+            Boolean shareBusyOnly, Boolean shareTitles, Boolean shareDetails) {
+        if (nickname != null) {
+            this.nickname = nickname;
+        }
+        if (bio != null) {
+            this.bio = bio;
+        }
+        if (theme != null) {
+            this.theme = theme;
+        }
+        if (shareBusyOnly != null) {
+            this.shareBusyOnly = shareBusyOnly;
+        }
+        if (shareTitles != null) {
+            this.shareTitles = shareTitles;
+        }
+        if (shareDetails != null) {
+            this.shareDetails = shareDetails;
+        }
     }
 }

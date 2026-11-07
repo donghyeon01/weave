@@ -34,12 +34,17 @@ public class Friendship extends BaseTimeEntity {
     @Column(nullable = false, length = 10)
     private Status status;
 
+    /** 요청 메시지 — PENDING 요청에서 주로 사용 (api-contract §3.6). */
+    @Column(length = 100)
+    private String message;
+
     protected Friendship() {
     }
 
-    public Friendship(Long userId, Long friendId) {
+    public Friendship(Long userId, Long friendId, String message) {
         this.userId = userId;
         this.friendId = friendId;
+        this.message = message;
         this.status = Status.PENDING;
     }
 
@@ -47,6 +52,7 @@ public class Friendship extends BaseTimeEntity {
     public Long getUserId() { return userId; }
     public Long getFriendId() { return friendId; }
     public Status getStatus() { return status; }
+    public String getMessage() { return message; }
 
     public void accept() {
         this.status = Status.ACCEPTED;

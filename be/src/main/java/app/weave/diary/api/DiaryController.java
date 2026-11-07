@@ -4,8 +4,10 @@ import app.weave.common.error.BusinessException;
 import app.weave.common.error.ErrorCode;
 import app.weave.diary.domain.Diary;
 import app.weave.diary.service.DiaryService;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.time.LocalDate;
@@ -38,8 +40,8 @@ public class DiaryController {
     @PostMapping
     public ResponseEntity<DiaryResponse> create(@AuthenticationPrincipal Long userId,
             @Valid @RequestBody CreateRequest req) {
-        Diary diary = service.create(userId, req.date(), req.title(), req.content(), req.mood(),
-                req.tags());
+        Diary diary = service.create(userId, req.date(), req.title(), req.content(),
+                parseMood(req.mood()), req.eventId(), req.tags());
         return ResponseEntity.created(URI.create("/api/diaries/" + diary.getDate()))
                 .body(toResponse(diary));
     }
@@ -62,9 +64,9 @@ public class DiaryController {
     @PatchMapping("/{date}")
     public DiaryResponse update(@AuthenticationPrincipal Long userId,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestBody UpdateRequest req) {
-        return toResponse(
-                service.update(userId, date, req.title(), req.content(), req.mood(), req.tags()));
+            @Valid @RequestBody UpdateRequest req) {
+        return toResponse(service.update(userId, date, req.getTitle(), req.getContent(),
+                parseMood(req.getMood()), req.getTags(), req.isEventIdSet(), req.getEventId()));
     }
 
     @DeleteMapping("/{date}")
@@ -82,23 +84,59 @@ public class DiaryController {
         }
     }
 
+    /** @Pattern이 통과한 값만 들어온다 — 소문자 계약 값을 enum으로 변환. */
+    private static Diary.Mood parseMood(String mood) {
+        return mood == null ? null : Diary.Mood.valueOf(mood.toUpperCase());
+    }
+
     private DiaryResponse toResponse(Diary d) {
         return new DiaryResponse(d.getId(), d.getDate().toString(), d.getTitle(), d.getContent(),
-                d.getMood(), d.getTags(), d.getCreatedAt().toString(), d.getUpdatedAt().toString());
+                d.getMood() == null ? null : d.getMood().name().toLowerCase(), d.getTags(),
+                d.getEventId(), d.getCreatedAt().toString(), d.getUpdatedAt().toString());
     }
 
     public record CreateRequest(LocalDate date, @Size(max = 100) String title,
-            @NotBlank String content, @Size(max = 20) String mood, List<String> tags) {
+            @NotBlank String content,
+            @Pattern(regexp = "happy|calm|busy|tired") String mood, List<String> tags,
+            Long eventId) {
     }
 
-    public record UpdateRequest(@Size(max = 100) String title, String content,
-            @Size(max = 20) String mood, List<String> tags) {
+    /**
+     * eventId는 필드 존재 자체가 의미 — 명시적 null은 연결 해제(계약 §3.5)라
+     * "필드 없음(유지)"과 구분해야 해서 setter 플래그를 둔 클래스로 선언한다.
+     */
+    public static final class UpdateRequest {
+        @Size(max = 100)
+        private String title;
+        private String content;
+        @Pattern(regexp = "happy|calm|busy|tired")
+        private String mood;
+        private List<String> tags;
+        private Long eventId;
+        private boolean eventIdSet;
+
+        public String getTitle() { return title; }
+        public void setTitle(String title) { this.title = title; }
+        public String getContent() { return content; }
+        public void setContent(String content) { this.content = content; }
+        public String getMood() { return mood; }
+        public void setMood(String mood) { this.mood = mood; }
+        public List<String> getTags() { return tags; }
+        public void setTags(List<String> tags) { this.tags = tags; }
+        public Long getEventId() { return eventId; }
+        public boolean isEventIdSet() { return eventIdSet; }
+
+        @JsonProperty("eventId")
+        public void setEventId(Long eventId) {
+            this.eventId = eventId;
+            this.eventIdSet = true;
+        }
     }
 
     public record DiarySummary(String date, String title) {
     }
 
     public record DiaryResponse(Long id, String date, String title, String content, String mood,
-            List<String> tags, String createdAt, String updatedAt) {
+            List<String> tags, Long eventId, String createdAt, String updatedAt) {
     }
 }

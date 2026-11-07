@@ -3,6 +3,11 @@ package app.weave.friend.service;
 import app.weave.auth.domain.User;
 import app.weave.common.error.BusinessException;
 import app.weave.common.error.ErrorCode;
+import app.weave.common.port.BusyBlock;
+import app.weave.common.port.EventAccess;
+import app.weave.common.port.EventRef;
+import app.weave.common.port.ProposalAccess;
+import app.weave.common.port.ProposalRoster;
 import app.weave.friend.domain.Friendship;
 import app.weave.friend.domain.Friendship.Status;
 import app.weave.friend.domain.FriendshipRepository;
@@ -10,6 +15,8 @@ import app.weave.notification.service.NotificationPayload;
 import app.weave.notification.service.NotificationPayload.UserRef;
 import app.weave.notification.service.NotificationPublisher;
 import app.weave.user.service.UserService;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,23 +28,28 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FriendService {
 
-    /** friendship 행 + 상대방 표시 정보 — 컨트롤러가 FriendshipResponse로 변환한다. */
-    public record FriendView(Friendship friendship, User counterparty) {
+    /** friendship 행 + 상대방 표시 정보 + 다음 약속 — 컨트롤러가 FriendshipResponse로 변환한다. */
+    public record FriendView(Friendship friendship, User counterparty, EventRef nextEvent) {
     }
 
     private final FriendshipRepository repository;
     private final UserService userService;
     private final NotificationPublisher publisher;
+    private final EventAccess eventAccess;
+    private final ProposalAccess proposalAccess;
 
     public FriendService(FriendshipRepository repository, UserService userService,
-            NotificationPublisher publisher) {
+            NotificationPublisher publisher, EventAccess eventAccess,
+            ProposalAccess proposalAccess) {
         this.repository = repository;
         this.userService = userService;
         this.publisher = publisher;
+        this.eventAccess = eventAccess;
+        this.proposalAccess = proposalAccess;
     }
 
     @Transactional
-    public FriendView request(Long me, String email) {
+    public FriendView request(Long me, String email, String message) {
         User target = userService.findByEmailStrict(email);
         if (target.getId().equals(me)) {
             throw new BusinessException(ErrorCode.FRIEND_SELF_REQUEST);
@@ -49,11 +61,11 @@ public class FriendService {
             throw new BusinessException(existing.get().getStatus() == Status.ACCEPTED
                     ? ErrorCode.FRIEND_ALREADY : ErrorCode.FRIEND_DUPLICATE_REQUEST);
         }
-        Friendship saved = repository.save(new Friendship(me, target.getId()));
+        Friendship saved = repository.save(new Friendship(me, target.getId(), message));
         User sender = userService.getMe(me);
         publisher.publish(target.getId(), new NotificationPayload.FriendRequest(
                 saved.getId(), new UserRef(me, sender.getNickname())));
-        return new FriendView(saved, target);
+        return new FriendView(saved, target, null);
     }
 
     /**
@@ -96,7 +108,9 @@ public class FriendService {
         User accepter = userService.getMe(me);
         publisher.publish(lockedTarget.getUserId(), new NotificationPayload.FriendAccepted(
                 lockedTarget.getId(), new UserRef(me, accepter.getNickname())));
-        return new FriendView(lockedTarget, accepter);
+        // 수락으로 ACCEPTED 전환 — 재요청으로 이전 공유 일정이 남아 있을 수 있어 nextEvent를 계산한다
+        EventRef next = nextEventsOf(me, List.of(lockedTarget)).get(lockedTarget.getId());
+        return new FriendView(lockedTarget, accepter, next);
     }
 
     @Transactional
@@ -106,9 +120,29 @@ public class FriendService {
         repository.delete(friendship);
     }
 
+    /**
+     * 친구 일정 미리보기 — ACCEPTED 관계만, 조율 불가 블록(시작·종료)만 반환한다 (계약 §3.6).
+     * {id}는 friendship 행 id — 비친구·PENDING·타인 관계는 존재 비노출 404.
+     */
+    @Transactional(readOnly = true)
+    public List<BusyBlock> schedule(Long me, Long friendshipId, LocalDate start, LocalDate end) {
+        Friendship friendship = repository.findByIdAndParticipant(friendshipId, me)
+                .filter(f -> f.getStatus() == Status.ACCEPTED)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FRIENDSHIP_NOT_FOUND));
+        return eventAccess.busyBlocksOf(friendship.counterpartyOf(me), start.atStartOfDay(),
+                end.plusDays(1).atStartOfDay());
+    }
+
     @Transactional(readOnly = true)
     public List<FriendView> listFriends(Long me) {
-        return toViews(repository.findAcceptedFriendships(me), me);
+        List<Friendship> rows = repository.findAcceptedFriendships(me);
+        Map<Long, EventRef> nextEvents = nextEventsOf(me, rows);
+        Map<Long, User> users = userService.findAllByIds(
+                rows.stream().map(f -> f.counterpartyOf(me)).toList());
+        return rows.stream()
+                .map(f -> new FriendView(f, users.get(f.counterpartyOf(me)),
+                        nextEvents.get(f.getId())))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -124,8 +158,35 @@ public class FriendService {
     private List<FriendView> toViews(List<Friendship> rows, Long me) {
         Map<Long, User> users = userService.findAllByIds(
                 rows.stream().map(f -> f.counterpartyOf(me)).toList());
+        // PENDING 요청에는 함께 확정된 일정이 성립하지 않아 nextEvent는 항상 null
         return rows.stream()
-                .map(f -> new FriendView(f, users.get(f.counterpartyOf(me))))
+                .map(f -> new FriendView(f, users.get(f.counterpartyOf(me)), null))
                 .toList();
+    }
+
+    /**
+     * 다음 약속 — 내 proposal 출처 미래 일정 중 원 제안 로스터에 그 친구가 포함된 가장 이른 1건.
+     * events·제안 데이터는 상류 모듈이 볼 수 없어 EventAccess·ProposalAccess 포트로 조회 (계약 §3.6).
+     */
+    private Map<Long, EventRef> nextEventsOf(Long me, List<Friendship> friendships) {
+        if (friendships.isEmpty()) {
+            return Map.of();
+        }
+        List<EventRef> future = eventAccess.proposalEventsAfter(me, LocalDateTime.now());
+        Map<Long, ProposalRoster> rosters = proposalAccess.rosters(future.stream()
+                .map(EventRef::proposalId).filter(p -> p != null).distinct().toList());
+        Map<Long, EventRef> result = new HashMap<>();
+        for (Friendship f : friendships) {
+            Long friend = f.counterpartyOf(me);
+            future.stream()
+                    .filter(e -> {
+                        ProposalRoster r = e.proposalId() != null
+                                ? rosters.get(e.proposalId()) : null;
+                        return r != null && r.involves(friend);
+                    })
+                    .findFirst() // future는 startTime 오름차순 — 첫 일치가 가장 이른 약속
+                    .ifPresent(e -> result.put(f.getId(), e));
+        }
+        return result;
     }
 }

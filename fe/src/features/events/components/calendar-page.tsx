@@ -98,7 +98,7 @@ export function CalendarPage() {
   const title = viewTitle(mode, view, mode === 'week' ? weekAnchor : anchor)
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] gap-6 p-8">
+    <div className="mx-auto flex w-full max-w-350 gap-6 p-8">
       {/* 캘린더 본체 — 시안 Calendar Main Section */}
       <section className="min-w-0 flex-1 rounded-2xl border border-border bg-surface p-6 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">

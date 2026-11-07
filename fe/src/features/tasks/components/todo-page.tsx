@@ -141,7 +141,7 @@ export function TodoPage() {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-[1152px] px-8 pt-8">
+    <div className="mx-auto w-full max-w-6xl px-8 pt-8">
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium text-text-secondary">
@@ -274,9 +274,9 @@ export function TodoPage() {
                     type="button"
                     aria-label={`${task.title} 옵션`}
                     onClick={() => setMenuFor(menuFor === task.id ? null : task.id)}
-                    className="flex size-[30px] items-center justify-center rounded-lg text-text-secondary hover:bg-surface-muted"
+                    className="flex size-7.5 items-center justify-center rounded-lg text-text-secondary hover:bg-surface-muted"
                   >
-                    <svg viewBox="0 0 3 12" className="h-3 w-[3px]" aria-hidden="true">
+                    <svg viewBox="0 0 3 12" className="h-3 w-0.75" aria-hidden="true">
                       <circle cx="1.5" cy="1.5" r="1.5" fill="currentColor" />
                       <circle cx="1.5" cy="6" r="1.5" fill="currentColor" />
                       <circle cx="1.5" cy="10.5" r="1.5" fill="currentColor" />

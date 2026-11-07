@@ -59,7 +59,7 @@ export function ThemeToggle() {
       <div
         role="radiogroup"
         aria-labelledby="theme-toggle-label"
-        className="mt-2 flex max-w-md gap-2 rounded-xl border border-border bg-surface-muted p-[7px]"
+        className="mt-2 flex max-w-md gap-2 rounded-xl border border-border bg-surface-muted p-1.75"
       >
         {OPTIONS.map((option) => {
           const active = option.value === current

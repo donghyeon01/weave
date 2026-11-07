@@ -62,7 +62,7 @@ function Avatar({ user, size = 'md' }: { user: FriendshipItem['user']; size?: 'm
 
 function SearchIcon() {
   return (
-    <svg viewBox="0 0 15 15" className="size-[15px]" aria-hidden="true">
+    <svg viewBox="0 0 15 15" className="size-3.75" aria-hidden="true">
       <path
         fill="currentColor"
         d="M10.7 9.6a6 6 0 1 0-1.1 1.1L14 15l1-1-4.3-4.4ZM6 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z"
@@ -173,7 +173,7 @@ export function FriendsPage() {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-[1280px] px-8 pt-8">
+    <div className="mx-auto w-full max-w-7xl px-8 pt-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="font-display text-[32px] leading-10">내 친구</h1>
@@ -234,7 +234,7 @@ export function FriendsPage() {
             <div className="mt-6 rounded-xl border border-border bg-tint-peach p-5 text-on-tint">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <svg viewBox="0 0 20 18" className="h-[18px] w-5" aria-hidden="true">
+                  <svg viewBox="0 0 20 18" className="h-4.5 w-5" aria-hidden="true">
                     <path
                       fill="currentColor"
                       d="M10 1 0 5.5v2h2v9h16v-9h2v-2L10 1Zm0 3.4L15.6 8H4.4L10 4.4ZM4 9.5h12V15H4V9.5Z"
@@ -323,7 +323,7 @@ export function FriendsPage() {
                       type="button"
                       aria-label={`${f.user.nickname} 옵션`}
                       onClick={() => setMenuFor(menuFor === f.friendshipId ? null : f.friendshipId)}
-                      className="flex size-[30px] items-center justify-center rounded-md text-text-secondary hover:bg-surface-muted"
+                      className="flex size-7.5 items-center justify-center rounded-md text-text-secondary hover:bg-surface-muted"
                     >
                       <KebabIcon />
                     </button>

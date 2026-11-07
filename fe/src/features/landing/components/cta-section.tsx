@@ -8,7 +8,7 @@ export function CtaSection() {
     <LandingSection tone="accent">
       <div className="flex items-center justify-between gap-6 py-2">
         <div>
-          <h2 className="font-display text-[26px] leading-[34px] text-on-tint">
+          <h2 className="font-display text-[26px] leading-8.5 text-on-tint">
             단톡방에서 시간 묻지 마세요.
           </h2>
           <p className="mt-1.5 text-base font-medium text-on-tint">

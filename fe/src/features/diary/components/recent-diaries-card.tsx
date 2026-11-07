@@ -17,7 +17,7 @@ export function RecentDiariesCard({
   const visible = expanded ? entries : entries.slice(0, 3)
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+    <section className="rounded-2xl border border-border bg-surface p-5 shadow-card-sm">
       <div className="flex items-center justify-between">
         <h3 className="font-display text-lg">지난 일기</h3>
         {entries.length > 3 && (

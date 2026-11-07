@@ -82,7 +82,7 @@ function TimetablePreview({
     blocks.some((b) => toMin(b.startTime.slice(11, 16)) < (hour + 1) * 60 && toMin(b.endTime.slice(11, 16)) > hour * 60)
 
   return (
-    <section className="mt-6 rounded-2xl border border-border bg-surface p-5 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+    <section className="mt-6 rounded-2xl border border-border bg-surface p-5 shadow-card-sm">
       <div className="flex items-center justify-between">
         <h3 className="font-display text-lg">친구별 일정 겹침 타임테이블 미리보기</h3>
         <span className="text-xs font-medium text-text-secondary">
@@ -291,7 +291,7 @@ export function SchedulingPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-12">
         {/* 좌측 5col — 친구 선택 + 조건 */}
         <form onSubmit={runRecommend} className="flex flex-col gap-6 lg:col-span-5">
-          <section className="rounded-2xl border border-border bg-surface p-5 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+          <section className="rounded-2xl border border-border bg-surface p-5 shadow-card-sm">
             <h2 className="font-display text-xl">함께할 친구 선택</h2>
             <p className="mt-1 text-xs font-medium text-text-secondary">
               선택된 {selectedIds.length}명의 캘린더와 매칭합니다
@@ -344,7 +344,7 @@ export function SchedulingPage() {
             </ul>
           </section>
 
-          <section className="rounded-2xl border border-border bg-surface p-5 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+          <section className="rounded-2xl border border-border bg-surface p-5 shadow-card-sm">
             <h2 className="font-display text-xl">조율 조건</h2>
             <div className="mt-4 flex flex-col gap-4">
               <div role="tablist" aria-label="조율 모드" className="flex gap-2">
@@ -527,7 +527,7 @@ export function SchedulingPage() {
                   'rounded-2xl border p-5',
                   c.rank === 1
                     ? 'border-accent bg-accent-soft/40 shadow-brutal-accent'
-                    : 'border-border bg-surface shadow-[0_1px_1px_rgba(0,0,0,0.05)]',
+                    : 'border-border bg-surface shadow-card-sm',
                 )}
               >
                 <div className="flex items-center gap-2">

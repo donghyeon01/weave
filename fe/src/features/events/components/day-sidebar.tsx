@@ -23,7 +23,7 @@ export function DaySidebar({ date, events, onEventClick, onAddClick }: DaySideba
   const sorted = sortByStart(events)
 
   return (
-    <aside className="w-80 shrink-0 rounded-2xl border border-border bg-surface p-4 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+    <aside className="w-80 shrink-0 rounded-2xl border border-border bg-surface p-4 shadow-card-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h2 className="font-display text-lg">{formatHeading(date)} 일정</h2>

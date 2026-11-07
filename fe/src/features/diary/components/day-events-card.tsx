@@ -8,7 +8,7 @@ export function DayEventsCard({ date }: { date: string }) {
   if (eventsQuery.isPending || events.length === 0) return null
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+    <section className="rounded-2xl border border-border bg-surface p-5 shadow-card-sm">
       <h3 className="font-display text-lg">연결된 일정</h3>
       <ul className="mt-3 flex flex-col gap-2">
         {events.map((e) => (

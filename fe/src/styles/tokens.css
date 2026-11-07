@@ -40,6 +40,11 @@
  *   - bg-accent-deep 위 text-surface 금지 → text-white (다크에서 surface가
  *     어두워지므로 채움 위 텍스트는 고정 토큰 사용)
  *   - bg-accent-soft/40 반투명 워시 위는 text-text만 허용
+ *
+ * v0.3.3 변경 — 잔여 임의 섀도우 토큰화 (이슈 #3):
+ *   - card-sm(0 1px 1px 5%)·card-md(0 2px 5px 4%)·bar(0 -10px 15px -3px 10%)
+ *     신규 — 화면 시각 수렴 커밋의 Figma 실측값을 그대로 토큰으로 승격
+ *   - check:tokens grep 게이트로 색·섀도우 리터럴 재유입 차단
  * ============================================================ */
 @theme {
   /* === 배경 레이어 === */
@@ -99,12 +104,16 @@
   --color-ring: #8b74ff; /* 포커스 링 (accent로 통일) */
 
   /* === 섀도우 === */
+  --shadow-card-sm: 0 1px 1px rgba(0, 0, 0, 0.05); /* 대시보드 카드 소프트 S (v0.3.3) */
+  --shadow-card-md: 0 2px 5px rgba(0, 0, 0, 0.04); /* 피처·행 카드 소프트 M (v0.3.3) */
   --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.04); /* 클린 카드 */
   --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.08); /* 호버 카드 */
+  --shadow-bar: 0 -10px 15px -3px rgba(0, 0, 0, 0.1); /* 하단 고정 바 상향 (v0.3.3) */
   --shadow-brutal-sm: 2px 2px 0px 0px var(--color-border-strong); /* 네오-브루탈 S */
   --shadow-brutal-md: 4px 4px 0px 0px var(--color-border-strong); /* 네오-브루탈 M */
   --shadow-brutal-lg: 6px 6px 0px 0px var(--color-border-strong); /* 네오-브루탈 L */
   --shadow-brutal-accent: 6px 6px 0px 0px var(--color-accent); /* 네오-브루탈 액센트 */
+  --shadow-brutal-line: 0px 2px 0px var(--color-border-strong); /* 하드 밑줄 — 랜딩 헤더 (v0.3.3) */
 
   /* === 타이포그래피 === */
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
@@ -158,6 +167,9 @@ body {
   /* 유지되는 값: primary·accent-deep·accent-soft·accent-pink·tint-*·success/warning/danger
      계열 채움·on-tint·on-success·on-danger·brand-kakao·milk-white
      (파스텔 채움과 그 위 텍스트는 고정) */
+  --shadow-card-sm: 0 1px 1px rgba(0, 0, 0, 0.35);
+  --shadow-card-md: 0 2px 5px rgba(0, 0, 0, 0.3);
   --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35);
   --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.5);
+  --shadow-bar: 0 -10px 15px -3px rgba(0, 0, 0, 0.4);
 }

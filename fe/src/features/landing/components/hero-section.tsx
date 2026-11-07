@@ -83,11 +83,19 @@ function TimetableCard() {
         <div className="mt-1 flex items-center justify-between rounded-lg border-2 border-border-strong bg-accent-deep p-3.5 shadow-brutal-md">
           <div className="flex items-center gap-2">
             <svg viewBox="0 0 32 32" className="size-8" aria-hidden="true">
-              <rect x="1" y="1" width="30" height="30" rx="15" fill="#C8DBFE" />
-              <rect x="1" y="1" width="30" height="30" rx="15" stroke="#1E2538" strokeWidth="2" />
+              <rect x="1" y="1" width="30" height="30" rx="15" className="fill-primary" />
+              <rect
+                x="1"
+                y="1"
+                width="30"
+                height="30"
+                rx="15"
+                className="stroke-on-tint"
+                strokeWidth="2"
+              />
               <path
                 d="M10.0391 7.96094H21.9609V9.72358H10.0391V7.96094ZM10.0391 22.2705H21.9609V24.0391H10.0391V22.2705ZM10.0391 19.4043H21.9609V21.1806H10.0391V19.4043ZM10.0391 16.5518H21.9609V18.3204H10.0391V16.5518ZM10.0391 13.6796H21.9609V15.4482H10.0391V13.6796ZM10.0391 10.8194H21.9609V12.5957H10.0391V10.8194Z"
-                fill="#1E2538"
+                className="fill-on-tint"
               />
             </svg>
             <div>
@@ -115,7 +123,7 @@ export function HeroSection() {
     <section className="relative overflow-clip border-b-2 border-border-strong bg-primary">
       <div
         aria-hidden="true"
-        className="absolute inset-0 opacity-10 [background-image:radial-gradient(circle,rgba(30,37,56,0.7)_1.5px,transparent_1.5px)] [background-size:24px_24px]"
+        className="absolute inset-0 opacity-10 [background-image:radial-gradient(circle,color-mix(in_srgb,var(--color-text)_70%,transparent)_1.5px,transparent_1.5px)] [background-size:24px_24px]"
       />
       <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-6 pb-12 pt-12 md:grid-cols-2">
         <div className="flex flex-col items-start gap-4">

@@ -219,7 +219,7 @@ export function TodoPage() {
           return (
             <li
               key={task.id}
-              className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-[0_2px_5px_rgba(0,0,0,0.04)]"
+              className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-card-md"
             >
               <div className="flex min-w-0 items-center gap-3">
                 <button
@@ -306,7 +306,7 @@ export function TodoPage() {
       {/* 일일 달성도 통계 — 시안 하단 섹션: 진행률 바 + N% 달성 */}
       <section
         aria-label="할 일 통계"
-        className="mt-8 rounded-2xl border border-border bg-surface p-6 shadow-[0_1px_1px_rgba(0,0,0,0.05)]"
+        className="mt-8 rounded-2xl border border-border bg-surface p-6 shadow-card-sm"
       >
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl">일일 달성도 통계</h2>

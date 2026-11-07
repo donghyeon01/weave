@@ -187,7 +187,7 @@ function DiaryEditorForm({
       )}
 
       {/* 작성 카드 — 시안 Main Writing Card: surface + border + soft shadow */}
-      <div className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-6 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+      <div className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-6 shadow-card-sm">
         <label className="flex flex-col gap-1.5 text-sm font-bold text-text">
           일기 제목
           <input

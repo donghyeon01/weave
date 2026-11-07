@@ -32,6 +32,9 @@ jobs:
 
       - run: npm run lint
 
+      # 디자인 토큰 grep 게이트 — 색·섀도우 리터럴 0건 (CONSTRAINTS, 이슈 #3)
+      - run: npm run check:tokens
+
       - run: npm run test
 
       - run: npm run build

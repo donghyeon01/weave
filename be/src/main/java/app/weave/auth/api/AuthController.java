@@ -9,6 +9,7 @@ import app.weave.common.error.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -34,11 +36,22 @@ public class AuthController {
     private final String cookieSameSite;
 
     public AuthController(AuthService authService, SessionService sessionService,
-            @org.springframework.beans.factory.annotation.Value(
-                    "${weave.cookie-samesite:Strict}") String cookieSameSite) {
+            @Value("${weave.cookie-samesite:Strict}") String cookieSameSite) {
         this.authService = authService;
         this.sessionService = sessionService;
-        this.cookieSameSite = cookieSameSite;
+        this.cookieSameSite = normalizeSameSite(cookieSameSite);
+    }
+
+    // 대소문자 오입력("none" 등)은 브라우저가 SameSite를 무시해 Lax 폴백 — Strict/Lax/None으로 정규화한다
+    private static String normalizeSameSite(String value) {
+        if (value == null) {
+            return "Strict";
+        }
+        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+            case "none" -> "None";
+            case "lax" -> "Lax";
+            default -> "Strict";
+        };
     }
 
     @PostMapping("/oauth/kakao")

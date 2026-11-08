@@ -1,15 +1,42 @@
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
-import { AppRoute } from './routes/app'
-import { KakaoCallbackRoute } from './routes/kakao-callback'
 import { LandingRoute } from './routes/landing'
-import { LoginRoute } from './routes/login'
-import { TodoRoute } from './routes/app/todo'
-import { CalendarRoute } from './routes/app/calendar'
-import { DiaryRoute } from './routes/app/diary'
-import { FriendsRoute } from './routes/app/friends'
-import { SchedulingRoute } from './routes/app/scheduling'
-import { ProfileRoute } from './routes/app/profile'
-import { ProposalsRoute } from './routes/app/proposals'
+
+// /app 라우트는 lazy chunk로 분리 — 랜딩 방문자가 앱 코드를 받지 않게 해 LCP를 지킨다
+const LoginRoute = lazy(() =>
+  import('./routes/login').then((m) => ({ default: m.LoginRoute })),
+)
+const KakaoCallbackRoute = lazy(() =>
+  import('./routes/kakao-callback').then((m) => ({ default: m.KakaoCallbackRoute })),
+)
+const AppRoute = lazy(() => import('./routes/app').then((m) => ({ default: m.AppRoute })))
+const TodoRoute = lazy(() => import('./routes/app/todo').then((m) => ({ default: m.TodoRoute })))
+const CalendarRoute = lazy(() =>
+  import('./routes/app/calendar').then((m) => ({ default: m.CalendarRoute })),
+)
+const DiaryRoute = lazy(() => import('./routes/app/diary').then((m) => ({ default: m.DiaryRoute })))
+const FriendsRoute = lazy(() =>
+  import('./routes/app/friends').then((m) => ({ default: m.FriendsRoute })),
+)
+const SchedulingRoute = lazy(() =>
+  import('./routes/app/scheduling').then((m) => ({ default: m.SchedulingRoute })),
+)
+const ProfileRoute = lazy(() =>
+  import('./routes/app/profile').then((m) => ({ default: m.ProfileRoute })),
+)
+const ProposalsRoute = lazy(() =>
+  import('./routes/app/proposals').then((m) => ({ default: m.ProposalsRoute })),
+)
+
+const routeFallback = (
+  <div className="flex min-h-screen items-center justify-center bg-background">
+    <p className="text-sm font-semibold text-text-secondary">불러오는 중…</p>
+  </div>
+)
+
+function lazyElement(element: React.ReactNode, fallback: React.ReactNode = routeFallback) {
+  return <Suspense fallback={fallback}>{element}</Suspense>
+}
 
 // top-nav.md의 6개 화면 라우트.
 export const router = createBrowserRouter([
@@ -18,21 +45,21 @@ export const router = createBrowserRouter([
     element: <LandingRoute />,
     children: [
       // /login은 랜딩 위 모달로 렌더된다
-      { path: 'login', element: <LoginRoute /> },
+      { path: 'login', element: lazyElement(<LoginRoute />, null) },
     ],
   },
-  { path: '/login/kakao/callback', element: <KakaoCallbackRoute /> },
+  { path: '/login/kakao/callback', element: lazyElement(<KakaoCallbackRoute />) },
   {
     path: '/app',
-    element: <AppRoute />,
+    element: lazyElement(<AppRoute />),
     children: [
-      { path: 'todo', element: <TodoRoute /> },
-      { path: 'calendar', element: <CalendarRoute /> },
-      { path: 'diary', element: <DiaryRoute /> },
-      { path: 'friends', element: <FriendsRoute /> },
-      { path: 'scheduling', element: <SchedulingRoute /> },
-      { path: 'profile', element: <ProfileRoute /> },
-      { path: 'proposals', element: <ProposalsRoute /> },
+      { path: 'todo', element: lazyElement(<TodoRoute />) },
+      { path: 'calendar', element: lazyElement(<CalendarRoute />) },
+      { path: 'diary', element: lazyElement(<DiaryRoute />) },
+      { path: 'friends', element: lazyElement(<FriendsRoute />) },
+      { path: 'scheduling', element: lazyElement(<SchedulingRoute />) },
+      { path: 'profile', element: lazyElement(<ProfileRoute />) },
+      { path: 'proposals', element: lazyElement(<ProposalsRoute />) },
     ],
   },
 ])

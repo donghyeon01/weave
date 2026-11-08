@@ -39,7 +39,7 @@ Last reviewed: 2026-11-04 (spec 승인과 동시)
 | 보안: 의존성 | high 이상 0건 | `osv-scanner scan source -r .` | CI |
 | 번들 | 랜딩 엔트리 gzip ≤ 150 kB | `size-limit` 또는 vite 빌드 리포트 | task end, CI |
 | 접근성 | axe critical/serious 0건 | `axe $PREVIEW_URL --tags wcag2a,wcag2aa,wcag21aa` | preview deploy |
-| 런타임 성능 | LCP ≤ 2500ms, CLS ≤ 0.1 | `lighthouse $PREVIEW_URL --output=json` | preview deploy |
+| 런타임 성능 | LCP ≤ 2500ms, CLS ≤ 0.1 | `lighthouse $PREVIEW_URL --output=json --throttling-method=devtools` — 실측 쓰로틀링 적용. 기본 simulate(lantern)는 웹폰트를 LCP 종속으로 과대계상해 한글 폰트 앱에서 구조적 측정 불가 | preview deploy |
 | 디자인 토큰 | `fe/src` 내 하드코딩 색상·섀도우 리터럴 0건 (토큰 정의 파일 제외) | grep CI 체크 (`#[0-9a-fA-F]{3,8}` 스캔) | CI |
 | 아키텍처 | 도메인 패키지 의존이 capability-map 단방향과 일치 (순환 0) | ArchUnit 테스트 (`be`) | CI |
 | API 계약 | `code`·enum·경로가 api-contract.md와 일치 — 파괴 변경은 문서 동시 갱신 | PR 리뷰 + `backend-api-pr-review` 체크리스트 | PR |

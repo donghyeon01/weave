@@ -6,17 +6,8 @@
     <link rel="apple-touch-icon" href="/icon-180.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Weave — 모두의 시간을 엮다</title>
-    <!-- 디자인 시스템 폰트 이원화: Jua(display) + Pretendard Variable(body) — 실패 시 토큰 폴백 -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Jua&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
-    />
+    <!-- 디자인 시스템 폰트 이원화: Jua(display) + Pretendard Variable(body) — globals.css에서 셀프호스팅 번들 -->
+    <!-- Jua는 font-display: optional이라 preload하지 않는다 — 첫 웨이브 대역폭 경쟁을 막기 위함 -->
   </head>
   <body>
     <div id="root"></div>

@@ -173,7 +173,7 @@ export function FriendsPage() {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-8 pt-8">
+    <div className="w-full">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="font-display text-[32px] leading-10">내 친구</h1>

@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --force",
     "test": "vitest run",
+    "check:tokens": "node scripts/check-tokens.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

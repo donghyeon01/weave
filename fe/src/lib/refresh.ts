@@ -1,3 +1,4 @@
+import { env } from '../config/env'
 import { useAuthStore } from '../stores/auth-store'
 import type { RefreshResponse } from '../types/auth'
 
@@ -7,7 +8,7 @@ import type { RefreshResponse } from '../types/auth'
 let refreshPromise: Promise<string | null> | null = null
 
 async function requestRefresh(): Promise<string | null> {
-  const res = await fetch('/api/auth/refresh', {
+  const res = await fetch(`${env.apiBaseUrl}/api/auth/refresh`, {
     method: 'POST',
     credentials: 'include',
   }).catch(() => null)

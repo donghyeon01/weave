@@ -28,7 +28,7 @@ export function DayView({ date, events, onEventClick, onDoubleClickTime }: DayVi
   const hours = Array.from({ length: GRID_END_H - GRID_START_H + 1 }, (_, i) => GRID_START_H + i)
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+    <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card-sm">
       {allDay.length > 0 && (
         <div className="flex flex-wrap gap-1.5 border-b border-border bg-surface-muted px-3 py-2">
           {allDay.map((e) => (

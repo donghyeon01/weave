@@ -311,7 +311,7 @@ export function FriendsPage() {
             {filteredFriends.map((f) => (
               <li
                 key={f.friendshipId}
-                className="flex flex-col justify-between rounded-lg border border-border bg-surface p-5 shadow-[0_1px_1px_rgba(0,0,0,0.05)]"
+                className="flex flex-col justify-between rounded-lg border border-border bg-surface p-5 shadow-card-sm"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">

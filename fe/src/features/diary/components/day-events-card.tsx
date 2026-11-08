@@ -8,7 +8,7 @@ export function DayEventsCard({ date }: { date: string }) {
   if (eventsQuery.isPending || events.length === 0) return null
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5 shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+    <section className="rounded-2xl border border-border bg-surface p-5 shadow-card-sm">
       <h3 className="font-display text-lg">연결된 일정</h3>
       <ul className="mt-3 flex flex-col gap-2">
         {events.map((e) => (
@@ -16,7 +16,7 @@ export function DayEventsCard({ date }: { date: string }) {
             key={e.id}
             className="flex items-baseline gap-2 rounded-lg bg-surface-muted px-3 py-2 text-sm"
           >
-            <span className="shrink-0 text-xs font-semibold text-text-muted">
+            <span className="shrink-0 text-xs font-semibold text-text-secondary">
               {e.allDay ? '종일' : `${e.startTime.slice(11, 16)} - ${e.endTime.slice(11, 16)}`}
             </span>
             <span className="truncate font-semibold text-text">{e.title}</span>

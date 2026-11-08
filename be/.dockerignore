@@ -1,0 +1,8 @@
+# be Docker 빌드 컨텍스트 — 로컬 빌드 산출물·IDE 잔재를 데몬에 보내지 않는다
+.gradle/
+build/
+out/
+bin/
+.idea/
+*.iml
+*.log

@@ -18,6 +18,10 @@ if (typeof document !== 'undefined') {
   )
 }
 
+// 모듈 레벨 오픈 스택 — 중첩 모달에서 Escape·Tab 트랩은 최상위 인스턴스만 처리하고,
+// body overflow 잠금은 마지막 모달이 닫힐 때 해제한다. (이슈 #3 F7)
+const openModals: symbol[] = []
+
 interface ModalProps {
   open: boolean
   onClose: () => void
@@ -37,6 +41,7 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
   const previousRef = useRef<HTMLElement | null>(null)
   // onClose를 deps에 두면 부모 재렌더마다 focus가 재실행돼 포커스를 뺏으므로 ref로 최신값만 참조
   const onCloseRef = useRef(onClose)
+  const idRef = useRef(Symbol('modal'))
 
   useEffect(() => {
     onCloseRef.current = onClose
@@ -59,7 +64,13 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
     }
     cardRef.current?.focus()
 
+    const id = idRef.current
+    openModals.push(id)
+    // 하위 모달의 리스너도 document에서 발화한다 — 최상위가 아니면 아무것도 하지 않는다.
+    const isTop = () => openModals[openModals.length - 1] === id
+
     const onKeyDown = (e: KeyboardEvent) => {
+      if (!isTop()) return
       if (e.key === 'Escape') {
         onCloseRef.current()
         return
@@ -87,7 +98,9 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
     document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = ''
+      const i = openModals.indexOf(id)
+      if (i !== -1) openModals.splice(i, 1)
+      if (openModals.length === 0) document.body.style.overflow = ''
     }
   }, [open])
 

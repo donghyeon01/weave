@@ -1,0 +1,6 @@
+# API 전용 도메인 — 도메인 미보유 시 nip.io로 OCI 공인 IP에 무료 도메인을 얻는다.
+# 예: OCI 공인 IP가 1.2.3.4면 API_DOMAIN=1-2-3-4.nip.io → Caddy가 Let's Encrypt 자동 발급.
+# /ws(STOMP) 업그레이드도 reverse_proxy가 자동 처리한다.
+{$API_DOMAIN} {
+	reverse_proxy be:8081
+}

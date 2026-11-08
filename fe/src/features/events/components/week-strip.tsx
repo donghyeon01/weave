@@ -32,7 +32,7 @@ export function WeekStrip({
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
+    <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card-sm">
       <div className="grid grid-cols-7 border-b border-border bg-surface-muted">
         {WEEKDAYS.map((w) => (
           <div key={w} className="px-2 py-2 text-center text-xs font-bold text-text-secondary">

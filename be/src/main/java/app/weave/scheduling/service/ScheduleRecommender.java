@@ -36,6 +36,24 @@ public class ScheduleRecommender {
     public List<Candidate> recommend(Mode mode, LocalDate rangeStart, LocalDate rangeEnd,
             LocalTime windowStart, LocalTime windowEnd, Integer slotMinutes,
             Integer durationDays, Map<Long, List<BusyInterval>> busyByUser) {
+        // 공개 진입점 방어 — 유일 호출자(SchedulingService)가 400으로 거르지만,
+        // 순수 계산기 계약 위반은 호출자 버그이므로 IllegalArgumentException으로 거부한다.
+        if (mode == null || rangeStart == null || rangeEnd == null
+                || rangeStart.isAfter(rangeEnd)) {
+            throw new IllegalArgumentException("mode/range invalid");
+        }
+        if (busyByUser == null || busyByUser.isEmpty()) {
+            throw new IllegalArgumentException("busyByUser must not be empty");
+        }
+        // 창은 slotMinutes 경로에서만 쓰인다 — 고정 블록(생략)은 창 없이 유효한 호출이다.
+        if (mode == Mode.TIME && slotMinutes != null
+                && (slotMinutes < 1 || windowStart == null || windowEnd == null
+                        || !windowEnd.isAfter(windowStart))) {
+            throw new IllegalArgumentException("time window/slot invalid");
+        }
+        if (mode == Mode.DATE && (durationDays == null || durationDays < 1)) {
+            throw new IllegalArgumentException("durationDays invalid");
+        }
         int total = busyByUser.size();
         List<Scored> scored = new ArrayList<>();
 

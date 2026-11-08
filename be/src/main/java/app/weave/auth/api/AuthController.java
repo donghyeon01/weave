@@ -9,6 +9,7 @@ import app.weave.common.error.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,10 +32,26 @@ public class AuthController {
 
     private final AuthService authService;
     private final SessionService sessionService;
+    // cross-site 배포(fe와 API가 다른 도메인)는 None 필수 — dev/prod 분기는 env로 주입한다
+    private final String cookieSameSite;
 
-    public AuthController(AuthService authService, SessionService sessionService) {
+    public AuthController(AuthService authService, SessionService sessionService,
+            @Value("${weave.cookie-samesite:Strict}") String cookieSameSite) {
         this.authService = authService;
         this.sessionService = sessionService;
+        this.cookieSameSite = normalizeSameSite(cookieSameSite);
+    }
+
+    // 대소문자 오입력("none" 등)은 브라우저가 SameSite를 무시해 Lax 폴백 — Strict/Lax/None으로 정규화한다
+    private static String normalizeSameSite(String value) {
+        if (value == null) {
+            return "Strict";
+        }
+        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+            case "none" -> "None";
+            case "lax" -> "Lax";
+            default -> "Strict";
+        };
     }
 
     @PostMapping("/oauth/kakao")
@@ -89,7 +107,7 @@ public class AuthController {
         return ResponseCookie.from(REFRESH_COOKIE, raw)
                 .httpOnly(true)
                 .secure(true)
-                .sameSite("Strict")
+                .sameSite(cookieSameSite)
                 .path("/api/auth")
                 .maxAge(REFRESH_MAX_AGE)
                 .build();
@@ -97,7 +115,7 @@ public class AuthController {
 
     private ResponseCookie expireCookie() {
         return ResponseCookie.from(REFRESH_COOKIE, "")
-                .httpOnly(true).secure(true).sameSite("Strict")
+                .httpOnly(true).secure(true).sameSite(cookieSameSite)
                 .path("/api/auth").maxAge(0)
                 .build();
     }

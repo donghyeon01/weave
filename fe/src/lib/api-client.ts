@@ -1,4 +1,5 @@
 import { ensureFreshToken } from './refresh'
+import { env } from '../config/env'
 import { useAuthStore } from '../stores/auth-store'
 
 const REFRESH_PATH = '/api/auth/refresh'
@@ -65,7 +66,12 @@ async function send(path: string, init: ApiRequestInit): Promise<Response> {
 
   const payload = serializeBody(body, headers)
 
-  return fetch(path, { ...rest, headers, body: payload, credentials: 'include' })
+  return fetch(`${env.apiBaseUrl}${path}`, {
+    ...rest,
+    headers,
+    body: payload,
+    credentials: 'include',
+  })
 }
 
 function serializeBody(body: unknown, headers: Headers): BodyInit | undefined {

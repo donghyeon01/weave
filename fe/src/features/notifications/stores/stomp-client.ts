@@ -1,4 +1,5 @@
 import { Client } from '@stomp/stompjs'
+import { env } from '../../../config/env'
 import { ensureFreshToken } from '../../../lib/refresh'
 import { queryClient } from '../../../lib/react-query'
 import { useAuthStore } from '../../../stores/auth-store'
@@ -34,8 +35,8 @@ async function connect(): Promise<Client | null> {
   if (token === null) return null
 
   const c = new Client({
-    // vite dev 프록시가 /ws를 백엔드 8081로 넘긴다
-    brokerURL: `${location.origin.replace(/^http/, 'ws')}/ws`,
+    // 배포는 apiBaseUrl의 API 도메인, 로컬은 vite dev 프록시가 /ws를 백엔드 8081로 넘긴다
+    brokerURL: `${(env.apiBaseUrl || location.origin).replace(/^http/, 'ws')}/ws`,
     connectHeaders: { Authorization: `Bearer ${token}` },
     reconnectDelay: 5000,
     onConnect: () => {

@@ -123,7 +123,7 @@ export function ProfilePage() {
   }
 
   const cardClass =
-    'rounded-2xl border border-border bg-surface p-6 shadow-[0_1px_1px_rgba(0,0,0,0.05)]'
+    'rounded-2xl border border-border bg-surface p-6 shadow-card-sm'
   const cardHead =
     'flex items-center justify-between border-b border-border pb-4'
 
@@ -358,7 +358,7 @@ export function ProfilePage() {
 
       {/* 하단 스티키 저장 바 — 시안 4:6: blur + border-t + 암호화 문구 + 변경 취소/저장하기 */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/80 backdrop-blur-md md:left-64">
-        <div className="flex items-center justify-between px-8 py-4 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)]">
+        <div className="flex items-center justify-between px-8 py-4 shadow-bar">
           <span className="flex items-center gap-2 text-xs font-medium text-text-secondary">
             <svg viewBox="0 0 13 13" className="size-3.5" aria-hidden="true">
               <path

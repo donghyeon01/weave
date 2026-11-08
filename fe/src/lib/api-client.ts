@@ -28,6 +28,8 @@ export interface ApiRequestInit extends Omit<RequestInit, 'body'> {
   body?: unknown
   /** 생성 POST의 멱등 재시도 키 (api-contract §1.6) */
   idempotencyKey?: string
+  /** 'blob'이면 바이너리 본문을 그대로 반환 — 인증이 필요한 이미지 fetch용 (objectURL 생성 전제) */
+  responseType?: 'blob'
 }
 
 /**
@@ -53,7 +55,7 @@ async function request<T>(path: string, init: ApiRequestInit, canRetry: boolean)
     // 갱신 실패 — 원래 401 응답을 봉투 파싱해 throw (refresh 401이면 이미 logout 상태)
   }
 
-  return parseResponse<T>(res)
+  return parseResponse<T>(res, init.responseType)
 }
 
 async function send(path: string, init: ApiRequestInit): Promise<Response> {
@@ -90,9 +92,10 @@ function serializeBody(body: unknown, headers: Headers): BodyInit | undefined {
   return JSON.stringify(body)
 }
 
-async function parseResponse<T>(res: Response): Promise<T> {
+async function parseResponse<T>(res: Response, responseType?: 'blob'): Promise<T> {
   if (res.ok) {
     if (res.status === 204) return undefined as T
+    if (responseType === 'blob') return (await res.blob()) as T
     const contentType = res.headers.get('content-type') ?? ''
     if (contentType.includes('application/json')) return (await res.json()) as T
     return (await res.text()) as T

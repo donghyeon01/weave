@@ -2,6 +2,7 @@ package app.weave.diary.api;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -9,15 +10,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import app.weave.auth.jwt.JwtProvider;
+import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -43,8 +49,18 @@ class DiaryControllerTest {
     private Long otherId;
     private String token;
 
+    @TempDir
+    static Path uploadDir;
+
+    @DynamicPropertySource
+    static void props(DynamicPropertyRegistry r) {
+        r.add("weave.upload.dir", () -> uploadDir.toString());
+    }
+
     @BeforeEach
     void setUp() {
+        // FK: diary_photos → diaries → users 참조라 자식부터 삭제
+        jdbc.update("DELETE FROM diary_photos");
         // diaries.event_id → events 참조라 일기부터 삭제
         jdbc.update("DELETE FROM diaries");
         jdbc.update("DELETE FROM events");
@@ -248,5 +264,89 @@ class DiaryControllerTest {
         mvc.perform(delete("/api/diaries/2026-05-20")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
+    }
+
+    private byte[] jpeg() {
+        return new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 1, 2, 3, 4};
+    }
+
+    private void createDiary(String date) throws Exception {
+        mvc.perform(post("/api/diaries")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"" + date + "\",\"content\":\"본문\"}"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void 사진_업로드는_201과_메타를_반환하고_응답에_포함된다() throws Exception {
+        createDiary("2027-06-01");
+
+        mvc.perform(multipart("/api/diaries/2027-06-01/photos")
+                        .file(new MockMultipartFile("file", "p.jpg", "image/jpeg", jpeg()))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.contentType").value("image/jpeg"))
+                .andExpect(jsonPath("$.sortOrder").value(0));
+
+        mvc.perform(get("/api/diaries/2027-06-01")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.photos.length()").value(1))
+                .andExpect(jsonPath("$.photos[0].contentType").value("image/jpeg"));
+    }
+
+    @Test
+    void 사진_조회는_소유자에게_바이트를_내리고_타인은_404다() throws Exception {
+        createDiary("2027-06-01");
+        String location = mvc.perform(multipart("/api/diaries/2027-06-01/photos")
+                        .file(new MockMultipartFile("file", "p.jpg", "image/jpeg", jpeg()))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getHeader("Location");
+
+        mvc.perform(get(location)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "image/jpeg"));
+
+        String otherToken = jwtProvider.createAccessToken(otherId, List.of("ROLE_USER"));
+        mvc.perform(post("/api/diaries")
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2027-06-01\",\"content\":\"타인본문\"}"))
+                .andExpect(status().isCreated());
+        mvc.perform(get(location)
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("DIARY-PHOTO-NOT-FOUND"));
+    }
+
+    @Test
+    void 사진_삭제는_204이고_없는_일기에_업로드는_404다() throws Exception {
+        createDiary("2027-06-01");
+        String location = mvc.perform(multipart("/api/diaries/2027-06-01/photos")
+                        .file(new MockMultipartFile("file", "p.jpg", "image/jpeg", jpeg()))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getHeader("Location");
+
+        mvc.perform(delete(location)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(multipart("/api/diaries/2027-06-02/photos")
+                        .file(new MockMultipartFile("file", "p.jpg", "image/jpeg", jpeg()))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("DIARY-NOT-FOUND"));
+    }
+
+    @Test
+    void 사진_엔드포인트는_미인증이면_401이다() throws Exception {
+        mvc.perform(multipart("/api/diaries/2027-06-01/photos")
+                        .file(new MockMultipartFile("file", "p.jpg", "image/jpeg", jpeg())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH-UNAUTHORIZED"));
     }
 }

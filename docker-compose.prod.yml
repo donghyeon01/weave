@@ -39,7 +39,11 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
+      # 일기 사진 로컬 스토리지 — 호스트 ~/weave-ops/uploads에 두어 재배포·백업 경로와 맞춘다
+      UPLOAD_DIR: /data/uploads
       TZ: Asia/Seoul
+    volumes:
+      - ${HOST_UPLOAD_DIR:-~/weave-ops/uploads}:/data/uploads
     depends_on:
       mysql:
         condition: service_healthy

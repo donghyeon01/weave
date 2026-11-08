@@ -46,6 +46,8 @@ curl -s http://127.0.0.1:8081/api/health
 
 복원 후 be 재시작으로 커넥션 정리: `docker restart $(docker ps -q --filter label=com.docker.compose.service=be)`
 
+업로드 파일(일기 사진)은 `uploads-*.tar.gz` 별도 덤프 — `tar -xzf ~/weave-ops/backups/uploads-*.tar.gz -C ~/weave-ops/uploads`
+
 ### 새 박스로 이전 (박스 전손 시나리오)
 
 1. 사전에 오프박스로 옮겨둔 최신 덤프 확보 (아래 "미적용 항목" 참고 — 미설정이면 백업도 같이 소실)

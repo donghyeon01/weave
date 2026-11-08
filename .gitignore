@@ -28,6 +28,9 @@ out/
 # Screen snapshots (로컬 임시 보존 — scripts/snapshot_screens.py)
 snapshots/
 
+# 일기 사진 로컬 업로드 (be weave.upload.dir 기본값)
+uploads/
+
 # Gradle IDE output
 bin/
 

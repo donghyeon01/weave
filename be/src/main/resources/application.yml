@@ -26,11 +26,19 @@ spring:
   web:
     resources:
       add-mappings: true
+  servlet:
+    multipart:
+      # 일기 사진 계약 — 장당 5MB (api-contract §3.5)
+      max-file-size: 5MB
+      max-request-size: 5MB
 
 server:
   port: ${SERVER_PORT:8081}
 
 weave:
+  # 일기 사진 로컬 디스크 스토리지 루트 — prod는 볼륨 마운트 경로(/data/uploads)
+  upload:
+    dir: ${UPLOAD_DIR:./uploads}
   demo-enabled: ${DEMO_ENABLED:false}
   jwt-secret: ${JWT_SECRET:dev-only-secret-override-with-env-32bytes!!}
   kakao:

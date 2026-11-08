@@ -6,8 +6,17 @@ export interface DiaryResponse {
   content: string
   mood: string | null
   tags: string[] | null
+  photos: DiaryPhotoMeta[]
   createdAt: string
   updatedAt: string
+}
+
+/** 사진 메타 — 바이트는 인증 fetch(blob)→objectURL로만 얻는다 (<img>는 Authorization을 못 보냄). */
+export interface DiaryPhotoMeta {
+  id: number
+  contentType: string
+  sizeBytes: number
+  sortOrder: number
 }
 
 // GET /api/diaries?yearMonth= — content 없는 미리보기

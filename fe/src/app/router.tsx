@@ -1,9 +1,11 @@
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
 import { LandingRoute } from './routes/landing'
-import { LoginRoute } from './routes/login'
 
 // /app 라우트는 lazy chunk로 분리 — 랜딩 방문자가 앱 코드를 받지 않게 해 LCP를 지킨다
+const LoginRoute = lazy(() =>
+  import('./routes/login').then((m) => ({ default: m.LoginRoute })),
+)
 const KakaoCallbackRoute = lazy(() =>
   import('./routes/kakao-callback').then((m) => ({ default: m.KakaoCallbackRoute })),
 )
@@ -26,18 +28,14 @@ const ProposalsRoute = lazy(() =>
   import('./routes/app/proposals').then((m) => ({ default: m.ProposalsRoute })),
 )
 
-function lazyElement(element: React.ReactNode) {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-background">
-          <p className="text-sm font-semibold text-text-secondary">불러오는 중…</p>
-        </div>
-      }
-    >
-      {element}
-    </Suspense>
-  )
+const routeFallback = (
+  <div className="flex min-h-screen items-center justify-center bg-background">
+    <p className="text-sm font-semibold text-text-secondary">불러오는 중…</p>
+  </div>
+)
+
+function lazyElement(element: React.ReactNode, fallback: React.ReactNode = routeFallback) {
+  return <Suspense fallback={fallback}>{element}</Suspense>
 }
 
 // top-nav.md의 6개 화면 라우트.
@@ -47,7 +45,7 @@ export const router = createBrowserRouter([
     element: <LandingRoute />,
     children: [
       // /login은 랜딩 위 모달로 렌더된다
-      { path: 'login', element: <LoginRoute /> },
+      { path: 'login', element: lazyElement(<LoginRoute />, null) },
     ],
   },
   { path: '/login/kakao/callback', element: lazyElement(<KakaoCallbackRoute />) },

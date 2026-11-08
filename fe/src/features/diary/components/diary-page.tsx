@@ -10,7 +10,7 @@ export function DiaryPage() {
   const [selectedDate, setSelectedDate] = useState(today)
 
   return (
-    <div className="mx-auto w-full max-w-7xl p-8">
+    <div className="w-full">
       <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
         <DiaryEditor date={selectedDate} />
         <aside className="flex flex-col gap-6">

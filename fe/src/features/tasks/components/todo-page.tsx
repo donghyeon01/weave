@@ -141,7 +141,7 @@ export function TodoPage() {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-8 pt-8">
+    <div className="w-full">
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium text-text-secondary">

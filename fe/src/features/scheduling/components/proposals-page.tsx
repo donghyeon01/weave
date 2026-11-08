@@ -89,7 +89,7 @@ export function ProposalsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-8">
+    <div className="w-full">
       <div className="flex flex-col gap-2.5">
         <div className="flex items-center gap-3">
           <h1 className="font-display text-[32px] leading-normal">제안 보관함</h1>

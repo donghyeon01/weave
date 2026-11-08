@@ -226,7 +226,7 @@ export function SchedulingPage() {
   const step = candidates !== null ? 3 : selectedIds.length > 0 ? 2 : 1
 
   return (
-    <div className="mx-auto w-full max-w-7xl p-8">
+    <div className="w-full">
       {/* 헤더 — accent 배지 + H1 + 통계 칩 */}
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-1.5">

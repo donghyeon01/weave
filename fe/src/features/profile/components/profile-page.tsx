@@ -128,7 +128,7 @@ export function ProfilePage() {
     'flex items-center justify-between border-b border-border pb-4'
 
   return (
-    <div className="mx-auto max-w-6xl px-8 pb-32 pt-8">
+    <div className="pb-32">
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">

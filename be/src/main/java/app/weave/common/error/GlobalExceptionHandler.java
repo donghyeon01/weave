@@ -12,6 +12,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 /**
  * 모든 예외를 api-contract §1.4 에러 봉투로 변환한다.
@@ -53,6 +54,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
         return respond(ErrorCode.ACCESS_DENIED, ErrorCode.ACCESS_DENIED.getMessage(),
+                List.of());
+    }
+
+    /** multipart 크기 상한은 컨트롤러 도달 전에 터진다 — 현재 유일한 업로드 경로(일기 사진) 코드로 변환. */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadSize(MaxUploadSizeExceededException e) {
+        return respond(ErrorCode.DIARY_PHOTO_SIZE, ErrorCode.DIARY_PHOTO_SIZE.getMessage(),
                 List.of());
     }
 

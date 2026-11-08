@@ -31,5 +31,13 @@ if [ ! -s "$OUT" ]; then
   exit 1
 fi
 
+# 일기 사진 업로드 — mysqldump가 못 담는 파일이라 tar로 같이 보관한다
+UPLOAD_DIR_HOST="${WEAVE_UPLOAD_DIR:-$HOME/weave-ops/uploads}"
+if [ -d "$UPLOAD_DIR_HOST" ]; then
+  UOUT="$BACKUP_DIR/uploads-$(date +%Y%m%d-%H%M%S).tar.gz"
+  tar -czf "$UOUT" -C "$UPLOAD_DIR_HOST" .
+  find "$BACKUP_DIR" -name 'uploads-*.tar.gz' -mtime +"$KEEP_DAYS" -delete
+fi
+
 find "$BACKUP_DIR" -name 'weave-*.sql.gz' -mtime +"$KEEP_DAYS" -delete
 echo "backup ok: $OUT ($(du -h "$OUT" | cut -f1))"

@@ -4,19 +4,26 @@ import app.weave.auth.domain.User;
 import app.weave.auth.domain.UserRepository;
 import app.weave.common.error.BusinessException;
 import app.weave.common.error.ErrorCode;
+import app.weave.common.port.UserFileCleanup;
 import java.util.Collection;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserService {
 
-    private final UserRepository userRepository;
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
-    public UserService(UserRepository userRepository) {
+    private final UserRepository userRepository;
+    private final UserFileCleanup fileCleanup;
+
+    public UserService(UserRepository userRepository, UserFileCleanup fileCleanup) {
         this.userRepository = userRepository;
+        this.fileCleanup = fileCleanup;
     }
 
     @Transactional(readOnly = true)
@@ -60,5 +67,11 @@ public class UserService {
     public void deleteMe(Long userId) {
         User user = getMe(userId);
         userRepository.delete(user); // FK ON DELETE CASCADE가 전 데이터 정리
+        // 디스크 파일은 CASCADE가 못 지우므로 포트로 정리 — 실패해도 탈퇴는 완료시킨다
+        try {
+            fileCleanup.deleteAllForUser(userId);
+        } catch (RuntimeException e) {
+            log.warn("탈퇴 사용자 파일 정리 실패 userId={}", userId, e);
+        }
     }
 }

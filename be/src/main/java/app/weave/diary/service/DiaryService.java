@@ -16,10 +16,13 @@ public class DiaryService {
 
     private final DiaryRepository repository;
     private final EventAccess eventAccess;
+    private final DiaryPhotoStorage photoStorage;
 
-    public DiaryService(DiaryRepository repository, EventAccess eventAccess) {
+    public DiaryService(DiaryRepository repository, EventAccess eventAccess,
+            DiaryPhotoStorage photoStorage) {
         this.repository = repository;
         this.eventAccess = eventAccess;
+        this.photoStorage = photoStorage;
     }
 
     @Transactional
@@ -67,7 +70,10 @@ public class DiaryService {
 
     @Transactional
     public void delete(Long userId, LocalDate date) {
-        repository.delete(get(userId, date));
+        Diary diary = get(userId, date);
+        repository.delete(diary);
+        // 행은 FK CASCADE로 지워지고 첨부 파일은 여기서 정리한다
+        photoStorage.deleteForDiary(userId, diary.getId());
     }
 
     /** 연결 일정은 본인 소유만 — 미존재·타인 소유는 400 (계약 §3.5). eventId null은 미연결이라 통과. */

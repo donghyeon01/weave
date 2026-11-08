@@ -8,7 +8,8 @@ import { useDiary } from '../api/use-diary'
 import { useDeleteDiary } from '../api/use-delete-diary'
 import { useSaveDiary } from '../api/use-save-diary'
 import { clearDraft, readDraft, writeDraft } from '../draft'
-import type { DiaryResponse } from '../types'
+import type { DiaryPhotoMeta, DiaryResponse } from '../types'
+import { DiaryPhotos } from './diary-photos'
 import { MoodPicker } from './mood-picker'
 import { TagInput } from './tag-input'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
@@ -43,11 +44,13 @@ function DiaryEditorForm({
   initial,
   hasRecord,
   draftRestored,
+  photos,
 }: {
   date: string
   initial: EditorInitial
   hasRecord: boolean
   draftRestored: string | null
+  photos: DiaryPhotoMeta[]
 }) {
   const saveDiary = useSaveDiary()
   const deleteDiary = useDeleteDiary()
@@ -228,6 +231,8 @@ function DiaryEditorForm({
           />
         </label>
 
+        <DiaryPhotos date={date} photos={photos} enabled={hasRecord} />
+
         {error !== null && (
           <p role="alert" className="text-sm font-semibold text-danger-text">
             {error}
@@ -307,6 +312,7 @@ export function DiaryEditor({ date }: { date: string }) {
       initial={initial}
       hasRecord={diary !== null}
       draftRestored={draft?.savedAt ?? null}
+      photos={diary?.photos ?? []}
     />
   )
 }

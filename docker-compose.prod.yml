@@ -32,7 +32,8 @@ services:
       MYSQL_USER: weave
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
-      DEMO_ENABLED: "false"
+      # 둘러보기용 데모 계정 발급 허용 — .env.production의 DEMO_ENABLED로 제어 (기본 off)
+      DEMO_ENABLED: ${DEMO_ENABLED:-false}
       # fe(vercel.app)와 API(nip.io)는 cross-site — refresh 쿠키 전송에 None 필수
       COOKIE_SAMESITE: None
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}

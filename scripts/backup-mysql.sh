@@ -22,7 +22,7 @@ fi
 
 OUT="$BACKUP_DIR/weave-$(date +%Y%m%d-%H%M%S).sql.gz"
 docker exec -e MYSQL_PWD="$DB_PASS" "$MYSQL_CID" \
-  mysqldump -u weave --single-transaction --routines --events weave \
+  mysqldump -u weave --single-transaction --no-tablespaces --routines --events weave \
   | gzip > "$OUT"
 
 if [ ! -s "$OUT" ]; then

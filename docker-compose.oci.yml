@@ -1,0 +1,7 @@
+# OCI 실환경 오버라이드 — 박스의 기존 nginx+certbot이 80/443을 점유한다.
+# caddy는 기동하지 않고 be만 localhost에 게시 → nginx가 API_DOMAIN으로 프록시.
+# 사용: docker compose --env-file .env.production -f docker-compose.prod.yml -f docker-compose.oci.yml up -d mysql be
+services:
+  be:
+    ports:
+      - "127.0.0.1:8081:8081"

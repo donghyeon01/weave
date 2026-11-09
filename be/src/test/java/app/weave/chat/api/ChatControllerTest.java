@@ -134,6 +134,12 @@ class ChatControllerTest {
                         .param("limit", "101").header("Authorization", "Bearer " + token))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON-VALIDATION"));
+
+        // 숫자 아닌 커서는 타입 불일치 — 500이 아니라 400 COMMON-MALFORMED
+        mvc.perform(get("/api/chat/rooms/{id}/messages", room.getId())
+                        .param("cursor", "abc").header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON-MALFORMED"));
     }
 
     @Test

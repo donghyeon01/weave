@@ -10,6 +10,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -36,6 +37,14 @@ public class GlobalExceptionHandler {
                 .toList();
         return respond(ErrorCode.COMMON_VALIDATION, ErrorCode.COMMON_VALIDATION.getMessage(),
                 fieldErrors);
+    }
+
+    /** 쿼리·경로 변수의 타입 불일치(?cursor=abc → Long)도 해석 실패로 — 500이 아니라 400. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(
+            MethodArgumentTypeMismatchException e) {
+        return respond(ErrorCode.COMMON_MALFORMED, ErrorCode.COMMON_MALFORMED.getMessage(),
+                List.of());
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

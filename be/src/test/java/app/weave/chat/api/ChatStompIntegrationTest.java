@@ -24,6 +24,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
@@ -57,6 +58,10 @@ class ChatStompIntegrationTest {
     JwtProvider jwtProvider;
     @Autowired
     ChatService chatService;
+    @Autowired
+    SimpMessagingTemplate messagingTemplate;
+    @Autowired
+    org.springframework.messaging.simp.user.SimpUserRegistry userRegistry;
 
     private WebSocketStompClient stompClient;
     private Long meId;
@@ -101,10 +106,21 @@ class ChatStompIntegrationTest {
     /** ERROR 프레임의 message 헤더({"code":"..."})를 큐로 수집하는 세션 핸들러. */
     private static class ErrorCapture extends StompSessionHandlerAdapter {
         final BlockingQueue<String> errors = new LinkedBlockingQueue<>();
+        int connectedCount;
 
-        // ERROR 프레임은 handleException이 아니라 handleFrame으로 라우팅된다
+        @Override
+        public void afterConnected(StompSession session, StompHeaders connectedHeaders) {
+            connectedCount++;
+        }
+
+        // ERROR 프레임은 handleException이 아니라 handleFrame으로 라우팅된다.
+        // 중복 CONNECTED 프레임이 오면 이미 연결된 세션의 handleFrame으로 들어온다
         @Override
         public void handleFrame(StompHeaders headers, Object payload) {
+            if (StompCommand.CONNECTED.name().equals(headers.getFirst("stompCommand"))) {
+                connectedCount++;
+                return;
+            }
             errors.add(String.valueOf(headers.getFirst("message")));
         }
 
@@ -207,6 +223,91 @@ class ChatStompIntegrationTest {
 
         me.session().send("/app/rooms/" + r.getId(), Map.of("content", "hi"));
         assertThat(me.errors().nextError()).contains("CHAT-ROOM-CLOSED");
+    }
+
+    @Test
+    void 와일드카드_SUBSCRIBE는_ERROR로_거부된다() throws Exception {
+        Conn me = connect(meId);
+        me.session().subscribe("/topic/rooms/*", new BroadcastCapture());
+        assertThat(me.errors().nextError()).contains("CHAT-ROOM-NOT-FOUND");
+
+        // ERROR 송신 후 세션 종료 — 새 연결로 패턴 목적지 구독도 차단 확인
+        Conn me2 = connect(meId);
+        me2.session().subscribe("/topic/**", new BroadcastCapture());
+        assertThat(me2.errors().nextError()).contains("CHAT-ROOM-NOT-FOUND");
+    }
+
+    @Test
+    void topic_직행_SEND는_ERROR이고_구독자_수신과_DB_저장이_없다() throws Exception {
+        ChatRoom r = room(5L, List.of(meId, p1Id));
+        Conn me = connect(meId);
+        Conn p1 = connect(p1Id);
+        BroadcastCapture capture = new BroadcastCapture();
+        p1.session().subscribe("/topic/rooms/" + r.getId(), capture);
+        Thread.sleep(300);
+
+        // /app 경유가 아닌 브로커 직행 SEND — 멤버라도 차단해야 한다
+        me.session().send("/topic/rooms/" + r.getId(),
+                Map.of("content", "위조", "senderId", 0));
+
+        assertThat(me.errors().nextError()).contains("CHAT-ROOM-NOT-FOUND");
+        assertThat(capture.messages.poll(2, TimeUnit.SECONDS)).isNull();
+        assertThat(chatService.history(meId, r.getId(), null, null)).isEmpty();
+    }
+
+    @Test
+    void 유효하지_않은_payload의_SEND는_CHAT_MESSAGE_INVALID_ERROR() throws Exception {
+        ChatRoom r = room(6L, List.of(meId));
+
+        Conn c1 = connect(meId);
+        c1.session().send("/app/rooms/" + r.getId(), Map.of("content", "   "));
+        assertThat(c1.errors().nextError()).contains("CHAT-MESSAGE-INVALID");
+
+        Conn c2 = connect(meId);
+        c2.session().send("/app/rooms/" + r.getId(),
+                Map.of("content", "x".repeat(2001)));
+        assertThat(c2.errors().nextError()).contains("CHAT-MESSAGE-INVALID");
+
+        Conn c3 = connect(meId);
+        c3.session().send("/app/rooms/" + r.getId(),
+                Map.of("content", "ok", "clientMessageId", "k".repeat(65)));
+        assertThat(c3.errors().nextError()).contains("CHAT-MESSAGE-INVALID");
+
+        assertThat(chatService.history(meId, r.getId(), null, null)).isEmpty();
+    }
+
+    @Test
+    void CONNECTED는_1회이고_notification과_room구독이_공존한다() throws Exception {
+        ChatRoom r = room(7L, List.of(meId, p1Id));
+        Conn me = connect(meId);
+        Conn p1 = connect(p1Id);
+        assertThat(me.errors().connectedCount).isEqualTo(1);
+        assertThat(p1.errors().connectedCount).isEqualTo(1);
+
+        // notification 구독 경로 회귀 — /queue,/user 브로커 목적지도 같은 브로커에서 동작
+        BroadcastCapture notif = new BroadcastCapture();
+        me.session().subscribe("/user/queue/notifications", notif);
+        BroadcastCapture roomCap = new BroadcastCapture();
+        p1.session().subscribe("/topic/rooms/" + r.getId(), roomCap);
+        Thread.sleep(300);
+
+        // 구독 등록은 비동기 — 짧은 윈도에 유실될 수 있어 수신될 때까지 재전송한다
+        var u = userRegistry.getUser(String.valueOf(meId));
+        Map<String, Object> got = null;
+        for (int i = 0; i < 10 && got == null; i++) {
+            messagingTemplate.convertAndSendToUser(String.valueOf(meId),
+                    "/queue/notifications", Map.of("type", "TEST"));
+            got = notif.messages.poll(500, TimeUnit.MILLISECONDS);
+        }
+        assertThat(u).isNotNull();
+        var subs = u.getSessions().stream()
+                .flatMap(s -> s.getSubscriptions().stream())
+                .map(org.springframework.messaging.simp.user.SimpSubscription::getDestination)
+                .toList();
+        assertThat(got).as("subs=%s", subs).isNotNull();
+
+        me.session().send("/app/rooms/" + r.getId(), Map.of("content", "공존"));
+        assertThat(roomCap.next()).isNotNull();
     }
 
     @Test

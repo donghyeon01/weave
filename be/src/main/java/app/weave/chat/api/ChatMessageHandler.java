@@ -14,7 +14,9 @@ import org.springframework.stereotype.Controller;
 /**
  * api-contract §3.10 STOMP 송신 — SEND /app/rooms/{id}를 받아
  * /topic/rooms/{id}로 이력 응답과 동형(ChatMessageView)을 브로드캐스트한다.
- * 멤버십·CLOSED 검증은 StompRoomAuthInterceptor가 선행하고, 서비스가 재검증한다.
+ * 멤버십·CLOSED·payload 검증은 StompRoomAuthInterceptor가 선행하고, 서비스가 재검증한다.
+ * 잔여 리스크: 인터셉터 통과 후 close된 방에 도달한 send는 서비스 예외 → ERROR 프레임 경로.
+ * @MessageExceptionHandler 없이도 MessagingException 변환으로 계약 ERROR(code)를 유지한다.
  */
 @Controller
 public class ChatMessageHandler {

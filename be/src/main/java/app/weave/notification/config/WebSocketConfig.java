@@ -46,7 +46,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/queue", "/user");
+        // enableSimpleBroker는 last-call-wins라 두 번째 브로커 빈은 CONNECTED 중복을 만든다 —
+        // 브로커는 이 한 곳, /topic은 chat이 사용.
+        // /user는 브로커 prefix가 아니라 user-destination prefix여야 한다 — 브로커에도 넣으면
+        // /user/queue/* 원시 구독이 번역 구독(/queue/...-user{session})을 덮어 push가 유실된다.
+        registry.enableSimpleBroker("/queue", "/topic");
         registry.setUserDestinationPrefix("/user");
     }
 

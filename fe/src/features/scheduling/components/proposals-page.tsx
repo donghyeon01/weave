@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { ApiError } from '../../../lib/api-client'
 import type { ProposalStatus, ProposalSummary, Slot } from '../types'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
@@ -36,8 +39,11 @@ export function ProposalsPage() {
   const respond = useRespondProposal()
   const cancel = useCancelProposal()
   const confirmProposal = useConfirmProposal()
+  const queryClient = useQueryClient()
 
-  const [box, setBox] = useState<Box>('received')
+  // 알림 링크가 ?box=sent로 보낸 탭을 지정할 수 있다 — 라우트는 box만 지원한다
+  const [searchParams] = useSearchParams()
+  const [box, setBox] = useState<Box>(searchParams.get('box') === 'sent' ? 'sent' : 'received')
   const [page, setPage] = useState(0)
   const [detailId, setDetailId] = useState<number | null>(null)
   const [confirmAction, setConfirmAction] = useState<
@@ -97,7 +103,31 @@ export function ProposalsPage() {
         setDetailId(null)
         setToast({ variant: 'success', message: '약속을 확정했어요.' })
       },
-      onError: () => setToast({ variant: 'danger', message: '확정에 실패했어요.' }),
+      onError: (error) => {
+        // 404 = 비방장·미존재 — 상세를 닫고 접근 불가를 안내한다
+        if (error instanceof ApiError && error.status === 404) {
+          setDetailId(null)
+          setToast({
+            variant: 'danger',
+            message: '제안을 확인할 수 없어요. 권한이 없거나 이미 삭제된 제안이에요.',
+          })
+          return
+        }
+        // 409 PROPOSAL-NOT-AWAITING-CONFIRM = 이미 확정·취소 등 상태가 바뀐 제안 —
+        // 목록을 재조회해 화면 상태를 서버와 맞춘다
+        if (
+          error instanceof ApiError &&
+          (error.code === 'PROPOSAL-NOT-AWAITING-CONFIRM' || error.status === 409)
+        ) {
+          void queryClient.invalidateQueries({ queryKey: ['scheduling', 'proposals'] })
+          setToast({
+            variant: 'danger',
+            message: '이미 상태가 바뀐 제안이에요. 목록을 새로고침했어요.',
+          })
+          return
+        }
+        setToast({ variant: 'danger', message: '확정에 실패했어요.' })
+      },
     })
   }
 

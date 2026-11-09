@@ -75,7 +75,7 @@ describe('use-proposal-mutations', () => {
   it('confirm 409 에러는 호출부로 전파된다', async () => {
     const queryClient = createQueryClient()
     apiFetchMock.mockRejectedValueOnce(
-      new ApiError('PROPOSAL_NOT_ALL_ACCEPTED', 409, '아직 전원 수락하지 않았어요'),
+      new ApiError('PROPOSAL-NOT-AWAITING-CONFIRM', 409, '확정 대기 상태가 아닌 제안이에요'),
     )
 
     const { result } = renderHook(() => useConfirmProposal(), {

@@ -162,8 +162,13 @@ export function NotificationBell() {
                 )}
                 {item.type.startsWith('PROPOSAL_') && (
                   <div className="px-4 pb-3">
+                    {/* 방장 대상 알림(ALL_ACCEPTED·CONFIRMED·DECLINED)은 보낸 탭이 맞다 */}
                     <Link
-                      to="/app/proposals"
+                      to={
+                        item.type === 'PROPOSAL_RECEIVED'
+                          ? '/app/proposals'
+                          : '/app/proposals?box=sent'
+                      }
                       onClick={() => setOpen(false)}
                       className="text-xs font-semibold text-accent-text hover:underline"
                     >

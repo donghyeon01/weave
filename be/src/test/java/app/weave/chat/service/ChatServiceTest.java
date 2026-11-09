@@ -12,7 +12,14 @@ import app.weave.chat.service.ChatService.ChatMessageView;
 import app.weave.common.error.BusinessException;
 import app.weave.common.error.ErrorCode;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -222,5 +229,104 @@ class ChatServiceTest {
         assertThat(first).isNotNull();
         // CLOSED 방은 openRooms에서 비노출
         assertThat(chatService.openRooms(meId)).isEmpty();
+    }
+
+    /** 두 작업을 같은 latch에서 동시에 놓아 경합을 유도한다. */
+    private <T> List<T> race(Callable<T> t1, Callable<T> t2) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch go = new CountDownLatch(1);
+        Future<T> f1 = pool.submit(() -> { ready.countDown(); go.await(); return t1.call(); });
+        Future<T> f2 = pool.submit(() -> { ready.countDown(); go.await(); return t2.call(); });
+        assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+        go.countDown();
+        List<T> results = List.of(f1.get(30, TimeUnit.SECONDS), f2.get(30, TimeUnit.SECONDS));
+        pool.shutdownNow();
+        return results;
+    }
+
+    @Test
+    void 같은_clientMessageId_동시_송신은_둘다_성공하고_같은_행을_반환한다() throws Exception {
+        ChatRoom room = newRoom(20L, List.of(meId));
+        // check-then-INSERT의 미스 구간은 좁아 라운드를 반복해 경합 노출을 높인다
+        for (int round = 0; round < 10; round++) {
+            final int r = round;
+            String key = "dup-" + r;
+            List<ChatMessageView> results = race(
+                    () -> chatService.send(meId, room.getId(), "a" + r, key),
+                    () -> chatService.send(meId, room.getId(), "a" + r, key));
+            assertThat(results.get(0).id()).isEqualTo(results.get(1).id());
+        }
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM chat_messages WHERE room_id=? "
+                        + "AND client_message_id LIKE 'dup-%'",
+                Integer.class, room.getId())).isEqualTo(10);
+    }
+
+    @Test
+    void 동시_markRead는_커서가_역행하지_않고_큰_값이_남는다() throws Exception {
+        ChatRoom room = newRoom(21L, List.of(meId, p1Id));
+        ChatMessageView lo = chatService.send(p1Id, room.getId(), "lo", null);
+        ChatMessageView hi = chatService.send(p1Id, room.getId(), "hi", null);
+        for (int round = 0; round < 5; round++) {
+            jdbc.update("UPDATE chat_room_members SET last_read_message_id=NULL "
+                    + "WHERE room_id=? AND user_id=?", room.getId(), meId);
+            race(() -> chatService.markRead(meId, room.getId(), hi.id()),
+                    () -> chatService.markRead(meId, room.getId(), lo.id()));
+            Long cursor = jdbc.queryForObject(
+                    "SELECT last_read_message_id FROM chat_room_members "
+                            + "WHERE room_id=? AND user_id=?",
+                    Long.class, room.getId(), meId);
+            assertThat(cursor).isEqualTo(hi.id());
+        }
+    }
+
+    @Test
+    void send와_closeRoom의_경합은_직렬화되어_결과가_일관된다() throws Exception {
+        for (int round = 0; round < 8; round++) {
+            long proposalId = 30L + round;
+            ChatRoom room = newRoom(proposalId, List.of(meId));
+            final int r = round;
+            List<Object> results = race(
+                    () -> {
+                        try {
+                            return chatService.send(meId, room.getId(), "r" + r, null);
+                        } catch (BusinessException e) {
+                            return e;
+                        }
+                    },
+                    () -> {
+                        chatService.closeRoom(proposalId);
+                        return "closed";
+                    });
+            Object sendResult = results.get(0);
+            Integer msgCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM chat_messages WHERE room_id=?",
+                    Integer.class, room.getId());
+            if (sendResult instanceof BusinessException e) {
+                // close 선점 — send는 CHAT-ROOM-CLOSED고 메시지는 없어야 한다
+                assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CHAT_ROOM_CLOSED);
+                assertThat(msgCount).isEqualTo(0);
+            } else {
+                // send 선점 — 메시지 저장 후 방은 CLOSED로 전이
+                assertThat(msgCount).isEqualTo(1);
+            }
+            assertThat(roomRepository.findById(room.getId()).get().getStatus())
+                    .isEqualTo(ChatRoom.Status.CLOSED);
+        }
+    }
+
+    @Test
+    void 동시_송신_후_history는_createdAt_오름차순을_보장한다() throws Exception {
+        ChatRoom room = newRoom(40L, List.of(meId, p1Id));
+        for (int i = 0; i < 4; i++) {
+            final int n = i;
+            race(() -> chatService.send(meId, room.getId(), "me-" + n, null),
+                    () -> chatService.send(p1Id, room.getId(), "p1-" + n, null));
+        }
+        List<ChatMessageView> page = chatService.history(meId, room.getId(), null, null);
+        assertThat(page).hasSize(8);
+        assertThat(page).isSortedAccordingTo(Comparator
+                .comparing(ChatMessageView::createdAt).thenComparing(ChatMessageView::id));
     }
 }

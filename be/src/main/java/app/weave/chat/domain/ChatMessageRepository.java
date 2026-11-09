@@ -14,10 +14,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     /** 첫 페이지 — 최신순 limit건. Top 없이 Pageable로만 제한한다 (findTop은 1건 고정). */
     List<ChatMessage> findByRoomIdOrderByIdDesc(Long roomId, Pageable pageable);
 
-    /** unread count — id > 커서 AND 본인 발신 제외 (api-contract §3.10). */
-    long countByRoomIdAndIdGreaterThanAndSenderIdNot(Long roomId, Long lastReadMessageId,
-            Long senderId);
-
     Optional<ChatMessage> findByRoomIdAndClientMessageId(Long roomId, String clientMessageId);
 
     boolean existsByRoomIdAndId(Long roomId, Long id);

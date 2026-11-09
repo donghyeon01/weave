@@ -4,8 +4,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.LocalDateTime;
+import org.springframework.data.domain.Persistable;
 
 /**
  * 방 멤버 + 읽음 커서. 멤버십은 방 생성 시점 제안 로스터의 스냅샷 — 이후 제안 참여자가
@@ -14,7 +18,11 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "chat_room_members")
 @IdClass(ChatRoomMemberId.class)
-public class ChatRoomMember {
+public class ChatRoomMember implements Persistable<ChatRoomMemberId> {
+
+    /** 복합키 엔터티는 save가 merge로 판별해 SELECT+UPDATE — isNew로 배치 INSERT 경로를 연다. */
+    @Transient
+    private boolean isNew = true;
 
     @Id
     @Column(name = "room_id", nullable = false)
@@ -36,6 +44,22 @@ public class ChatRoomMember {
     public ChatRoomMember(Long roomId, Long userId) {
         this.roomId = roomId;
         this.userId = userId;
+    }
+
+    @PostPersist
+    @PostLoad
+    void markPersisted() {
+        this.isNew = false;
+    }
+
+    @Override
+    public ChatRoomMemberId getId() {
+        return new ChatRoomMemberId(roomId, userId);
+    }
+
+    @Override
+    public boolean isNew() {
+        return isNew;
     }
 
     public Long getRoomId() { return roomId; }

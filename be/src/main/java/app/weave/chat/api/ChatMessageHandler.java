@@ -1,0 +1,45 @@
+package app.weave.chat.api;
+
+import app.weave.chat.service.ChatService;
+import app.weave.chat.service.ChatService.ChatMessageView;
+import app.weave.chat.service.StompRoomAuthInterceptor;
+import app.weave.common.error.BusinessException;
+import java.security.Principal;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Controller;
+
+/**
+ * api-contract §3.10 STOMP 송신 — SEND /app/rooms/{id}를 받아
+ * /topic/rooms/{id}로 이력 응답과 동형(ChatMessageView)을 브로드캐스트한다.
+ * 멤버십·CLOSED 검증은 StompRoomAuthInterceptor가 선행하고, 서비스가 재검증한다.
+ */
+@Controller
+public class ChatMessageHandler {
+
+    public record SendPayload(String content, String clientMessageId) {
+    }
+
+    private final ChatService chatService;
+    private final SimpMessagingTemplate template;
+
+    public ChatMessageHandler(ChatService chatService, SimpMessagingTemplate template) {
+        this.chatService = chatService;
+        this.template = template;
+    }
+
+    @MessageMapping("/rooms/{roomId}")
+    public void send(@DestinationVariable Long roomId, @Payload SendPayload payload,
+            Principal principal) {
+        Long me = Long.valueOf(principal.getName());
+        ChatMessageView view;
+        try {
+            view = chatService.send(me, roomId, payload.content(), payload.clientMessageId());
+        } catch (BusinessException e) {
+            throw StompRoomAuthInterceptor.error(e.getErrorCode());
+        }
+        template.convertAndSend("/topic/rooms/" + roomId, view);
+    }
+}

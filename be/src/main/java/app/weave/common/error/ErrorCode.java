@@ -38,6 +38,10 @@ public enum ErrorCode {
     PROPOSAL_NOT_AWAITING_CONFIRM("PROPOSAL-NOT-AWAITING-CONFIRM", 409,
             "확정 대기 중인 제안이 아닙니다."),
     PROPOSAL_NOT_PARTICIPANT("PROPOSAL-NOT-PARTICIPANT", 403, "제안의 참여자가 아닙니다."),
+    CHAT_ROOM_NOT_FOUND("CHAT-ROOM-NOT-FOUND", 404, "채팅방을 찾을 수 없습니다."),
+    CHAT_NOT_MEMBER("CHAT-NOT-MEMBER", 404, "채팅방 멤버가 아닙니다."),
+    CHAT_ROOM_CLOSED("CHAT-ROOM-CLOSED", 409, "종료된 채팅방입니다."),
+    CHAT_MESSAGE_INVALID("CHAT-MESSAGE-INVALID", 400, "메시지가 올바르지 않습니다."),
     INTERNAL_ERROR("INTERNAL-ERROR", 500, "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
 
     private final String code;

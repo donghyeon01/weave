@@ -20,7 +20,8 @@ import java.util.Set;
 class ArchitectureTest {
 
     private static final Set<String> FEATURES = Set.of(
-            "auth", "user", "notification", "task", "event", "diary", "friend", "scheduling");
+            "auth", "user", "notification", "task", "event", "diary", "friend", "scheduling",
+            "chat");
 
     /** 전 모듈 공통 허용 — auth(JWT·User)·common(에러·BaseTime)은 어디서나 소비 가능. */
     private static final Set<String> BASE = Set.of("auth", "common");
@@ -62,6 +63,8 @@ class ArchitectureTest {
     static final ArchRule friend_경계 = boundaryOf("friend");
     @ArchTest
     static final ArchRule scheduling_경계 = boundaryOf("scheduling");
+    @ArchTest
+    static final ArchRule chat_경계 = boundaryOf("chat");
     @ArchTest
     static final ArchRule common_경계 =
             noClasses().that().resideInAPackage("app.weave.common..")

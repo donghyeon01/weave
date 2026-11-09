@@ -1,0 +1,226 @@
+package app.weave.chat.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import app.weave.chat.domain.ChatRoom;
+import app.weave.chat.domain.ChatRoomMember;
+import app.weave.chat.domain.ChatRoomMemberRepository;
+import app.weave.chat.domain.ChatRoomRepository;
+import app.weave.chat.domain.Mode;
+import app.weave.chat.service.ChatService.ChatMessageView;
+import app.weave.common.error.BusinessException;
+import app.weave.common.error.ErrorCode;
+import java.time.LocalDateTime;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+@SpringBootTest
+@Testcontainers
+class ChatServiceTest {
+
+    @Container
+    @ServiceConnection
+    static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8");
+
+    @Autowired
+    ChatService chatService;
+    @Autowired
+    ChatRoomRepository roomRepository;
+    @Autowired
+    ChatRoomMemberRepository memberRepository;
+    @Autowired
+    JdbcTemplate jdbc;
+
+    private Long meId;
+    private Long p1Id;
+    private Long outsiderId;
+
+    @BeforeEach
+    void setUp() {
+        jdbc.update("DELETE FROM chat_messages");
+        jdbc.update("DELETE FROM chat_room_members");
+        jdbc.update("DELETE FROM chat_rooms");
+        jdbc.update("DELETE FROM users WHERE email LIKE '%@weave.local'");
+        jdbc.update("INSERT INTO users(email,name,nickname,provider) VALUES "
+                + "('me@weave.local','나','나','demo'),('p1@weave.local','일','일','demo'),"
+                + "('out@weave.local','외','외','demo')");
+        meId = idOf("me@weave.local");
+        p1Id = idOf("p1@weave.local");
+        outsiderId = idOf("out@weave.local");
+    }
+
+    private Long idOf(String email) {
+        return jdbc.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, email);
+    }
+
+    private ChatRoom newRoom(long proposalId, List<Long> members) {
+        return chatService.createRoom(proposalId, "방" + proposalId, Mode.TIME,
+                LocalDateTime.of(2026, 12, 1, 10, 0), LocalDateTime.of(2026, 12, 1, 12, 0),
+                members);
+    }
+
+    private void assertError(ErrorCode code, Runnable r) {
+        assertThatThrownBy(r::run).isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode()).isEqualTo(code);
+    }
+
+    @Test
+    void createRoom_방과_멤버_슬롯_스냅샷이_저장된다() {
+        ChatRoom room = newRoom(1L, List.of(meId, p1Id));
+
+        assertThat(roomRepository.findByProposalId(1L)).isPresent();
+        assertThat(memberRepository.findByRoomId(room.getId())).hasSize(2);
+        assertThat(room.getMode()).isEqualTo(Mode.TIME);
+        assertThat(room.getStartTime()).isEqualTo(LocalDateTime.of(2026, 12, 1, 10, 0));
+        assertThat(room.getStatus()).isEqualTo(ChatRoom.Status.OPEN);
+    }
+
+    @Test
+    void createRoom_같은_proposalId_재생성은_UK_위반() {
+        newRoom(2L, List.of(meId));
+        assertThatThrownBy(() -> newRoom(2L, List.of(meId)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void 비멤버와_미존재_방은_404() {
+        ChatRoom room = newRoom(3L, List.of(meId));
+
+        assertError(ErrorCode.CHAT_NOT_MEMBER,
+                () -> chatService.history(outsiderId, room.getId(), null, null));
+        assertError(ErrorCode.CHAT_NOT_MEMBER,
+                () -> chatService.send(outsiderId, room.getId(), "hi", null));
+        assertError(ErrorCode.CHAT_NOT_MEMBER,
+                () -> chatService.markRead(outsiderId, room.getId(), 1L));
+        assertError(ErrorCode.CHAT_ROOM_NOT_FOUND,
+                () -> chatService.history(meId, 999999L, null, null));
+        assertThat(chatService.isMember(room.getId(), outsiderId)).isFalse();
+        assertThat(chatService.isMember(room.getId(), meId)).isTrue();
+    }
+
+    @Test
+    void CLOSED_방은_송신_이력_읽음이_409() {
+        ChatRoom room = newRoom(4L, List.of(meId));
+        ChatMessageView m = chatService.send(meId, room.getId(), "hi", null);
+        chatService.closeRoom(4L);
+
+        assertError(ErrorCode.CHAT_ROOM_CLOSED,
+                () -> chatService.send(meId, room.getId(), "again", null));
+        assertError(ErrorCode.CHAT_ROOM_CLOSED,
+                () -> chatService.history(meId, room.getId(), null, null));
+        assertError(ErrorCode.CHAT_ROOM_CLOSED,
+                () -> chatService.markRead(meId, room.getId(), m.id()));
+        assertThat(roomRepository.findById(room.getId()).get().getClosedAt()).isNotNull();
+    }
+
+    @Test
+    void send_멱등과_검증() {
+        ChatRoom room = newRoom(5L, List.of(meId));
+
+        ChatMessageView first = chatService.send(meId, room.getId(), "hello", "c-1");
+        ChatMessageView retry = chatService.send(meId, room.getId(), "hello", "c-1");
+        assertThat(retry.id()).isEqualTo(first.id());
+        assertThat(chatService.history(meId, room.getId(), null, null)).hasSize(1);
+
+        // null·빈 문자열 키는 멱등 미적용 — 매번 새 행
+        chatService.send(meId, room.getId(), "a", null);
+        chatService.send(meId, room.getId(), "b", "");
+        chatService.send(meId, room.getId(), "c", "   ");
+        assertThat(chatService.history(meId, room.getId(), null, null)).hasSize(4);
+
+        assertError(ErrorCode.CHAT_MESSAGE_INVALID,
+                () -> chatService.send(meId, room.getId(), "  ", null));
+        assertError(ErrorCode.CHAT_MESSAGE_INVALID,
+                () -> chatService.send(meId, room.getId(), "x".repeat(2001), null));
+        assertError(ErrorCode.CHAT_MESSAGE_INVALID,
+                () -> chatService.send(meId, room.getId(), "ok", "k".repeat(65)));
+        // trim 적용
+        assertThat(chatService.send(meId, room.getId(), "  hi  ", null).content())
+                .isEqualTo("hi");
+    }
+
+    @Test
+    void history_커서_경계와_오름차순() {
+        ChatRoom room = newRoom(6L, List.of(meId));
+        for (int i = 1; i <= 5; i++) {
+            chatService.send(meId, room.getId(), "m" + i, null);
+        }
+
+        List<ChatMessageView> firstPage = chatService.history(meId, room.getId(), null, 2);
+        assertThat(firstPage).extracting(ChatMessageView::content).containsExactly("m4", "m5");
+
+        List<ChatMessageView> secondPage =
+                chatService.history(meId, room.getId(), firstPage.get(0).id(), 2);
+        assertThat(secondPage).extracting(ChatMessageView::content)
+                .containsExactly("m2", "m3");
+
+        assertError(ErrorCode.COMMON_VALIDATION,
+                () -> chatService.history(meId, room.getId(), null, 0));
+        assertError(ErrorCode.COMMON_VALIDATION,
+                () -> chatService.history(meId, room.getId(), null, 101));
+    }
+
+    @Test
+    void send_뷰에_nickname이_채워진다() {
+        ChatRoom room = newRoom(7L, List.of(meId));
+        ChatMessageView v = chatService.send(meId, room.getId(), "hi", null);
+        assertThat(v.nickname()).isEqualTo("나");
+        assertThat(v.senderId()).isEqualTo(meId);
+    }
+
+    @Test
+    void unread와_markRead_규칙() {
+        ChatRoom room = newRoom(8L, List.of(meId, p1Id));
+        ChatMessageView m1 = chatService.send(p1Id, room.getId(), "p1-1", null);
+        chatService.send(meId, room.getId(), "me", null); // 본인 발신은 미읽음 제외
+        ChatMessageView m3 = chatService.send(p1Id, room.getId(), "p1-2", null);
+
+        // last_read NULL → 상대 발신 전체가 미읽음
+        var rooms = chatService.openRooms(meId);
+        assertThat(rooms).hasSize(1);
+        assertThat(rooms.get(0).unreadCount()).isEqualTo(2);
+        assertThat(rooms.get(0).slot().mode()).isEqualTo(Mode.TIME);
+
+        // 타 방 메시지 id는 400
+        ChatRoom other = newRoom(9L, List.of(meId, p1Id));
+        ChatMessageView foreign = chatService.send(p1Id, other.getId(), "x", null);
+        assertError(ErrorCode.CHAT_MESSAGE_INVALID,
+                () -> chatService.markRead(meId, room.getId(), foreign.id()));
+
+        // markRead 후 0 — room 9가 생겼으므로 해당 방만 골라 확인
+        ChatRoomMember member = chatService.markRead(meId, room.getId(), m3.id());
+        assertThat(member.getLastReadMessageId()).isEqualTo(m3.id());
+        assertThat(chatService.openRooms(meId).stream()
+                .filter(s -> s.roomId().equals(room.getId())).findFirst().get().unreadCount())
+                .isEqualTo(0);
+
+        // 커서 역행은 no-op — 단조 증가
+        ChatRoomMember after = chatService.markRead(meId, room.getId(), m1.id());
+        assertThat(after.getLastReadMessageId()).isEqualTo(m3.id());
+    }
+
+    @Test
+    void closeRoom은_멱등_no_op() {
+        chatService.closeRoom(4242L); // 방 없음 — 예외 없이 no-op
+
+        ChatRoom room = newRoom(10L, List.of(meId));
+        chatService.closeRoom(10L);
+        LocalDateTime first = roomRepository.findById(room.getId()).get().getClosedAt();
+        chatService.closeRoom(10L); // 재close — 상태 유지
+        assertThat(roomRepository.findById(room.getId()).get().getStatus())
+                .isEqualTo(ChatRoom.Status.CLOSED);
+        assertThat(first).isNotNull();
+        // CLOSED 방은 openRooms에서 비노출
+        assertThat(chatService.openRooms(meId)).isEmpty();
+    }
+}

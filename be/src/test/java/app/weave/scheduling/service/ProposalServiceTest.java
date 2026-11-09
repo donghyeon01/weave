@@ -385,4 +385,197 @@ class ProposalServiceTest {
                 "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_CONFIRMED'",
                 Integer.class)).isEqualTo(0);
     }
+
+    @Test
+    void ALL_ACCEPTED의_두_confirm_동시호출은_잠금으로_직렬화되어_한쪽만_성공한다()
+            throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+        // 같은 제안 행을 findByIdForUpdate로 잠그므로 패자는 ALL_ACCEPTED를 못 보고 409
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch go = new CountDownLatch(1);
+        Future<MvcResult> f1 = pool.submit(() -> {
+            ready.countDown(); go.await();
+            return mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                    .header("Authorization", "Bearer " + meToken)).andReturn();
+        });
+        Future<MvcResult> f2 = pool.submit(() -> {
+            ready.countDown(); go.await();
+            return mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                    .header("Authorization", "Bearer " + meToken)).andReturn();
+        });
+        assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+        go.countDown();
+        MvcResult r1 = f1.get(30, TimeUnit.SECONDS);
+        MvcResult r2 = f2.get(30, TimeUnit.SECONDS);
+        pool.shutdownNow();
+
+        int s1 = r1.getResponse().getStatus();
+        int s2 = r2.getResponse().getStatus();
+        assertThat(List.of(s1, s2)).containsExactlyInAnyOrder(200, 409);
+        MvcResult loser = s1 == 409 ? r1 : r2;
+        assertThat(com.jayway.jsonpath.JsonPath.<String>read(
+                loser.getResponse().getContentAsString(), "$.code"))
+                .isEqualTo("PROPOSAL-NOT-AWAITING-CONFIRM");
+
+        // 부산물 중복 없음 — EVENTS·CONFIRMED 알림이 참석자 수(3)만큼 정확히 한 번만
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
+                .isEqualTo("CONFIRMED");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                .isEqualTo(3);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_CONFIRMED'",
+                Integer.class)).isEqualTo(3);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_ALL_ACCEPTED'",
+                Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void ALL_ACCEPTED에서_confirm과_cancel의_경합은_승자가_최종상태를_결정한다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+        // 같은 FOR UPDATE 잠금 — 선점 쪽이 상태를 바꾸고 패자는 409
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch go = new CountDownLatch(1);
+        Future<MvcResult> fConfirm = pool.submit(() -> {
+            ready.countDown(); go.await();
+            return mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                    .header("Authorization", "Bearer " + meToken)).andReturn();
+        });
+        Future<MvcResult> fCancel = pool.submit(() -> {
+            ready.countDown(); go.await();
+            return mvc.perform(post("/api/scheduling/proposals/" + id + "/cancel")
+                    .header("Authorization", "Bearer " + meToken)).andReturn();
+        });
+        assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+        go.countDown();
+        int sConfirm = fConfirm.get(30, TimeUnit.SECONDS).getResponse().getStatus();
+        int sCancel = fCancel.get(30, TimeUnit.SECONDS).getResponse().getStatus();
+        pool.shutdownNow();
+
+        assertThat(List.of(sConfirm, sCancel)).containsExactlyInAnyOrder(200, 409);
+        String status = jdbc.queryForObject(
+                "SELECT status FROM schedule_proposals WHERE id=?", String.class, id);
+        if (sConfirm == 200) {
+            // confirm 승리 — 확정 부산물이 정확히 한 번 생성되고 cancel은 게이트 이탈로 409
+            assertThat(status).isEqualTo("CONFIRMED");
+            assertThat(jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                    .isEqualTo(3);
+            assertThat(jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_CONFIRMED'",
+                    Integer.class)).isEqualTo(3);
+        } else {
+            // cancel 승리 — EVENTS·CONFIRMED 알림 미생성
+            assertThat(status).isEqualTo("CANCELLED");
+            assertThat(jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                    .isEqualTo(0);
+            assertThat(jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_CONFIRMED'",
+                    Integer.class)).isEqualTo(0);
+        }
+    }
+
+    @Test
+    void CONFIRMED_후_reconfirm은_409고_EVENTS와_알림이_늘지_않는다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROPOSAL-NOT-AWAITING-CONFIRM"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                .isEqualTo(3);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_CONFIRMED'",
+                Integer.class)).isEqualTo(3);
+    }
+
+    @Test
+    void CONFIRMED_후_참여자_재응답은_409다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/respond")
+                        .header("Authorization", "Bearer " + p1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"response\":\"DECLINED\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROPOSAL-NOT-PENDING"));
+    }
+
+    @Test
+    void 두번째_확정알림_실패는_앞서_저장된_알림까지_전부_롤백한다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+        // 첫 publish는 실제 INSERT까지 성공시키고 두 번째에서 실패 — "일부 알림 저장 후 롤백" 증명
+        org.mockito.Mockito.doCallRealMethod()
+                .doThrow(new RuntimeException("injected publish failure"))
+                .when(publisher).publish(org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.any(
+                                NotificationPayload.ProposalConfirmed.class));
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isInternalServerError());
+
+        // 실제 경로를 탄 호출이 2번 — 첫 INSERT까지 수행 후 실패했음을 호출 수로 증명
+        org.mockito.Mockito.verify(publisher, org.mockito.Mockito.times(2))
+                .publish(org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.any(
+                                NotificationPayload.ProposalConfirmed.class));
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
+                .isEqualTo("ALL_ACCEPTED");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                .isEqualTo(0);
+        // 첫 publish가 INSERT까지 수행했지만 트랜잭션 롤백으로 0건이어야 한다
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_CONFIRMED'",
+                Integer.class)).isEqualTo(0);
+    }
+
+    @Test
+    void ALL_ACCEPTED_알림_실패는_마지막_응답과_상태전이를_롤백한다() throws Exception {
+        Long id = createProposal();
+        org.mockito.Mockito.doThrow(new RuntimeException("injected publish failure"))
+                .when(publisher).publish(org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.any(
+                                NotificationPayload.ProposalAllAccepted.class));
+
+        respond(p1Token, id, "ACCEPTED"); // 전원 수락 전이라 발행 경로를 타지 않아 200
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/respond")
+                        .header("Authorization", "Bearer " + p2Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"response\":\"ACCEPTED\"}"))
+                .andExpect(status().isInternalServerError());
+
+        // p2의 응답 UPDATE와 ALL_ACCEPTED 전이가 함께 롤백 — 재시도 가능 상태로 남는다
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
+                .isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject(
+                "SELECT response FROM schedule_proposal_participants "
+                        + "WHERE proposal_id=? AND user_id=?", String.class, id, p2Id))
+                .isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_ALL_ACCEPTED'",
+                Integer.class)).isEqualTo(0);
+    }
 }

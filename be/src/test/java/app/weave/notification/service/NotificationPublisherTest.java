@@ -133,6 +133,9 @@ class NotificationPublisherTest {
         publisher.publish(userId,
                 new NotificationPayload.ProposalReceived(9L, "캡스톤 회의",
                         new UserRef(3L, "철수"), slot));
+        publisher.publish(userId,
+                new NotificationPayload.ProposalAllAccepted(9L, "캡스톤 회의",
+                        new UserRef(3L, "철수"), slot));
         publisher.publish(userId, new ProposalConfirmed(9L, "캡스톤 회의", slot));
         publisher.publish(userId,
                 new NotificationPayload.ProposalDeclined(9L, "캡스톤 회의",
@@ -159,6 +162,11 @@ class NotificationPublisherTest {
                 .containsOnlyKeys("type", "date", "startTime", "endTime")
                 .containsEntry("type", "TIME")
                 .containsEntry("startTime", "14:00");
+
+        Map<String, Object> allAccepted = byType.get(NotificationType.PROPOSAL_ALL_ACCEPTED)
+                .getPayload();
+        assertThat(allAccepted).containsOnlyKeys("proposalId", "title", "organizer", "slot");
+        assertThat(nested(allAccepted, "organizer")).containsOnlyKeys("id", "nickname");
 
         Map<String, Object> confirmed = byType.get(NotificationType.PROPOSAL_CONFIRMED)
                 .getPayload();

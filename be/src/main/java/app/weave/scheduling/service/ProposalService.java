@@ -95,8 +95,7 @@ public class ProposalService {
 
     /**
      * 응답 — FOR UPDATE 잠금으로 직렬화 (ADR-0004).
-     * 전원 ACCEPTED 시 확정은 단일 트랜잭션: status + 전원 EVENTS + 전원 알림 INSERT가 원자다.
-     * WS push만 AFTER_COMMIT으로 빠진다 (Publisher 내부).
+     * 전원 수락은 자동 확정하지 않고 ALL_ACCEPTED 게이트로 둔다 (ADR-0011) — 확정은 방장 confirm.
      */
     @Transactional
     public ProposalDetail respond(Long me, Long proposalId, Response response) {
@@ -113,21 +112,13 @@ public class ProposalService {
         List<ScheduleProposalParticipant> all = participantRepository
                 .findByProposalId(proposalId);
         if (all.stream().allMatch(r -> r.getResponse() == Response.ACCEPTED)) {
-            proposal.confirm();
-            List<Long> attendeeIds = new ArrayList<>(
-                    all.stream().map(ScheduleProposalParticipant::getUserId).toList());
-            attendeeIds.add(proposal.getOrganizerId());
-            boolean allDay = proposal.getMode() == Mode.DATE;
-            eventRepository.saveAll(attendeeIds.stream()
-                    .map(uid -> new Event(uid, proposal.getTitle(), null,
-                            proposal.getStartTime(), proposal.getEndTime(), null, allDay,
-                            Source.PROPOSAL, proposal.getId(), null))
-                    .toList());
-            var confirmed = new NotificationPayload.ProposalConfirmed(proposal.getId(),
-                    proposal.getTitle(), toPayloadSlot(proposal.toSlot()));
-            for (Long uid : attendeeIds) {
-                publisher.publish(uid, confirmed);
-            }
+            proposal.markAllAccepted();
+            User organizer = loadUser(proposal.getOrganizerId());
+            publisher.publish(proposal.getOrganizerId(),
+                    new NotificationPayload.ProposalAllAccepted(proposal.getId(),
+                            proposal.getTitle(),
+                            new UserRef(organizer.getId(), organizer.getNickname()),
+                            toPayloadSlot(proposal.toSlot())));
         } else if (all.stream().anyMatch(r -> r.getResponse() == Response.DECLINED)) {
             proposal.decline();
             User decliner = loadUser(me);
@@ -135,6 +126,42 @@ public class ProposalService {
                     new NotificationPayload.ProposalDeclined(proposal.getId(),
                             proposal.getTitle(),
                             new UserRef(me, decliner.getNickname())));
+        }
+        return detailOf(proposal);
+    }
+
+    /**
+     * 확정 — 방장 전용, ALL_ACCEPTED 게이트 통과 시에만 (ADR-0011).
+     * status + 전원 EVENTS + 전원 알림 INSERT가 단일 트랜잭션으로 원자다 (ADR-0004).
+     * WS push만 AFTER_COMMIT으로 빠진다 (Publisher 내부).
+     */
+    @Transactional
+    public ProposalDetail confirmProposal(Long me, Long proposalId) {
+        ScheduleProposal proposal = proposalRepository.findByIdForUpdate(proposalId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND));
+        if (!proposal.getOrganizerId().equals(me)) {
+            throw new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND);
+        }
+        if (proposal.getStatus() != Status.ALL_ACCEPTED) {
+            throw new BusinessException(ErrorCode.PROPOSAL_NOT_AWAITING_CONFIRM);
+        }
+        proposal.confirm();
+
+        List<ScheduleProposalParticipant> all = participantRepository
+                .findByProposalId(proposalId);
+        List<Long> attendeeIds = new ArrayList<>(
+                all.stream().map(ScheduleProposalParticipant::getUserId).toList());
+        attendeeIds.add(proposal.getOrganizerId());
+        boolean allDay = proposal.getMode() == Mode.DATE;
+        eventRepository.saveAll(attendeeIds.stream()
+                .map(uid -> new Event(uid, proposal.getTitle(), null,
+                        proposal.getStartTime(), proposal.getEndTime(), null, allDay,
+                        Source.PROPOSAL, proposal.getId(), null))
+                .toList());
+        var confirmed = new NotificationPayload.ProposalConfirmed(proposal.getId(),
+                proposal.getTitle(), toPayloadSlot(proposal.toSlot()));
+        for (Long uid : attendeeIds) {
+            publisher.publish(uid, confirmed);
         }
         return detailOf(proposal);
     }
@@ -147,7 +174,9 @@ public class ProposalService {
         if (!proposal.getOrganizerId().equals(me)) {
             throw new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND);
         }
-        if (proposal.getStatus() != Status.PENDING) {
+        // 게이트(ALL_ACCEPTED)도 "아직 늦지 않은" 상태 — 방장 취소 허용 (ADR-0011)
+        if (proposal.getStatus() != Status.PENDING
+                && proposal.getStatus() != Status.ALL_ACCEPTED) {
             throw new BusinessException(ErrorCode.PROPOSAL_NOT_PENDING);
         }
         proposal.cancel();

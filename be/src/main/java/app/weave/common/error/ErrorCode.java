@@ -35,6 +35,8 @@ public enum ErrorCode {
     SCHEDULING_NOT_FRIEND("SCHEDULING-NOT-FRIEND", 400, "친구가 아닌 사용자가 포함되어 있습니다."),
     PROPOSAL_NOT_FOUND("PROPOSAL-NOT-FOUND", 404, "제안을 찾을 수 없습니다."),
     PROPOSAL_NOT_PENDING("PROPOSAL-NOT-PENDING", 409, "이미 처리된 제안입니다."),
+    PROPOSAL_NOT_AWAITING_CONFIRM("PROPOSAL-NOT-AWAITING-CONFIRM", 409,
+            "확정 대기 중인 제안이 아닙니다."),
     PROPOSAL_NOT_PARTICIPANT("PROPOSAL-NOT-PARTICIPANT", 403, "제안의 참여자가 아닙니다."),
     INTERNAL_ERROR("INTERNAL-ERROR", 500, "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
 

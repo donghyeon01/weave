@@ -111,14 +111,62 @@ class ProposalServiceTest {
                 .andReturn();
     }
 
+    /** p1·p2 전원 수락까지 진행해 ALL_ACCEPTED 상태로 만든다. */
+    private void acceptAll(Long id) throws Exception {
+        respond(p1Token, id, "ACCEPTED");
+        respond(p2Token, id, "ACCEPTED");
+    }
+
     @Test
-    void 전원_수락하면_CONFIRMED와_전원_events_알림이_단일_트랜잭션으로_생긴다() throws Exception {
+    void 전원_수락하면_ALL_ACCEPTED이고_방장에게만_확정대기_알림이_간다() throws Exception {
         Long id = createProposal();
         respond(p1Token, id, "ACCEPTED");
         mvc.perform(post("/api/scheduling/proposals/" + id + "/respond")
                         .header("Authorization", "Bearer " + p2Token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"response\":\"ACCEPTED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ALL_ACCEPTED"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
+                .isEqualTo("ALL_ACCEPTED");
+        // 게이트 — 확정 전이 없으므로 EVENTS·CONFIRMED 알림 없음 (ADR-0011)
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                .isEqualTo(0);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_CONFIRMED'", Integer.class))
+                .isEqualTo(0);
+        // 방장에게만 PROPOSAL_ALL_ACCEPTED — payload는 계약 §3.7 확정본 필드 집합
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_ALL_ACCEPTED'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_ALL_ACCEPTED' AND user_id=?",
+                Integer.class, meId)).isEqualTo(1);
+        String payload = jdbc.queryForObject(
+                "SELECT payload FROM notifications WHERE type='PROPOSAL_ALL_ACCEPTED'",
+                String.class);
+        assertThat(com.jayway.jsonpath.JsonPath.<Integer>read(payload, "$.proposalId")
+                .longValue()).isEqualTo(id);
+        assertThat(com.jayway.jsonpath.JsonPath.<String>read(payload, "$.title"))
+                .isEqualTo("캡스톤 회의");
+        assertThat(com.jayway.jsonpath.JsonPath.<Integer>read(payload, "$.organizer.id")
+                .longValue()).isEqualTo(meId);
+        assertThat(com.jayway.jsonpath.JsonPath.<String>read(payload, "$.organizer.nickname"))
+                .isEqualTo("나");
+        assertThat(com.jayway.jsonpath.JsonPath.<String>read(payload, "$.slot.type"))
+                .isEqualTo("TIME");
+    }
+
+    @Test
+    void 방장이_confirm하면_CONFIRMED와_전원_events_알림이_단일_트랜잭션으로_생긴다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
@@ -133,13 +181,58 @@ class ProposalServiceTest {
                 "SELECT COUNT(*) FROM events WHERE source='proposal' AND proposal_id=?",
                 Integer.class, id))
                 .isEqualTo(3);
-        // 알림: RECEIVED 2 + CONFIRMED 3
+        // 알림: RECEIVED 2 + ALL_ACCEPTED 1 + CONFIRMED 3
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_RECEIVED'", Integer.class))
                 .isEqualTo(2);
         assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_ALL_ACCEPTED'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_CONFIRMED'", Integer.class))
                 .isEqualTo(3);
+    }
+
+    @Test
+    void 비방장의_confirm은_404다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + p1Token))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PROPOSAL-NOT-FOUND"));
+    }
+
+    @Test
+    void PENDING_제안의_confirm은_409다() throws Exception {
+        Long id = createProposal();
+        respond(p1Token, id, "ACCEPTED");
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROPOSAL-NOT-AWAITING-CONFIRM"));
+    }
+
+    @Test
+    void ALL_ACCEPTED에서_방장_취소는_CANCELLED다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/cancel")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
+                .isEqualTo("CANCELLED");
+        // 취소 후 confirm은 게이트를 벗어났으므로 409
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROPOSAL-NOT-AWAITING-CONFIRM"));
     }
 
     @Test
@@ -165,14 +258,14 @@ class ProposalServiceTest {
         assertThat(List.of(s1, s2)).containsExactlyInAnyOrder(200, 200);
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
-                .isEqualTo("CONFIRMED");
+                .isEqualTo("ALL_ACCEPTED");
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
-                .isEqualTo(3);
+                .isEqualTo(0);
     }
 
     @Test
-    void 확정된_제안의_재응답은_409다() throws Exception {
+    void ALL_ACCEPTED_제안의_재응답은_409다() throws Exception {
         Long id = createProposal();
         respond(p1Token, id, "ACCEPTED");
         respond(p2Token, id, "ACCEPTED");
@@ -253,25 +346,22 @@ class ProposalServiceTest {
         int s2 = f2.get(30, TimeUnit.SECONDS).getResponse().getStatus();
         pool.shutdownNow();
 
-        // 잠금 직렬화 — 한쪽만 전이 성공, 패자는 409
-        assertThat(List.of(s1, s2)).containsExactlyInAnyOrder(200, 409);
+        // 잠금 직렬화 — 취소는 PENDING·ALL_ACCEPTED 모두 허용이라 항상 성공,
+        // 마지막 수락은 취소 선행 시 PROPOSAL-NOT-PENDING으로 409
+        assertThat(s2).isEqualTo(200);
+        assertThat(s1).isIn(200, 409);
         String status = jdbc.queryForObject(
                 "SELECT status FROM schedule_proposals WHERE id=?", String.class, id);
-        assertThat(status).isIn("CONFIRMED", "CANCELLED");
-        if (status.equals("CONFIRMED")) {
-            assertThat(jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
-                    .isEqualTo(3);
-        } else {
-            assertThat(jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
-                    .isEqualTo(0);
-        }
+        assertThat(status).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                .isEqualTo(0);
     }
 
     @Test
-    void 확정_알림_INSERT_실패_시_응답과_이벤트가_전부_롤백된다() throws Exception {
+    void 확정_알림_INSERT_실패_시_전이와_이벤트가_전부_롤백된다() throws Exception {
         Long id = createProposal();
+        acceptAll(id);
         // PROPOSAL_CONFIRMED 발행만 실패 주입 — 2-인자 publish가 서비스 호출 경로
         // (내부 3-인자 self-invocation은 프록시를 우회해 2-인자를 스텁해야 가로챈다)
         org.mockito.Mockito.doThrow(new RuntimeException("injected publish failure"))
@@ -279,21 +369,15 @@ class ProposalServiceTest {
                         org.mockito.ArgumentMatchers.any(
                                 NotificationPayload.ProposalConfirmed.class));
 
-        respond(p1Token, id, "ACCEPTED");
-        // 마지막 수락이 확정 경로를 타면 알림 실패로 500
-        mvc.perform(post("/api/scheduling/proposals/" + id + "/respond")
-                        .header("Authorization", "Bearer " + p2Token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"response\":\"ACCEPTED\"}"))
+        // confirm이 확정 경로를 타면 알림 실패로 500
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
                 .andExpect(status().isInternalServerError());
 
-        // 단일 트랜잭션 증명 — 응답 UPDATE·status 전이·EVENTS INSERT 전부 롤백
+        // 단일 트랜잭션 증명 — status 전이·EVENTS INSERT 전부 롤백, 게이트 상태 유지
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
-                .isEqualTo("PENDING");
-        assertThat(jdbc.queryForObject(
-                "SELECT response FROM schedule_proposal_participants WHERE proposal_id=? AND user_id=?",
-                String.class, id, p2Id)).isEqualTo("PENDING");
+                .isEqualTo("ALL_ACCEPTED");
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
                 .isEqualTo(0);

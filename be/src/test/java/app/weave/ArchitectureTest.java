@@ -13,7 +13,8 @@ import java.util.Set;
 
 /**
  * capability-map의 모듈 경계를 강제한다.
- * 허용 의존: 전 모듈 auth·common 공통 + friend→user·notification + scheduling→friend·event·notification.
+ * 허용 의존: 전 모듈 auth·common 공통 + friend→user·notification
+ * + scheduling→friend·event·notification·chat.
  * 이 표에 없는 feature 의존과 순환은 테스트가 깨진다.
  */
 @AnalyzeClasses(packages = "app.weave", importOptions = ImportOption.DoNotIncludeTests.class)
@@ -29,7 +30,7 @@ class ArchitectureTest {
     /** feature별 추가 허용 — capability-map 엣지 그대로. */
     private static final Map<String, Set<String>> EXTRA = Map.of(
             "friend", Set.of("user", "notification"),
-            "scheduling", Set.of("friend", "event", "notification"));
+            "scheduling", Set.of("friend", "event", "notification", "chat"));
 
     private static ArchRule boundaryOf(String feature) {
         Set<String> forbidden = new HashSet<>(FEATURES);

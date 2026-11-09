@@ -46,10 +46,13 @@ class ProposalServiceTest {
 
     @MockitoSpyBean
     app.weave.notification.service.NotificationPublisher publisher;
+    @Autowired
+    app.weave.chat.service.ChatService chatService;
 
     private Long meId;
     private Long p1Id;
     private Long p2Id;
+    private Long p3Id;
     private Long outsiderId;
     private String meToken;
     private String p1Token;
@@ -58,6 +61,9 @@ class ProposalServiceTest {
 
     @BeforeEach
     void setUp() {
+        jdbc.update("DELETE FROM chat_messages");
+        jdbc.update("DELETE FROM chat_room_members");
+        jdbc.update("DELETE FROM chat_rooms");
         jdbc.update("DELETE FROM schedule_proposal_participants");
         jdbc.update("DELETE FROM schedule_proposals");
         jdbc.update("DELETE FROM notifications");
@@ -66,10 +72,12 @@ class ProposalServiceTest {
         jdbc.update("DELETE FROM users WHERE email LIKE '%@weave.local'");
         jdbc.update("INSERT INTO users(email,name,nickname,provider) VALUES "
                 + "('me@weave.local','나','나','demo'),('p1@weave.local','일','일','demo'),"
-                + "('p2@weave.local','이','이','demo'),('out@weave.local','외','외','demo')");
+                + "('p2@weave.local','이','이','demo'),('p3@weave.local','삼','삼','demo'),"
+                + "('out@weave.local','외','외','demo')");
         meId = idOf("me@weave.local");
         p1Id = idOf("p1@weave.local");
         p2Id = idOf("p2@weave.local");
+        p3Id = idOf("p3@weave.local");
         outsiderId = idOf("out@weave.local");
         meToken = jwtProvider.createAccessToken(meId, List.of("ROLE_USER"));
         p1Token = jwtProvider.createAccessToken(p1Id, List.of("ROLE_USER"));
@@ -77,6 +85,7 @@ class ProposalServiceTest {
         outsiderToken = jwtProvider.createAccessToken(outsiderId, List.of("ROLE_USER"));
         befriend(meId, p1Id);
         befriend(meId, p2Id);
+        befriend(meId, p3Id);
     }
 
     private Long idOf(String email) {
@@ -89,11 +98,17 @@ class ProposalServiceTest {
     }
 
     private Long createProposal() throws Exception {
+        return createProposal(List.of(p1Id, p2Id));
+    }
+
+    private Long createProposal(List<Long> participantIds) throws Exception {
+        String ids = participantIds.stream().map(String::valueOf)
+                .collect(java.util.stream.Collectors.joining(","));
         MvcResult r = mvc.perform(post("/api/scheduling/proposals")
                         .header("Authorization", "Bearer " + meToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"캡스톤 회의\",\"slot\":{\"type\":\"TIME\",\"date\":\"2026-05-12\",\"startTime\":\"14:00\",\"endTime\":\"16:00\"},\"participantIds\":["
-                                + p1Id + "," + p2Id + "]}"))
+                                + ids + "]}"))
                 .andExpect(status().isCreated())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
                         .header().string("Location",
@@ -577,5 +592,139 @@ class ProposalServiceTest {
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_ALL_ACCEPTED'",
                 Integer.class)).isEqualTo(0);
+    }
+
+    // ── 제안 라이프사이클 ↔ 채팅방 연동 (계약 §3.10) ──
+
+    @Test
+    void 참여자_2명_제안_생성은_채팅방과_전원_멤버를_만든다() throws Exception {
+        Long id = createProposal();
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM chat_rooms WHERE proposal_id=? AND status='OPEN'",
+                Integer.class, id)).isEqualTo(1);
+        // 방장 포함 3명 — roster는 [me] + participantIds
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM chat_room_members m JOIN chat_rooms r ON m.room_id=r.id "
+                        + "WHERE r.proposal_id=?", Integer.class, id)).isEqualTo(3);
+        for (Long uid : List.of(meId, p1Id, p2Id)) {
+            assertThat(jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM chat_room_members m JOIN chat_rooms r ON m.room_id=r.id "
+                            + "WHERE r.proposal_id=? AND m.user_id=?",
+                    Integer.class, id, uid)).isEqualTo(1);
+        }
+        // 슬롯 스냅샷 — TIME 모드, 저장 규약과 동일한 start/end
+        assertThat(jdbc.queryForObject(
+                "SELECT mode FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isEqualTo("TIME");
+        assertThat(jdbc.queryForObject(
+                "SELECT start_time FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .startsWith("2026-05-12T14:00");
+        assertThat(jdbc.queryForObject(
+                "SELECT end_time FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .startsWith("2026-05-12T16:00");
+    }
+
+    @Test
+    void 참여자_1명_제안은_채팅방을_만들지_않는다() throws Exception {
+        Long id = createProposal(List.of(p1Id));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM chat_rooms WHERE proposal_id=?", Integer.class, id))
+                .isEqualTo(0);
+    }
+
+    @Test
+    void 참여자_3명_제안은_방장_포함_4명_멤버의_방을_만든다() throws Exception {
+        Long id = createProposal(List.of(p1Id, p2Id, p3Id));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM chat_room_members m JOIN chat_rooms r ON m.room_id=r.id "
+                        + "WHERE r.proposal_id=?", Integer.class, id)).isEqualTo(4);
+    }
+
+    @Test
+    void confirm하면_채팅방이_CLOSED되고_closed_at이_찍힌다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isEqualTo("CLOSED");
+        assertThat(jdbc.queryForObject(
+                "SELECT closed_at FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isNotNull();
+    }
+
+    @Test
+    void 거절로_DECLINED되면_채팅방이_CLOSED된다() throws Exception {
+        Long id = createProposal();
+        respond(p1Token, id, "DECLINED");
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isEqualTo("CLOSED");
+    }
+
+    @Test
+    void PENDING_제안_취소는_채팅방을_CLOSED한다() throws Exception {
+        Long id = createProposal();
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/cancel")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isEqualTo("CLOSED");
+    }
+
+    @Test
+    void ALL_ACCEPTED_제안_취소도_채팅방을_CLOSED한다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/cancel")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isEqualTo("CLOSED");
+    }
+
+    @Test
+    void 이미_CLOSED인_방의_재close는_멱등이다() throws Exception {
+        Long id = createProposal();
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/cancel")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk());
+        String closedAt = jdbc.queryForObject(
+                "SELECT closed_at FROM chat_rooms WHERE proposal_id=?", String.class, id);
+
+        chatService.closeRoom(id); // 재호출 — 예외 없이 무시
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isEqualTo("CLOSED");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM chat_rooms WHERE proposal_id=? AND closed_at=?",
+                Integer.class, id, closedAt)).isEqualTo(1);
+    }
+
+    @Test
+    void 방_없는_제안의_종결_경로는_close가_no_op이다() throws Exception {
+        Long id = createProposal(List.of(p1Id)); // 1:1 — 방 미생성
+
+        respond(p1Token, id, "DECLINED"); // closeRoom 호출 경로를 타도 방이 없어 no-op
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
+                .isEqualTo("DECLINED");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM chat_rooms WHERE proposal_id=?", Integer.class, id))
+                .isEqualTo(0);
     }
 }

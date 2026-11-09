@@ -2,6 +2,7 @@ package app.weave.scheduling.service;
 
 import app.weave.auth.domain.User;
 import app.weave.auth.domain.UserRepository;
+import app.weave.chat.service.ChatService;
 import app.weave.common.error.BusinessException;
 import app.weave.common.error.ErrorCode;
 import app.weave.event.domain.Event;
@@ -46,17 +47,20 @@ public class ProposalService {
     private final EventRepository eventRepository;
     private final NotificationPublisher publisher;
     private final UserRepository userRepository;
+    private final ChatService chatService;
 
     public ProposalService(ScheduleProposalRepository proposalRepository,
             ScheduleProposalParticipantRepository participantRepository,
             FriendshipRepository friendshipRepository, EventRepository eventRepository,
-            NotificationPublisher publisher, UserRepository userRepository) {
+            NotificationPublisher publisher, UserRepository userRepository,
+            ChatService chatService) {
         this.proposalRepository = proposalRepository;
         this.participantRepository = participantRepository;
         this.friendshipRepository = friendshipRepository;
         this.eventRepository = eventRepository;
         this.publisher = publisher;
         this.userRepository = userRepository;
+        this.chatService = chatService;
     }
 
     @Transactional
@@ -83,6 +87,17 @@ public class ProposalService {
                 modeOf(slot), range[0], range[1], idempotencyKey));
         participantRepository.saveAll(participantIds.stream()
                 .map(uid -> new ScheduleProposalParticipant(proposal.getId(), uid)).toList());
+
+        // 참석 총원 3명+(방장+참여자 2)이면 제안 범위 단체채팅 방을 같은 트랜잭션에 생성한다 —
+        // 방 생성이 제안의 일부라 실패 시 제안 생성도 롤백된다 (계약 §3.10).
+        if (participantIds.size() >= 2) {
+            List<Long> roster = new ArrayList<>();
+            roster.add(me);
+            roster.addAll(participantIds);
+            chatService.createRoom(proposal.getId(), proposal.getTitle(),
+                    mapMode(proposal.getMode()), proposal.getStartTime(), proposal.getEndTime(),
+                    roster);
+        }
 
         User organizer = loadUser(me);
         var payload = new NotificationPayload.ProposalReceived(proposal.getId(), title,
@@ -121,6 +136,7 @@ public class ProposalService {
                             toPayloadSlot(proposal.toSlot())));
         } else if (all.stream().anyMatch(r -> r.getResponse() == Response.DECLINED)) {
             proposal.decline();
+            chatService.closeRoom(proposalId);
             User decliner = loadUser(me);
             publisher.publish(proposal.getOrganizerId(),
                     new NotificationPayload.ProposalDeclined(proposal.getId(),
@@ -146,6 +162,7 @@ public class ProposalService {
             throw new BusinessException(ErrorCode.PROPOSAL_NOT_AWAITING_CONFIRM);
         }
         proposal.confirm();
+        chatService.closeRoom(proposalId);
 
         List<ScheduleProposalParticipant> all = participantRepository
                 .findByProposalId(proposalId);
@@ -180,6 +197,7 @@ public class ProposalService {
             throw new BusinessException(ErrorCode.PROPOSAL_NOT_PENDING);
         }
         proposal.cancel();
+        chatService.closeRoom(proposalId);
         return detailOf(proposal);
     }
 
@@ -260,6 +278,11 @@ public class ProposalService {
 
     private Mode modeOf(Slot slot) {
         return slot instanceof Slot.Time ? Mode.TIME : Mode.DATE;
+    }
+
+    /** scheduling Mode → chat Mode — 값만 같고 타입은 모듈별로 분리되어 이름으로 매핑한다. */
+    private app.weave.chat.domain.Mode mapMode(Mode mode) {
+        return app.weave.chat.domain.Mode.valueOf(mode.name());
     }
 
     /** scheduling Slot → 알림 payload Slot 변환 (계약 §3.7 payload와 동형). */

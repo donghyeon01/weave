@@ -37,6 +37,18 @@ export function useRespondProposal() {
   })
 }
 
+// confirm은 주최자 전용·ALL_ACCEPTED에서만 가능. 확정 시 서버가 EVENTS를 만들므로 ['events']까지 무효화.
+export function useConfirmProposal() {
+  const invalidate = useProposalInvalidator([['events']])
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<ProposalResponse>(`/api/scheduling/proposals/${id}/confirm`, {
+        method: 'POST',
+      }),
+    onSuccess: invalidate,
+  })
+}
+
 // 취소는 주최자 전용·알림 없음 — 호출부는 ConfirmModal 경유.
 export function useCancelProposal() {
   const invalidate = useProposalInvalidator()

@@ -17,6 +17,7 @@ function readTitle(item: NotificationItem): string {
   }
   const title = typeof p.title === 'string' ? p.title : '제안'
   if (item.type === 'PROPOSAL_RECEIVED') return `일정 제안이 도착했어요: ${title}`
+  if (item.type === 'PROPOSAL_ALL_ACCEPTED') return `모든 참여자가 수락했어요: ${title}`
   if (item.type === 'PROPOSAL_CONFIRMED') return `약속이 확정됐어요: ${title}`
   return `제안이 거절됐어요: ${title}`
 }

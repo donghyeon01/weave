@@ -33,7 +33,12 @@ export interface ProposalParticipant {
   respondedAt: string | null
 }
 
-export type ProposalStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'CANCELLED'
+export type ProposalStatus =
+  | 'PENDING'
+  | 'ALL_ACCEPTED'
+  | 'CONFIRMED'
+  | 'DECLINED'
+  | 'CANCELLED'
 
 export interface ProposalResponse {
   id: number

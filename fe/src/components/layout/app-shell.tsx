@@ -1,9 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, useOutlet } from "react-router-dom";
-import {
-  startStompClient,
-  stopStompClient,
-} from "../../features/notifications/stores/stomp-client";
+import { startStompClient, stopStompClient } from "../../lib/stomp";
+import { registerNotificationPush } from "../../features/notifications/stores/notification-push";
 import { useAuthStore } from "../../stores/auth-store";
 import { ContentHeader } from "./content-header";
 import { HeaderActionsProvider } from "./header-actions-provider";
@@ -19,6 +17,7 @@ export function AppShell() {
   // STOMP는 authed 동안만 유지 — logout·탈퇴 시 해제해 좀비 연결을 막는다
   useEffect(() => {
     if (status === "authed") {
+      registerNotificationPush();
       startStompClient();
       return () => stopStompClient();
     }

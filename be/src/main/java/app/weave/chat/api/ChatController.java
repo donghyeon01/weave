@@ -1,5 +1,6 @@
 package app.weave.chat.api;
 
+import app.weave.chat.domain.ChatRoom.Status;
 import app.weave.chat.domain.ChatRoomMember;
 import app.weave.chat.domain.Mode;
 import app.weave.chat.service.ChatService;
@@ -35,9 +36,9 @@ public class ChatController {
 
     @GetMapping
     public List<RoomResponse> rooms(@AuthenticationPrincipal Long me) {
-        return service.openRooms(me).stream()
+        return service.myRooms(me).stream()
                 .map(s -> new RoomResponse(s.roomId(), s.proposalId(), s.title(),
-                        toRoomSlot(s.slot()), s.unreadCount()))
+                        toRoomSlot(s.slot()), s.unreadCount(), s.status()))
                 .toList();
     }
 
@@ -87,7 +88,7 @@ public class ChatController {
     }
 
     public record RoomResponse(Long roomId, Long proposalId, String title, RoomSlot slot,
-            long unreadCount) {
+            long unreadCount, Status status) {
     }
 
     public record ReadRequest(@NotNull Long lastReadMessageId) {

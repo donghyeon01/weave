@@ -29,7 +29,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 제안 범위 단체채팅 — scheduling이 방 생성·종료를 호출하는 단방향 계약의 수신 측.
  * chat은 scheduling을 모른다 (proposal_id는 논리 참조, 슬롯·멤버는 스냅샷).
- * 에러 우선순위: 방 미존재(404) → 비멤버(404, 소유권 규약상 403 아님) → CLOSED(409) → 입력 검증.
+ * 에러 우선순위: 방 미존재(404) → 비멤버(404, 소유권 규약상 403 아님) → CLOSED(409, 송신만) → 입력 검증.
+ * CLOSED 방은 읽기 전용 — 목록·이력·읽음 커서는 멤버에게 허용하고 송신만 409로 거부한다.
  */
 @Service
 public class ChatService {
@@ -39,9 +40,9 @@ public class ChatService {
     private static final int MAX_CONTENT = 2000;
     private static final int MAX_CLIENT_MESSAGE_ID = 64;
 
-    /** 방 목록 항목 — slot은 생성 시 스냅샷 그대로. */
+    /** 방 목록 항목 — slot은 생성 시 스냅샷 그대로. status로 CLOSED 읽기 전용을 구분한다. */
     public record RoomSummary(Long roomId, Long proposalId, String title, SlotView slot,
-            long unreadCount) {
+            long unreadCount, Status status) {
     }
 
     /** 스냅샷 슬롯 — fe의 Slot 동형 직렬화는 Task 4 DTO에서 결정한다. */
@@ -88,9 +89,10 @@ public class ChatService {
         roomRepository.findByProposalIdForUpdate(proposalId).ifPresent(ChatRoom::close);
     }
 
+    /** 내가 멤버인 전체 방 (OPEN + CLOSED) — CLOSED는 status로 표시, 읽기 전용. */
     @Transactional(readOnly = true)
-    public List<RoomSummary> openRooms(Long me) {
-        List<ChatRoom> rooms = roomRepository.findOpenRoomsByMember(me);
+    public List<RoomSummary> myRooms(Long me) {
+        List<ChatRoom> rooms = roomRepository.findRoomsByMember(me);
         Map<Long, Long> unread = memberRepository.countUnreadByRoom(me,
                         rooms.stream().map(ChatRoom::getId).toList()).stream()
                 .collect(Collectors.toMap(ChatRoomMemberRepository.UnreadRow::getRoomId,
@@ -98,7 +100,7 @@ public class ChatService {
         return rooms.stream()
                 .map(room -> new RoomSummary(room.getId(), room.getProposalId(), room.getTitle(),
                         new SlotView(room.getMode(), room.getStartTime(), room.getEndTime()),
-                        unread.getOrDefault(room.getId(), 0L)))
+                        unread.getOrDefault(room.getId(), 0L), room.getStatus()))
                 .toList();
     }
 
@@ -112,7 +114,7 @@ public class ChatService {
         if (size < 1 || size > MAX_LIMIT) {
             throw new BusinessException(ErrorCode.COMMON_VALIDATION);
         }
-        requireOpenMember(me, roomId);
+        requireMember(me, roomId);
         List<ChatMessage> page = cursor == null
                 ? messageRepository.findByRoomIdOrderByIdDesc(roomId, PageRequest.of(0, size))
                 : messageRepository.findByRoomIdAndIdLessThanOrderByIdDesc(roomId, cursor,
@@ -171,7 +173,7 @@ public class ChatService {
      */
     @Transactional
     public ChatRoomMember markRead(Long me, Long roomId, Long lastReadMessageId) {
-        requireOpenMember(me, roomId);
+        requireMember(me, roomId);
         if (lastReadMessageId == null
                 || !messageRepository.existsByRoomIdAndId(roomId, lastReadMessageId)) {
             throw new BusinessException(ErrorCode.CHAT_MESSAGE_INVALID);
@@ -186,15 +188,13 @@ public class ChatService {
         return memberRepository.existsByRoomIdAndUserId(roomId, userId);
     }
 
-    private ChatRoomMember requireOpenMember(Long me, Long roomId) {
-        ChatRoom room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
-        ChatRoomMember member = memberRepository.findByRoomIdAndUserId(roomId, me)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_NOT_MEMBER));
-        if (room.getStatus() == Status.CLOSED) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_CLOSED);
+    /** 읽기 경로(이력·읽음 커서)용 — 멤버십만 검사하고 CLOSED 방도 허용한다. */
+    private ChatRoomMember requireMember(Long me, Long roomId) {
+        if (!roomRepository.existsById(roomId)) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND);
         }
-        return member;
+        return memberRepository.findByRoomIdAndUserId(roomId, me)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_NOT_MEMBER));
     }
 
     /** send·closeRoom 직렬화용 — 방 행을 FOR UPDATE로 잡고 상태를 확인한다. */

@@ -116,17 +116,18 @@ class ChatServiceTest {
     }
 
     @Test
-    void CLOSED_방은_송신_이력_읽음이_409() {
+    void CLOSED_방은_송신만_409이고_이력_읽음은_허용된다() {
         ChatRoom room = newRoom(4L, List.of(meId));
         ChatMessageView m = chatService.send(meId, room.getId(), "hi", null);
         chatService.closeRoom(4L);
 
         assertError(ErrorCode.CHAT_ROOM_CLOSED,
                 () -> chatService.send(meId, room.getId(), "again", null));
-        assertError(ErrorCode.CHAT_ROOM_CLOSED,
-                () -> chatService.history(meId, room.getId(), null, null));
-        assertError(ErrorCode.CHAT_ROOM_CLOSED,
-                () -> chatService.markRead(meId, room.getId(), m.id()));
+        // 읽기 전용 — 이력 조회·읽음 커서 갱신은 멤버에게 허용
+        assertThat(chatService.history(meId, room.getId(), null, null))
+                .extracting(ChatMessageView::id).containsExactly(m.id());
+        assertThat(chatService.markRead(meId, room.getId(), m.id()).getLastReadMessageId())
+                .isEqualTo(m.id());
         assertThat(roomRepository.findById(room.getId()).get().getClosedAt()).isNotNull();
     }
 
@@ -193,7 +194,7 @@ class ChatServiceTest {
         ChatMessageView m3 = chatService.send(p1Id, room.getId(), "p1-2", null);
 
         // last_read NULL → 상대 발신 전체가 미읽음
-        var rooms = chatService.openRooms(meId);
+        var rooms = chatService.myRooms(meId);
         assertThat(rooms).hasSize(1);
         assertThat(rooms.get(0).unreadCount()).isEqualTo(2);
         assertThat(rooms.get(0).slot().mode()).isEqualTo(Mode.TIME);
@@ -207,7 +208,7 @@ class ChatServiceTest {
         // markRead 후 0 — room 9가 생겼으므로 해당 방만 골라 확인
         ChatRoomMember member = chatService.markRead(meId, room.getId(), m3.id());
         assertThat(member.getLastReadMessageId()).isEqualTo(m3.id());
-        assertThat(chatService.openRooms(meId).stream()
+        assertThat(chatService.myRooms(meId).stream()
                 .filter(s -> s.roomId().equals(room.getId())).findFirst().get().unreadCount())
                 .isEqualTo(0);
 
@@ -227,8 +228,10 @@ class ChatServiceTest {
         assertThat(roomRepository.findById(room.getId()).get().getStatus())
                 .isEqualTo(ChatRoom.Status.CLOSED);
         assertThat(first).isNotNull();
-        // CLOSED 방은 openRooms에서 비노출
-        assertThat(chatService.openRooms(meId)).isEmpty();
+        // CLOSED 방도 목록에 status=CLOSED로 노출 (읽기 전용)
+        assertThat(chatService.myRooms(meId)).hasSize(1);
+        assertThat(chatService.myRooms(meId).get(0).status())
+                .isEqualTo(ChatRoom.Status.CLOSED);
     }
 
     /** 두 작업을 같은 latch에서 동시에 놓아 경합을 유도한다. */

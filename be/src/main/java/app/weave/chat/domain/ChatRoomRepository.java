@@ -24,8 +24,8 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
     @Query("select r from ChatRoom r where r.proposalId = :proposalId")
     Optional<ChatRoom> findByProposalIdForUpdate(@Param("proposalId") Long proposalId);
 
-    /** 내 OPEN 방 목록 — 비연관 엔터티 ON 조인 (id만 보유하는 프로젝트 관례). */
+    /** 내 방 목록 (OPEN + CLOSED) — 비연관 엔터티 ON 조인 (id만 보유하는 프로젝트 관례). */
     @Query("select r from ChatRoom r join ChatRoomMember m on r.id = m.roomId "
-            + "where m.userId = :me and r.status = 'OPEN'")
-    List<ChatRoom> findOpenRoomsByMember(@Param("me") Long me);
+            + "where m.userId = :me")
+    List<ChatRoom> findRoomsByMember(@Param("me") Long me);
 }

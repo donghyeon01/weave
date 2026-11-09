@@ -46,7 +46,7 @@ class ProposalServiceTest {
 
     @MockitoSpyBean
     app.weave.notification.service.NotificationPublisher publisher;
-    @Autowired
+    @MockitoSpyBean
     app.weave.chat.service.ChatService chatService;
 
     private Long meId;
@@ -619,10 +619,10 @@ class ProposalServiceTest {
                 .isEqualTo("TIME");
         assertThat(jdbc.queryForObject(
                 "SELECT start_time FROM chat_rooms WHERE proposal_id=?", String.class, id))
-                .startsWith("2026-05-12T14:00");
+                .startsWith("2026-05-12 14:00");
         assertThat(jdbc.queryForObject(
                 "SELECT end_time FROM chat_rooms WHERE proposal_id=?", String.class, id))
-                .startsWith("2026-05-12T16:00");
+                .startsWith("2026-05-12 16:00");
     }
 
     @Test
@@ -726,5 +726,148 @@ class ProposalServiceTest {
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM chat_rooms WHERE proposal_id=?", Integer.class, id))
                 .isEqualTo(0);
+    }
+
+    @Test
+    void 방_생성_실패는_제안_참여자_방_멤버_알림을_전부_롤백한다() throws Exception {
+        // 멤버 INSERT까지 수행한 뒤 예외 — 방 행 INSERT가 실제로 실행됐음을 보장하면서
+        // 트랜잭션 롤백으로 방·멤버까지 사라지는지 증명한다 (계약 §3.10 단일 트랜잭션)
+        org.mockito.Mockito.doAnswer(inv -> {
+            inv.callRealMethod();
+            throw new RuntimeException("injected createRoom failure");
+        }).when(chatService).createRoom(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(app.weave.chat.domain.Mode.class),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyList());
+
+        mvc.perform(post("/api/scheduling/proposals")
+                        .header("Authorization", "Bearer " + meToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"캡스톤 회의\",\"slot\":{\"type\":\"TIME\","
+                                + "\"date\":\"2026-05-12\",\"startTime\":\"14:00\","
+                                + "\"endTime\":\"16:00\"},\"participantIds\":["
+                                + p1Id + "," + p2Id + "]}"))
+                .andExpect(status().isInternalServerError());
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM schedule_proposals", Integer.class)).isEqualTo(0);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM schedule_proposal_participants", Integer.class))
+                .isEqualTo(0);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM chat_rooms", Integer.class)).isEqualTo(0);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM chat_room_members", Integer.class)).isEqualTo(0);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications", Integer.class)).isEqualTo(0);
+    }
+
+    @Test
+    void confirm_알림실패는_제안상태와_방_CLOSED전이를_함께_롤백한다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+        // closeRoom 이후 지점 — 두 번째 CONFIRMED 발행에서 실패 (첫 발행은 INSERT까지 수행)
+        org.mockito.Mockito.doCallRealMethod()
+                .doThrow(new RuntimeException("injected publish failure"))
+                .when(publisher).publish(org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.any(
+                                NotificationPayload.ProposalConfirmed.class));
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isInternalServerError());
+
+        // closeRoom의 status/closed_at UPDATE가 트랜잭션 롤백으로 복원된다
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
+                .isEqualTo("ALL_ACCEPTED");
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isEqualTo("OPEN");
+        assertThat(jdbc.queryForObject(
+                "SELECT closed_at FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isNull();
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                .isEqualTo(0);
+    }
+
+    @Test
+    void 전원_수락_직후에도_방은_게이트_기간_동안_OPEN을_유지한다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+
+        // ALL_ACCEPTED 게이트 — confirm·cancel·decline 전까지 방은 살아있다 (계약 §3.10)
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
+                .isEqualTo("ALL_ACCEPTED");
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isEqualTo("OPEN");
+        assertThat(jdbc.queryForObject(
+                "SELECT closed_at FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isNull();
+    }
+
+    @Test
+    void DATE_모드_제안의_방은_자정부터_endDate다음날_자정_배타상한으로_저장된다()
+            throws Exception {
+        MvcResult r = mvc.perform(post("/api/scheduling/proposals")
+                        .header("Authorization", "Bearer " + meToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"주말 여행\",\"slot\":{\"type\":\"DATE\","
+                                + "\"startDate\":\"2026-05-12\",\"endDate\":\"2026-05-14\"},"
+                                + "\"participantIds\":[" + p1Id + "," + p2Id + "]}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Long id = com.jayway.jsonpath.JsonPath.<Number>read(
+                r.getResponse().getContentAsString(), "$.id").longValue();
+
+        // 저장 규약: DATE는 startDate 자정 ~ endDate+1일 자정(배타 상한) — 방 스냅샷도 동일
+        assertThat(jdbc.queryForObject(
+                "SELECT mode FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .isEqualTo("DATE");
+        assertThat(jdbc.queryForObject(
+                "SELECT start_time FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .startsWith("2026-05-12 00:00");
+        assertThat(jdbc.queryForObject(
+                "SELECT end_time FROM chat_rooms WHERE proposal_id=?", String.class, id))
+                .startsWith("2026-05-15 00:00");
+    }
+
+    @Test
+    void 같은_멱등키로_재생성하면_같은_제안을_반환하고_방은_하나만_남는다() throws Exception {
+        String body = "{\"title\":\"캡스톤 회의\",\"slot\":{\"type\":\"TIME\","
+                + "\"date\":\"2026-05-12\",\"startTime\":\"14:00\",\"endTime\":\"16:00\"},"
+                + "\"participantIds\":[" + p1Id + "," + p2Id + "]}";
+
+        MvcResult r1 = mvc.perform(post("/api/scheduling/proposals")
+                        .header("Authorization", "Bearer " + meToken)
+                        .header("Idempotency-Key", "prop-key-1")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Long id1 = com.jayway.jsonpath.JsonPath.<Number>read(
+                r1.getResponse().getContentAsString(), "$.id").longValue();
+
+        MvcResult r2 = mvc.perform(post("/api/scheduling/proposals")
+                        .header("Authorization", "Bearer " + meToken)
+                        .header("Idempotency-Key", "prop-key-1")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Long id2 = com.jayway.jsonpath.JsonPath.<Number>read(
+                r2.getResponse().getContentAsString(), "$.id").longValue();
+
+        assertThat(id2).isEqualTo(id1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM schedule_proposals", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM schedule_proposal_participants", Integer.class))
+                .isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM chat_rooms WHERE proposal_id=?", Integer.class, id1))
+                .isEqualTo(1);
     }
 }

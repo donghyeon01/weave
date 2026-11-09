@@ -34,6 +34,8 @@ SCREENS = [
     {'name': 'scheduling', 'path': '/app/scheduling', 'auth': True, 'route_file': 'src/app/routes/app/scheduling.tsx', 'feature': 'scheduling', 'nav': '일정 조율'},
     {'name': 'profile', 'path': '/app/profile', 'auth': True, 'route_file': 'src/app/routes/app/profile.tsx', 'feature': 'profile', 'nav': '내 프로필'},
     {'name': 'proposals', 'path': '/app/proposals', 'auth': True, 'route_file': 'src/app/routes/app/proposals.tsx', 'feature': 'scheduling'},
+    {'name': 'chat', 'path': '/app/chat', 'auth': True, 'route_file': 'src/app/routes/app/chat.tsx', 'feature': 'chat', 'nav': '채팅'},
+    {'name': 'chat-room', 'path': '/app/chat/1', 'auth': True, 'route_file': 'src/app/routes/app/chat-room.tsx', 'feature': 'chat'},
 ]
 
 SHARED_DIRS = ['src/components/ui', 'src/components/layout', 'src/styles']

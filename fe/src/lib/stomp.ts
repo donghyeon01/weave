@@ -36,6 +36,14 @@ export function onStompConnect(listener: () => void) {
   connectListeners.add(listener)
 }
 
+/** STOMP SEND — 미연결이면 throw해 호출부가 사용자에게 실패를 표면화하게 한다. */
+export function publish(destination: string, body: unknown) {
+  if (client === null || !client.connected) {
+    throw new Error('STOMP not connected')
+  }
+  client.publish({ destination, body: JSON.stringify(body) })
+}
+
 // stompjs는 재연결마다 구독 테이블을 초기화하므로 onConnect 때마다 전부 재구독한다.
 // 같은 연결에서 이 함수는 onConnect당 1회만 불리므로 중복 subscribe는 없다.
 function applySubscriptions(c: Client) {

@@ -61,6 +61,22 @@ export function ProfileIcon(props: IconProps) {
   )
 }
 
+export function MailIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 20 16" width="20" height="16" fill="none" aria-hidden="true" {...props}>
+      <path d="M2 16C1.45 16 0.979167 15.8042 0.5875 15.4125C0.195833 15.0208 0 14.55 0 14V2C0 1.45 0.195833 0.979167 0.5875 0.5875C0.979167 0.195833 1.45 0 2 0H18C18.55 0 19.0208 0.195833 19.4125 0.5875C19.8042 0.979167 20 1.45 20 2V14C20 14.55 19.8042 15.0208 19.4125 15.4125C19.0208 15.8042 18.55 16 18 16H2V16M10 9L2 4V14H18V4L10 9V9M10 7L18 2H2L10 7V7M2 4V2V14V4V4Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function MessageIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 20 20" width="20" height="20" fill="none" aria-hidden="true" {...props}>
+      <path d="M2 20V4C2 3.45 2.19583 2.97917 2.5875 2.5875C2.97917 2.19583 3.45 2 4 2H16C16.55 2 17.0208 2.19583 17.4125 2.5875C17.8042 2.97917 18 3.45 18 4V12C18 12.55 17.8042 13.0208 17.4125 13.4125C17.0208 13.8042 16.55 14 16 14H6L2 18V20V4V20V20M4 4V14.35L5.35 13H16V4H4V4V4Z" fill="currentColor" />
+    </svg>
+  )
+}
+
 export function SettingsIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 20.1 20" width="20" height="20" fill="none" aria-hidden="true" {...props}>

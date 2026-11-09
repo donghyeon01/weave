@@ -6,7 +6,9 @@ import { ConfirmModal } from '../ui/confirm-modal'
 import { Toast } from '../ui/toast'
 import { EventFormModal } from '../../features/events/components/event-form-modal'
 import { toYmd } from '../../features/events/utils'
+import { useChatRooms } from '../../features/chat/api/use-chat'
 import { useReceivedRequests } from '../../features/friends/api/use-friends'
+import { useProposals } from '../../features/scheduling/api/use-proposals'
 import { useLogout, useMe } from '../../features/profile/api/use-profile'
 import { useTasks } from '../../features/tasks/api/use-tasks'
 import { LogoutIcon, PlusIcon, SettingsIcon, SparklesIcon } from './nav-icons'
@@ -38,11 +40,22 @@ function CountBadge({ count }: { count: number }) {
   )
 }
 
-function navBadge(item: NavItem, taskCount: number, requestCount: number) {
+interface BadgeCounts {
+  task: number
+  request: number
+  proposalPending: number
+  chatUnread: number
+}
+
+function navBadge(item: NavItem, counts: BadgeCounts) {
   if (item.badge === 'new') return <AccentBadge>NEW</AccentBadge>
-  if (item.badge === 'todo-count' && taskCount > 0) return <CountBadge count={taskCount} />
-  if (item.badge === 'friend-requests' && requestCount > 0)
-    return <CountBadge count={requestCount} />
+  if (item.badge === 'todo-count' && counts.task > 0) return <CountBadge count={counts.task} />
+  if (item.badge === 'friend-requests' && counts.request > 0)
+    return <CountBadge count={counts.request} />
+  if (item.badge === 'proposal-pending' && counts.proposalPending > 0)
+    return <CountBadge count={counts.proposalPending} />
+  if (item.badge === 'chat-unread' && counts.chatUnread > 0)
+    return <CountBadge count={counts.chatUnread} />
   return null
 }
 
@@ -52,13 +65,22 @@ export function Sidebar() {
   const logout = useLogout()
   const tasks = useTasks()
   const received = useReceivedRequests()
+  // 받은 제안의 미응답 건수 — 1페이지(50건) 내 PENDING만 센다
+  const receivedProposals = useProposals('received', 0, 50)
+  const chatRooms = useChatRooms()
 
   const [eventOpen, setEventOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
-  const taskCount = (tasks.data ?? []).filter((t) => !t.completed).length
-  const requestCount = received.data?.length ?? 0
+  const badgeCounts: BadgeCounts = {
+    task: (tasks.data ?? []).filter((t) => !t.completed).length,
+    request: received.data?.length ?? 0,
+    proposalPending: (receivedProposals.data?.content ?? []).filter(
+      (p) => p.status === 'PENDING',
+    ).length,
+    chatUnread: (chatRooms.data ?? []).reduce((sum, r) => sum + r.unreadCount, 0),
+  }
   const avatarText = (me.data?.nickname || me.data?.name || '').slice(0, 2)
   const displayName = me.data?.name || me.data?.nickname || '—'
 
@@ -113,7 +135,7 @@ export function Sidebar() {
                     )}
                   />
                   <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                  {navBadge(item, taskCount, requestCount)}
+                  {navBadge(item, badgeCounts)}
                   {isActive && (
                     <span className="size-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />
                   )}

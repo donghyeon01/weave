@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '../../../lib/react-query'
 import type { NotificationItem } from '../types'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
 import { useMarkRead, useNotifications, useReadAll } from '../api/use-notifications'
@@ -28,6 +30,7 @@ function proposalIdOf(item: NotificationItem): number | null {
 }
 
 export function NotificationBell() {
+  const queryClient = useQueryClient()
   const { data } = useNotifications(0, 20)
   const markRead = useMarkRead()
   const readAll = useReadAll()
@@ -162,13 +165,23 @@ export function NotificationBell() {
                 )}
                 {item.type.startsWith('PROPOSAL_') && (
                   <div className="px-4 pb-3">
-                    {/* 방장 대상 알림(ALL_ACCEPTED·CONFIRMED·DECLINED)은 보낸 탭이 맞다 */}
+                    {/* 제안에 열린 채팅방이 있으면 방으로 바로 이동, 없으면 보관함.
+                        방장 대상 알림(ALL_ACCEPTED·CONFIRMED·DECLINED)은 보낸 탭이 맞다 */}
                     <Link
-                      to={
-                        item.type === 'PROPOSAL_RECEIVED'
+                      to={(() => {
+                        const pid = proposalIdOf(item)
+                        const room = pid !== null
+                          ? queryClient
+                              .getQueryData<{ roomId: number; proposalId: number }[]>(
+                                queryKeys.chat.rooms,
+                              )
+                              ?.find((r) => r.proposalId === pid)
+                          : undefined
+                        if (room !== undefined) return `/app/chat/${room.roomId}`
+                        return item.type === 'PROPOSAL_RECEIVED'
                           ? '/app/proposals'
                           : '/app/proposals?box=sent'
-                      }
+                      })()}
                       onClick={() => setOpen(false)}
                       className="text-xs font-semibold text-accent-text hover:underline"
                     >

@@ -67,6 +67,11 @@ public class ProposalController {
         return toResponse(service.respond(me, id, req.response()));
     }
 
+    @PostMapping("/{id}/confirm")
+    public ProposalResponse confirm(@AuthenticationPrincipal Long me, @PathVariable Long id) {
+        return toResponse(service.confirmProposal(me, id));
+    }
+
     @PostMapping("/{id}/cancel")
     public ProposalResponse cancel(@AuthenticationPrincipal Long me, @PathVariable Long id) {
         return toResponse(service.cancel(me, id));

@@ -13,14 +13,16 @@ import java.util.Set;
 
 /**
  * capability-map의 모듈 경계를 강제한다.
- * 허용 의존: 전 모듈 auth·common 공통 + friend→user·notification + scheduling→friend·event·notification.
+ * 허용 의존: 전 모듈 auth·common 공통 + friend→user·notification
+ * + scheduling→friend·event·notification·chat.
  * 이 표에 없는 feature 의존과 순환은 테스트가 깨진다.
  */
 @AnalyzeClasses(packages = "app.weave", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
 
     private static final Set<String> FEATURES = Set.of(
-            "auth", "user", "notification", "task", "event", "diary", "friend", "scheduling");
+            "auth", "user", "notification", "task", "event", "diary", "friend", "scheduling",
+            "chat");
 
     /** 전 모듈 공통 허용 — auth(JWT·User)·common(에러·BaseTime)은 어디서나 소비 가능. */
     private static final Set<String> BASE = Set.of("auth", "common");
@@ -28,7 +30,7 @@ class ArchitectureTest {
     /** feature별 추가 허용 — capability-map 엣지 그대로. */
     private static final Map<String, Set<String>> EXTRA = Map.of(
             "friend", Set.of("user", "notification"),
-            "scheduling", Set.of("friend", "event", "notification"));
+            "scheduling", Set.of("friend", "event", "notification", "chat"));
 
     private static ArchRule boundaryOf(String feature) {
         Set<String> forbidden = new HashSet<>(FEATURES);
@@ -62,6 +64,8 @@ class ArchitectureTest {
     static final ArchRule friend_경계 = boundaryOf("friend");
     @ArchTest
     static final ArchRule scheduling_경계 = boundaryOf("scheduling");
+    @ArchTest
+    static final ArchRule chat_경계 = boundaryOf("chat");
     @ArchTest
     static final ArchRule common_경계 =
             noClasses().that().resideInAPackage("app.weave.common..")

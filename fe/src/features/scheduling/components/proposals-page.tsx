@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { ApiError } from '../../../lib/api-client'
 import type { ProposalStatus, ProposalSummary, Slot } from '../types'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
@@ -7,7 +10,7 @@ import { Modal } from '../../../components/ui/modal'
 import { Toast } from '../../../components/ui/toast'
 import { cx } from '../../../utils/cx'
 import { useProposal, useProposals } from '../api/use-proposals'
-import { useCancelProposal, useRespondProposal } from '../api/use-proposal-mutations'
+import { useCancelProposal, useConfirmProposal, useRespondProposal } from '../api/use-proposal-mutations'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
 import { QueryErrorToast } from '../../../components/ui/query-error-toast'
@@ -18,6 +21,7 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const
 
 const STATUS_META: Record<ProposalStatus, { label: string; variant: 'default' | 'success' | 'danger' }> = {
   PENDING: { label: '대기 중', variant: 'default' },
+  ALL_ACCEPTED: { label: '확정 대기', variant: 'default' },
   CONFIRMED: { label: '확정', variant: 'success' },
   DECLINED: { label: '거절됨', variant: 'danger' },
   CANCELLED: { label: '취소됨', variant: 'default' },
@@ -34,8 +38,12 @@ function formatSlotHuman(slot: Slot): string {
 export function ProposalsPage() {
   const respond = useRespondProposal()
   const cancel = useCancelProposal()
+  const confirmProposal = useConfirmProposal()
+  const queryClient = useQueryClient()
 
-  const [box, setBox] = useState<Box>('received')
+  // 알림 링크가 ?box=sent로 보낸 탭을 지정할 수 있다 — 라우트는 box만 지원한다
+  const [searchParams] = useSearchParams()
+  const [box, setBox] = useState<Box>(searchParams.get('box') === 'sent' ? 'sent' : 'received')
   const [page, setPage] = useState(0)
   const [detailId, setDetailId] = useState<number | null>(null)
   const [confirmAction, setConfirmAction] = useState<
@@ -86,6 +94,41 @@ export function ProposalsPage() {
         onError: () => setToast({ variant: 'danger', message: '수락에 실패했어요.' }),
       },
     )
+  }
+
+  // 주최자 확정 게이트 — 전원 수락(ALL_ACCEPTED) 후에만 노출된다
+  const confirmSchedule = (id: number) => {
+    confirmProposal.mutate(id, {
+      onSuccess: () => {
+        setDetailId(null)
+        setToast({ variant: 'success', message: '약속을 확정했어요.' })
+      },
+      onError: (error) => {
+        // 404 = 비방장·미존재 — 상세를 닫고 접근 불가를 안내한다
+        if (error instanceof ApiError && error.status === 404) {
+          setDetailId(null)
+          setToast({
+            variant: 'danger',
+            message: '제안을 확인할 수 없어요. 권한이 없거나 이미 삭제된 제안이에요.',
+          })
+          return
+        }
+        // 409 PROPOSAL-NOT-AWAITING-CONFIRM = 이미 확정·취소 등 상태가 바뀐 제안 —
+        // 목록을 재조회해 화면 상태를 서버와 맞춘다
+        if (
+          error instanceof ApiError &&
+          (error.code === 'PROPOSAL-NOT-AWAITING-CONFIRM' || error.status === 409)
+        ) {
+          void queryClient.invalidateQueries({ queryKey: ['scheduling', 'proposals'] })
+          setToast({
+            variant: 'danger',
+            message: '이미 상태가 바뀐 제안이에요. 목록을 새로고침했어요.',
+          })
+          return
+        }
+        setToast({ variant: 'danger', message: '확정에 실패했어요.' })
+      },
+    })
   }
 
   return (
@@ -195,7 +238,18 @@ export function ProposalsPage() {
                       </Button>
                     </>
                   )}
-                  {box === 'sent' && p.status === 'PENDING' && (
+                  {box === 'sent' && p.status === 'ALL_ACCEPTED' && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => confirmSchedule(p.id)}
+                      disabled={confirmProposal.isPending}
+                    >
+                      일정 확정
+                    </Button>
+                  )}
+                  {/* 취소는 계약상 ALL_ACCEPTED에서도 허용 */}
+                  {box === 'sent' && (p.status === 'PENDING' || p.status === 'ALL_ACCEPTED') && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -204,7 +258,12 @@ export function ProposalsPage() {
                       제안 취소
                     </Button>
                   )}
-                  {p.status !== 'PENDING' && (
+                  {p.status === 'ALL_ACCEPTED' && box === 'received' && (
+                    <span className="text-[13px] font-medium text-text-muted">
+                      방장 확정 대기
+                    </span>
+                  )}
+                  {p.status !== 'PENDING' && p.status !== 'ALL_ACCEPTED' && (
                     <span className="text-[13px] font-medium text-text-muted">
                       {p.status === 'CONFIRMED'
                         ? '확정된 약속'
@@ -297,10 +356,12 @@ export function ProposalsPage() {
                 </li>
               ))}
             </ul>
-            {detailQuery.data.status === 'PENDING' && (
-              <div className="mt-4 flex justify-end gap-2">
+            {(detailQuery.data.status === 'PENDING' ||
+              detailQuery.data.status === 'ALL_ACCEPTED') && (
+              <div className="mt-4 flex items-center justify-end gap-2">
                 {box === 'received' ? (
-                  <>
+                  detailQuery.data.status === 'PENDING' ? (
+                    <>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -329,18 +390,35 @@ export function ProposalsPage() {
                     >
                       수락
                     </Button>
-                  </>
+                    </>
+                  ) : (
+                    <span className="text-[13px] font-medium text-text-muted">
+                      방장 확정 대기
+                    </span>
+                  )
                 ) : (
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => {
-                      setDetailId(null)
-                      setConfirmAction({ kind: 'cancel', id: detailQuery.data.id })
-                    }}
-                  >
-                    제안 취소
-                  </Button>
+                  <>
+                    {detailQuery.data.status === 'ALL_ACCEPTED' && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={confirmProposal.isPending}
+                        onClick={() => confirmSchedule(detailQuery.data.id)}
+                      >
+                        일정 확정
+                      </Button>
+                    )}
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => {
+                        setDetailId(null)
+                        setConfirmAction({ kind: 'cancel', id: detailQuery.data.id })
+                      }}
+                    >
+                      제안 취소
+                    </Button>
+                  </>
                 )}
               </div>
             )}

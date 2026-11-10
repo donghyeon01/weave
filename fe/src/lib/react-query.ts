@@ -50,4 +50,8 @@ export const queryKeys = {
     ],
     proposal: (id: number) => ['scheduling', 'proposals', 'detail', id],
   },
+  chat: {
+    rooms: ['chat', 'rooms'],
+    messages: (roomId: number) => ['chat', 'rooms', roomId, 'messages'],
+  },
 } as const

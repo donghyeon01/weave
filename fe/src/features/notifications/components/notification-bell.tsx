@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '../../../lib/react-query'
 import type { NotificationItem } from '../types'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
 import { useMarkRead, useNotifications, useReadAll } from '../api/use-notifications'
@@ -17,6 +19,7 @@ function readTitle(item: NotificationItem): string {
   }
   const title = typeof p.title === 'string' ? p.title : '제안'
   if (item.type === 'PROPOSAL_RECEIVED') return `일정 제안이 도착했어요: ${title}`
+  if (item.type === 'PROPOSAL_ALL_ACCEPTED') return `모든 참여자가 수락했어요: ${title}`
   if (item.type === 'PROPOSAL_CONFIRMED') return `약속이 확정됐어요: ${title}`
   return `제안이 거절됐어요: ${title}`
 }
@@ -27,6 +30,7 @@ function proposalIdOf(item: NotificationItem): number | null {
 }
 
 export function NotificationBell() {
+  const queryClient = useQueryClient()
   const { data } = useNotifications(0, 20)
   const markRead = useMarkRead()
   const readAll = useReadAll()
@@ -161,13 +165,33 @@ export function NotificationBell() {
                 )}
                 {item.type.startsWith('PROPOSAL_') && (
                   <div className="px-4 pb-3">
-                    <Link
-                      to="/app/proposals"
-                      onClick={() => setOpen(false)}
-                      className="text-xs font-semibold text-accent-text hover:underline"
-                    >
-                      제안 보관함에서 확인 →
-                    </Link>
+                    {/* 제안에 열린 채팅방이 있으면 방으로 바로 이동, 없으면 보관함.
+                        방장 대상 알림(ALL_ACCEPTED·CONFIRMED·DECLINED)은 보낸 탭이 맞다 */}
+                    {(() => {
+                      const pid = proposalIdOf(item)
+                      const room = pid !== null
+                        ? queryClient
+                            .getQueryData<{ roomId: number; proposalId: number }[]>(
+                              queryKeys.chat.rooms,
+                            )
+                            ?.find((r) => r.proposalId === pid)
+                        : undefined
+                      const to =
+                        room !== undefined
+                          ? `/app/chat/${room.roomId}`
+                          : item.type === 'PROPOSAL_RECEIVED'
+                            ? '/app/proposals'
+                            : '/app/proposals?box=sent'
+                      return (
+                        <Link
+                          to={to}
+                          onClick={() => setOpen(false)}
+                          className="text-xs font-semibold text-accent-text hover:underline"
+                        >
+                          {room !== undefined ? '채팅방에서 확인 →' : '제안 보관함에서 확인 →'}
+                        </Link>
+                      )
+                    })()}
                   </div>
                 )}
                 {item.type === 'FRIEND_REQUEST' && (

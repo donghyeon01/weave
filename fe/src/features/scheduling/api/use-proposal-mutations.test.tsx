@@ -4,11 +4,11 @@ import userEvent from '@testing-library/user-event'
 import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiFetch } from '../../../lib/api-client'
+import { apiFetch, ApiError } from '../../../lib/api-client'
 import { createQueryClient } from '../../../lib/react-query'
 import type { NotificationPage } from '../../notifications/types'
 import { NotificationBell } from '../../notifications/components/notification-bell'
-import { useRespondProposal } from './use-proposal-mutations'
+import { useConfirmProposal, useRespondProposal } from './use-proposal-mutations'
 
 vi.mock('../../../lib/api-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../lib/api-client')>()
@@ -46,6 +46,45 @@ describe('use-proposal-mutations', () => {
       expect(keys).toContainEqual(['notifications'])
       expect(keys).toContainEqual(['events'])
     })
+  })
+
+  it('confirm 성공 시 POST confirm을 호출하고 proposals+notifications+events를 무효화한다', async () => {
+    const queryClient = createQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    apiFetchMock.mockResolvedValueOnce({ id: 1, status: 'CONFIRMED' })
+
+    const { result } = renderHook(() => useConfirmProposal(), {
+      wrapper: wrapper(queryClient),
+    })
+    result.current.mutate(1)
+
+    await waitFor(() => {
+      expect(apiFetchMock).toHaveBeenCalledWith(
+        '/api/scheduling/proposals/1/confirm',
+        expect.objectContaining({ method: 'POST' }),
+      )
+      const keys = invalidateSpy.mock.calls.map(
+        (c) => (c[0] as { queryKey: string[] }).queryKey,
+      )
+      expect(keys).toContainEqual(['scheduling', 'proposals'])
+      expect(keys).toContainEqual(['notifications'])
+      expect(keys).toContainEqual(['events'])
+    })
+  })
+
+  it('confirm 409 에러는 호출부로 전파된다', async () => {
+    const queryClient = createQueryClient()
+    apiFetchMock.mockRejectedValueOnce(
+      new ApiError('PROPOSAL-NOT-AWAITING-CONFIRM', 409, '확정 대기 상태가 아닌 제안이에요'),
+    )
+
+    const { result } = renderHook(() => useConfirmProposal(), {
+      wrapper: wrapper(queryClient),
+    })
+    result.current.mutate(1)
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect((result.current.error as ApiError).status).toBe(409)
   })
 })
 

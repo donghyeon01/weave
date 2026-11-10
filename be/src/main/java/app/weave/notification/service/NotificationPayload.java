@@ -85,6 +85,20 @@ public sealed interface NotificationPayload {
         }
     }
 
+    record ProposalAllAccepted(Long proposalId, String title, UserRef organizer, Slot slot)
+            implements NotificationPayload {
+        @Override
+        public NotificationType type() {
+            return NotificationType.PROPOSAL_ALL_ACCEPTED;
+        }
+
+        @Override
+        public Map<String, Object> toMap() {
+            return Map.of("proposalId", proposalId, "title", title,
+                    "organizer", organizer.toMap(), "slot", slot.toMap());
+        }
+    }
+
     record ProposalConfirmed(Long proposalId, String title, Slot slot)
             implements NotificationPayload {
         @Override

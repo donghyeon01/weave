@@ -2,6 +2,7 @@ package app.weave.scheduling.service;
 
 import app.weave.auth.domain.User;
 import app.weave.auth.domain.UserRepository;
+import app.weave.chat.service.ChatService;
 import app.weave.common.error.BusinessException;
 import app.weave.common.error.ErrorCode;
 import app.weave.event.domain.Event;
@@ -46,17 +47,20 @@ public class ProposalService {
     private final EventRepository eventRepository;
     private final NotificationPublisher publisher;
     private final UserRepository userRepository;
+    private final ChatService chatService;
 
     public ProposalService(ScheduleProposalRepository proposalRepository,
             ScheduleProposalParticipantRepository participantRepository,
             FriendshipRepository friendshipRepository, EventRepository eventRepository,
-            NotificationPublisher publisher, UserRepository userRepository) {
+            NotificationPublisher publisher, UserRepository userRepository,
+            ChatService chatService) {
         this.proposalRepository = proposalRepository;
         this.participantRepository = participantRepository;
         this.friendshipRepository = friendshipRepository;
         this.eventRepository = eventRepository;
         this.publisher = publisher;
         this.userRepository = userRepository;
+        this.chatService = chatService;
     }
 
     @Transactional
@@ -72,6 +76,8 @@ public class ProposalService {
         if (participantIds == null || participantIds.isEmpty()) {
             throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
         }
+        // 중복 id는 participants UK·chat_room_members PK 충돌로 500이 나므로 미리 제거한다
+        participantIds = participantIds.stream().distinct().toList();
         if (!acceptedFriendIds(me).containsAll(participantIds)) {
             throw new BusinessException(ErrorCode.SCHEDULING_NOT_FRIEND);
         }
@@ -84,6 +90,17 @@ public class ProposalService {
         participantRepository.saveAll(participantIds.stream()
                 .map(uid -> new ScheduleProposalParticipant(proposal.getId(), uid)).toList());
 
+        // 참석 총원 3명+(방장+참여자 2)이면 제안 범위 단체채팅 방을 같은 트랜잭션에 생성한다 —
+        // 방 생성이 제안의 일부라 실패 시 제안 생성도 롤백된다 (계약 §3.10).
+        if (participantIds.size() >= 2) {
+            List<Long> roster = new ArrayList<>();
+            roster.add(me);
+            roster.addAll(participantIds);
+            chatService.createRoom(proposal.getId(), proposal.getTitle(),
+                    mapMode(proposal.getMode()), proposal.getStartTime(), proposal.getEndTime(),
+                    roster);
+        }
+
         User organizer = loadUser(me);
         var payload = new NotificationPayload.ProposalReceived(proposal.getId(), title,
                 new UserRef(me, organizer.getNickname()), toPayloadSlot(slot));
@@ -95,8 +112,7 @@ public class ProposalService {
 
     /**
      * 응답 — FOR UPDATE 잠금으로 직렬화 (ADR-0004).
-     * 전원 ACCEPTED 시 확정은 단일 트랜잭션: status + 전원 EVENTS + 전원 알림 INSERT가 원자다.
-     * WS push만 AFTER_COMMIT으로 빠진다 (Publisher 내부).
+     * 전원 수락은 자동 확정하지 않고 ALL_ACCEPTED 게이트로 둔다 (ADR-0011) — 확정은 방장 confirm.
      */
     @Transactional
     public ProposalDetail respond(Long me, Long proposalId, Response response) {
@@ -108,33 +124,67 @@ public class ProposalService {
         ScheduleProposalParticipant mine = participantRepository
                 .findByProposalIdAndUserId(proposalId, me)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PROPOSAL_NOT_PARTICIPANT));
+        // 계약 §3.8 — ACCEPTED|DECLINED만 허용한다. PENDING으로 되돌리는 응답 철회는 거부.
+        if (response == null || response == Response.PENDING) {
+            throw new BusinessException(ErrorCode.COMMON_VALIDATION);
+        }
         mine.respond(response);
 
         List<ScheduleProposalParticipant> all = participantRepository
                 .findByProposalId(proposalId);
         if (all.stream().allMatch(r -> r.getResponse() == Response.ACCEPTED)) {
-            proposal.confirm();
-            List<Long> attendeeIds = new ArrayList<>(
-                    all.stream().map(ScheduleProposalParticipant::getUserId).toList());
-            attendeeIds.add(proposal.getOrganizerId());
-            boolean allDay = proposal.getMode() == Mode.DATE;
-            eventRepository.saveAll(attendeeIds.stream()
-                    .map(uid -> new Event(uid, proposal.getTitle(), null,
-                            proposal.getStartTime(), proposal.getEndTime(), null, allDay,
-                            Source.PROPOSAL, proposal.getId(), null))
-                    .toList());
-            var confirmed = new NotificationPayload.ProposalConfirmed(proposal.getId(),
-                    proposal.getTitle(), toPayloadSlot(proposal.toSlot()));
-            for (Long uid : attendeeIds) {
-                publisher.publish(uid, confirmed);
-            }
+            proposal.markAllAccepted();
+            User organizer = loadUser(proposal.getOrganizerId());
+            publisher.publish(proposal.getOrganizerId(),
+                    new NotificationPayload.ProposalAllAccepted(proposal.getId(),
+                            proposal.getTitle(),
+                            new UserRef(organizer.getId(), organizer.getNickname()),
+                            toPayloadSlot(proposal.toSlot())));
         } else if (all.stream().anyMatch(r -> r.getResponse() == Response.DECLINED)) {
             proposal.decline();
+            chatService.closeRoom(proposalId);
             User decliner = loadUser(me);
             publisher.publish(proposal.getOrganizerId(),
                     new NotificationPayload.ProposalDeclined(proposal.getId(),
                             proposal.getTitle(),
                             new UserRef(me, decliner.getNickname())));
+        }
+        return detailOf(proposal);
+    }
+
+    /**
+     * 확정 — 방장 전용, ALL_ACCEPTED 게이트 통과 시에만 (ADR-0011).
+     * status + 전원 EVENTS + 전원 알림 INSERT가 단일 트랜잭션으로 원자다 (ADR-0004).
+     * WS push만 AFTER_COMMIT으로 빠진다 (Publisher 내부).
+     */
+    @Transactional
+    public ProposalDetail confirmProposal(Long me, Long proposalId) {
+        ScheduleProposal proposal = proposalRepository.findByIdForUpdate(proposalId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND));
+        if (!proposal.getOrganizerId().equals(me)) {
+            throw new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND);
+        }
+        if (proposal.getStatus() != Status.ALL_ACCEPTED) {
+            throw new BusinessException(ErrorCode.PROPOSAL_NOT_AWAITING_CONFIRM);
+        }
+        proposal.confirm();
+        chatService.closeRoom(proposalId);
+
+        List<ScheduleProposalParticipant> all = participantRepository
+                .findByProposalId(proposalId);
+        List<Long> attendeeIds = new ArrayList<>(
+                all.stream().map(ScheduleProposalParticipant::getUserId).toList());
+        attendeeIds.add(proposal.getOrganizerId());
+        boolean allDay = proposal.getMode() == Mode.DATE;
+        eventRepository.saveAll(attendeeIds.stream()
+                .map(uid -> new Event(uid, proposal.getTitle(), null,
+                        proposal.getStartTime(), proposal.getEndTime(), null, allDay,
+                        Source.PROPOSAL, proposal.getId(), null))
+                .toList());
+        var confirmed = new NotificationPayload.ProposalConfirmed(proposal.getId(),
+                proposal.getTitle(), toPayloadSlot(proposal.toSlot()));
+        for (Long uid : attendeeIds) {
+            publisher.publish(uid, confirmed);
         }
         return detailOf(proposal);
     }
@@ -147,10 +197,13 @@ public class ProposalService {
         if (!proposal.getOrganizerId().equals(me)) {
             throw new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND);
         }
-        if (proposal.getStatus() != Status.PENDING) {
+        // 게이트(ALL_ACCEPTED)도 "아직 늦지 않은" 상태 — 방장 취소 허용 (ADR-0011)
+        if (proposal.getStatus() != Status.PENDING
+                && proposal.getStatus() != Status.ALL_ACCEPTED) {
             throw new BusinessException(ErrorCode.PROPOSAL_NOT_PENDING);
         }
         proposal.cancel();
+        chatService.closeRoom(proposalId);
         return detailOf(proposal);
     }
 
@@ -231,6 +284,11 @@ public class ProposalService {
 
     private Mode modeOf(Slot slot) {
         return slot instanceof Slot.Time ? Mode.TIME : Mode.DATE;
+    }
+
+    /** scheduling Mode → chat Mode — 값만 같고 타입은 모듈별로 분리되어 이름으로 매핑한다. */
+    private app.weave.chat.domain.Mode mapMode(Mode mode) {
+        return app.weave.chat.domain.Mode.valueOf(mode.name());
     }
 
     /** scheduling Slot → 알림 payload Slot 변환 (계약 §3.7 payload와 동형). */

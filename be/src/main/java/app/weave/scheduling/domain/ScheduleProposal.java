@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 public class ScheduleProposal extends BaseTimeEntity {
 
     public enum Status {
-        PENDING, CONFIRMED, DECLINED, CANCELLED
+        PENDING, ALL_ACCEPTED, CONFIRMED, DECLINED, CANCELLED
     }
 
     @Id
@@ -41,7 +41,7 @@ public class ScheduleProposal extends BaseTimeEntity {
     private LocalDateTime endTime;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
+    @Column(nullable = false, length = 16)
     private Status status;
 
     @Column(name = "idempotency_key", length = 64)
@@ -79,6 +79,7 @@ public class ScheduleProposal extends BaseTimeEntity {
                 startTime.toLocalDate(), endTime.toLocalDate().minusDays(1));
     }
 
+    public void markAllAccepted() { this.status = Status.ALL_ACCEPTED; }
     public void confirm() { this.status = Status.CONFIRMED; }
     public void decline() { this.status = Status.DECLINED; }
     public void cancel() { this.status = Status.CANCELLED; }

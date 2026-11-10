@@ -27,6 +27,10 @@ const ProfileRoute = lazy(() =>
 const ProposalsRoute = lazy(() =>
   import('./routes/app/proposals').then((m) => ({ default: m.ProposalsRoute })),
 )
+const ChatRoute = lazy(() => import('./routes/app/chat').then((m) => ({ default: m.ChatRoute })))
+const ChatRoomRoute = lazy(() =>
+  import('./routes/app/chat-room').then((m) => ({ default: m.ChatRoomRoute })),
+)
 
 const routeFallback = (
   <div className="flex min-h-screen items-center justify-center bg-background">
@@ -60,6 +64,8 @@ export const router = createBrowserRouter([
       { path: 'scheduling', element: lazyElement(<SchedulingRoute />) },
       { path: 'profile', element: lazyElement(<ProfileRoute />) },
       { path: 'proposals', element: lazyElement(<ProposalsRoute />) },
+      { path: 'chat', element: lazyElement(<ChatRoute />) },
+      { path: 'chat/:roomId', element: lazyElement(<ChatRoomRoute />) },
     ],
   },
 ])

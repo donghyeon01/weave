@@ -12,6 +12,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -38,7 +39,8 @@ public class ChatController {
     public List<RoomResponse> rooms(@AuthenticationPrincipal Long me) {
         return service.myRooms(me).stream()
                 .map(s -> new RoomResponse(s.roomId(), s.proposalId(), s.title(),
-                        toRoomSlot(s.slot()), s.unreadCount(), s.status()))
+                        toRoomSlot(s.slot()), s.unreadCount(), s.status(), s.lastMessage(),
+                        s.lastMessageAt(), s.memberCount()))
                 .toList();
     }
 
@@ -88,7 +90,8 @@ public class ChatController {
     }
 
     public record RoomResponse(Long roomId, Long proposalId, String title, RoomSlot slot,
-            long unreadCount, Status status) {
+            long unreadCount, Status status, String lastMessage, LocalDateTime lastMessageAt,
+            long memberCount) {
     }
 
     public record ReadRequest(@NotNull Long lastReadMessageId) {

@@ -3,6 +3,7 @@ package app.weave.chat.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import app.weave.chat.domain.ChatMessageRepository;
 import app.weave.chat.domain.ChatRoom;
 import app.weave.chat.domain.ChatRoomMember;
 import app.weave.chat.domain.ChatRoomMemberRepository;
@@ -45,6 +46,8 @@ class ChatServiceTest {
     ChatRoomRepository roomRepository;
     @Autowired
     ChatRoomMemberRepository memberRepository;
+    @Autowired
+    ChatMessageRepository messageRepository;
     @Autowired
     JdbcTemplate jdbc;
 
@@ -198,6 +201,12 @@ class ChatServiceTest {
         assertThat(rooms).hasSize(1);
         assertThat(rooms.get(0).unreadCount()).isEqualTo(2);
         assertThat(rooms.get(0).slot().mode()).isEqualTo(Mode.TIME);
+        // 목록 카드 메타 — 최신 발신 내용·시각·멤버 수
+        // lastMessageAt은 DB 재조회 값이라 send 직후 뷰의 나노초와 다를 수 있어 리포지토리 값과 비교한다
+        assertThat(rooms.get(0).lastMessage()).isEqualTo("p1-2");
+        assertThat(rooms.get(0).lastMessageAt())
+                .isEqualTo(messageRepository.findById(m3.id()).get().getCreatedAt());
+        assertThat(rooms.get(0).memberCount()).isEqualTo(2);
 
         // 타 방 메시지 id는 400
         ChatRoom other = newRoom(9L, List.of(meId, p1Id));
@@ -232,6 +241,10 @@ class ChatServiceTest {
         assertThat(chatService.myRooms(meId)).hasSize(1);
         assertThat(chatService.myRooms(meId).get(0).status())
                 .isEqualTo(ChatRoom.Status.CLOSED);
+        // 메시지 없는 방 — lastMessage·lastMessageAt은 null, memberCount는 멤버 수
+        assertThat(chatService.myRooms(meId).get(0).lastMessage()).isNull();
+        assertThat(chatService.myRooms(meId).get(0).lastMessageAt()).isNull();
+        assertThat(chatService.myRooms(meId).get(0).memberCount()).isEqualTo(1);
     }
 
     /** 두 작업을 같은 latch에서 동시에 놓아 경합을 유도한다. */

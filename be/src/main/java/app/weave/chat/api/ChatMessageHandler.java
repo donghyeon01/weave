@@ -4,7 +4,10 @@ import app.weave.chat.service.ChatService;
 import app.weave.chat.service.ChatService.ChatMessageView;
 import app.weave.chat.service.StompRoomAuthInterceptor;
 import app.weave.common.error.BusinessException;
+import app.weave.common.error.ErrorCode;
 import java.security.Principal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -20,6 +23,8 @@ import org.springframework.stereotype.Controller;
  */
 @Controller
 public class ChatMessageHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ChatMessageHandler.class);
 
     public record SendPayload(String content, String clientMessageId) {
     }
@@ -41,6 +46,10 @@ public class ChatMessageHandler {
             view = chatService.send(me, roomId, payload.content(), payload.clientMessageId());
         } catch (BusinessException e) {
             throw StompRoomAuthInterceptor.error(e.getErrorCode());
+        } catch (RuntimeException e) {
+            // 비도메인 예외는 내부 메시지가 ERROR 프레임에 새지 않도록 봉투로 변환한다
+            log.warn("chat send 실패 roomId={} userId={}", roomId, me, e);
+            throw StompRoomAuthInterceptor.error(ErrorCode.INTERNAL_ERROR);
         }
         template.convertAndSend("/topic/rooms/" + roomId, view);
     }

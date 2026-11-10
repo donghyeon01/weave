@@ -110,11 +110,12 @@ public class ChatService {
      */
     @Transactional(readOnly = true)
     public List<ChatMessageView> history(Long me, Long roomId, Long cursor, Integer limit) {
+        // 에러 우선순위 — 방·멤버십(404) 확인이 입력 검증(400)보다 먼저다.
+        requireMember(me, roomId);
         int size = limit == null ? DEFAULT_LIMIT : limit;
         if (size < 1 || size > MAX_LIMIT) {
             throw new BusinessException(ErrorCode.COMMON_VALIDATION);
         }
-        requireMember(me, roomId);
         List<ChatMessage> page = cursor == null
                 ? messageRepository.findByRoomIdOrderByIdDesc(roomId, PageRequest.of(0, size))
                 : messageRepository.findByRoomIdAndIdLessThanOrderByIdDesc(roomId, cursor,

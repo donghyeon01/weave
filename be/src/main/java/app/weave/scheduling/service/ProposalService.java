@@ -76,6 +76,8 @@ public class ProposalService {
         if (participantIds == null || participantIds.isEmpty()) {
             throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
         }
+        // 중복 id는 participants UK·chat_room_members PK 충돌로 500이 나므로 미리 제거한다
+        participantIds = participantIds.stream().distinct().toList();
         if (!acceptedFriendIds(me).containsAll(participantIds)) {
             throw new BusinessException(ErrorCode.SCHEDULING_NOT_FRIEND);
         }
@@ -122,6 +124,10 @@ public class ProposalService {
         ScheduleProposalParticipant mine = participantRepository
                 .findByProposalIdAndUserId(proposalId, me)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PROPOSAL_NOT_PARTICIPANT));
+        // 계약 §3.8 — ACCEPTED|DECLINED만 허용한다. PENDING으로 되돌리는 응답 철회는 거부.
+        if (response == null || response == Response.PENDING) {
+            throw new BusinessException(ErrorCode.COMMON_VALIDATION);
+        }
         mine.respond(response);
 
         List<ScheduleProposalParticipant> all = participantRepository

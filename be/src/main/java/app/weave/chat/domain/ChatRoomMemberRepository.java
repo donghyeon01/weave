@@ -21,8 +21,6 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
 
     List<ChatRoomMember> findByRoomId(Long roomId);
 
-    List<ChatRoomMember> findByUserId(Long userId);
-
     /**
      * 읽음 커서 조건부 갱신 — last_read가 NULL이거나 더 작을 때만 UPDATE해
      * 동시 markRead 경합에서 커서 역행을 DB 단에서 차단한다 (0행 갱신 = no-op).

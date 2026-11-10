@@ -66,11 +66,4 @@ public class ChatRoomMember implements Persistable<ChatRoomMemberId> {
     public Long getUserId() { return userId; }
     public Long getLastReadMessageId() { return lastReadMessageId; }
     public LocalDateTime getJoinedAt() { return joinedAt; }
-
-    /** 커서 단조 증가 — 현재보다 작은 값은 무시하고 유지한다. */
-    public void markRead(Long messageId) {
-        if (lastReadMessageId == null || messageId > lastReadMessageId) {
-            this.lastReadMessageId = messageId;
-        }
-    }
 }

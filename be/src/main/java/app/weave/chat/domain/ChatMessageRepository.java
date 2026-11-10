@@ -27,7 +27,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             + "where m.roomId in :roomIds group by m.roomId")
     List<LastIdRow> findLastIdByRoomIds(@Param("roomIds") List<Long> roomIds);
 
-    Optional<ChatMessage> findByRoomIdAndClientMessageId(Long roomId, String clientMessageId);
+    Optional<ChatMessage> findByRoomIdAndSenderIdAndClientMessageId(Long roomId, Long senderId,
+            String clientMessageId);
 
     boolean existsByRoomIdAndId(Long roomId, Long id);
 }

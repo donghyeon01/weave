@@ -161,6 +161,24 @@ class ChatServiceTest {
     }
 
     @Test
+    void 같은_clientMessageId는_sender별로_독립이다() {
+        ChatRoom room = newRoom(11L, List.of(meId, p1Id));
+
+        ChatMessageView mine = chatService.send(meId, room.getId(), "내 메시지", "shared-key");
+        // 다른 멤버가 같은 키를 써도 내 행이 아니라 본인 행이 생성된다 (선점 버그 회귀)
+        ChatMessageView theirs = chatService.send(p1Id, room.getId(), "상대 메시지", "shared-key");
+        assertThat(theirs.id()).isNotEqualTo(mine.id());
+        assertThat(theirs.senderId()).isEqualTo(p1Id);
+
+        // 각자의 재전송은 각자의 행을 반환한다
+        assertThat(chatService.send(meId, room.getId(), "다시", "shared-key").id())
+                .isEqualTo(mine.id());
+        assertThat(chatService.send(p1Id, room.getId(), "다시", "shared-key").id())
+                .isEqualTo(theirs.id());
+        assertThat(chatService.history(meId, room.getId(), null, null)).hasSize(2);
+    }
+
+    @Test
     void history_커서_경계와_오름차순() {
         ChatRoom room = newRoom(6L, List.of(meId));
         for (int i = 1; i <= 5; i++) {

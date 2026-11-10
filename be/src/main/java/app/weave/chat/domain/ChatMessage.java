@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 /**
  * append-only 메시지 행 — 수정·삭제 없음. client_message_id는 STOMP 재전송 멱등키로
- * UK(room_id, client_message_id)가 보장한다 (생략 시 NULL — 다중 NULL 허용).
+ * UK(room_id, sender_id, client_message_id)가 보장한다 (생략 시 NULL — 다중 NULL 허용).
  */
 @Entity
 @Table(name = "chat_messages")

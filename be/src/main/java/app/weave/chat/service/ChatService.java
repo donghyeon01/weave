@@ -154,7 +154,7 @@ public class ChatService {
     }
 
     /**
-     * clientMessageId가 있으면 UK(room_id, client_message_id) 조회를 먼저 — 있으면 기존 행을
+     * clientMessageId가 있으면 UK(room_id, sender_id, client_message_id) 조회를 먼저 — 있으면 기존 행을
      * 반환해 STOMP 재전송을 멱등 처리한다. null·빈 문자열 키는 매번 새 행.
      * 동시 송신으로 uk_chat_messages_client 충돌이 나면 패자의 트랜잭션은 rollback-only라
      * 같은 트랜잭션 재조회가 불가 — 새 트랜잭션으로 한 번 재시도해 선점자 행을 반환한다.
@@ -181,7 +181,8 @@ public class ChatService {
         String key = clientMessageId == null || clientMessageId.isBlank() ? null
                 : clientMessageId;
         if (key != null) {
-            var existing = messageRepository.findByRoomIdAndClientMessageId(roomId, key);
+            var existing =
+                    messageRepository.findByRoomIdAndSenderIdAndClientMessageId(roomId, me, key);
             if (existing.isPresent()) {
                 return toViews(List.of(existing.get())).get(0);
             }

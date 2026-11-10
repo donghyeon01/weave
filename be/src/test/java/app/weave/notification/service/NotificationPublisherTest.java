@@ -140,6 +140,12 @@ class NotificationPublisherTest {
         publisher.publish(userId,
                 new NotificationPayload.ProposalDeclined(9L, "캡스톤 회의",
                         new UserRef(2L, "영희")));
+        publisher.publish(userId,
+                new NotificationPayload.SharedItem(4L, "DIARY", 12L,
+                        new UserRef(3L, "철수"), "제주 여행"));
+        publisher.publish(userId,
+                new NotificationPayload.ShareReply(4L, 21L, "DIARY",
+                        new UserRef(2L, "영희"), "제주 여행"));
 
         Map<NotificationType, Notification> byType = repository.findAll().stream()
                 .collect(Collectors.toMap(Notification::getType, Function.identity()));
@@ -176,6 +182,18 @@ class NotificationPublisherTest {
                 .getPayload();
         assertThat(declined).containsOnlyKeys("proposalId", "title", "declinedBy");
         assertThat(nested(declined, "declinedBy")).containsOnlyKeys("id", "nickname");
+
+        Map<String, Object> sharedItem = byType.get(NotificationType.SHARED_ITEM)
+                .getPayload();
+        assertThat(sharedItem)
+                .containsOnlyKeys("shareId", "itemType", "itemId", "owner", "itemTitle");
+        assertThat(nested(sharedItem, "owner")).containsOnlyKeys("id", "nickname");
+
+        Map<String, Object> shareReply = byType.get(NotificationType.SHARE_REPLY)
+                .getPayload();
+        assertThat(shareReply)
+                .containsOnlyKeys("shareId", "replyId", "itemType", "author", "itemTitle");
+        assertThat(nested(shareReply, "author")).containsOnlyKeys("id", "nickname");
 
         // DATE 슬롯도 계약 §3.8 형태 — {type,startDate,endDate}
         assertThat(new Slot.Days(LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 14))

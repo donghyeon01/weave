@@ -6,6 +6,7 @@ import app.weave.common.port.SharedPhotoBytes;
 import app.weave.common.port.SharedPhotoRef;
 import app.weave.diary.domain.DiaryPhotoRepository;
 import app.weave.diary.domain.DiaryRepository;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
@@ -41,7 +42,15 @@ public class DiaryAccessAdapter implements DiaryAccess {
     public Optional<SharedPhotoBytes> photoBytesOf(Long ownerId, Long diaryId,
             Long photoId) {
         return photoRepository.findByIdAndDiaryIdAndUserId(photoId, diaryId, ownerId)
-                .map(p -> new SharedPhotoBytes(p.getContentType(),
-                        storage.read(p.getStoragePath())));
+                .flatMap(p -> {
+                    try {
+                        return Optional.of(new SharedPhotoBytes(p.getContentType(),
+                                storage.read(p.getStoragePath())));
+                    } catch (UncheckedIOException e) {
+                        // DB 행은 있으나 디스크 파일이 없는 경우 — 열람 불가는 부재와
+                        // 동일하게 처리해 호출부가 404로 매핑하게 한다 (500 방지).
+                        return Optional.empty();
+                    }
+                });
     }
 }

@@ -47,6 +47,8 @@ class DiaryAccessAdapterTest {
     @Autowired
     DiaryPhotoService photoService;
     @Autowired
+    app.weave.diary.domain.DiaryPhotoRepository photoRepository;
+    @Autowired
     JdbcTemplate jdbc;
 
     private Long meId;
@@ -120,5 +122,41 @@ class DiaryAccessAdapterTest {
         DiaryPhoto photo = photoService.upload(meId, diary, jpeg());
 
         assertThat(adapter.photoBytesOf(otherId, diary.getId(), photo.getId())).isEmpty();
+    }
+
+    @Test
+    void 다른_일기의_사진은_empty다() {
+        Diary other = diaryService.create(meId, LocalDate.of(2027, 5, 21), "다른 날", "본문",
+                null, null, null);
+        DiaryPhoto photo = photoService.upload(meId, other, jpeg());
+
+        assertThat(adapter.photoBytesOf(meId, diary.getId(), photo.getId())).isEmpty();
+    }
+
+    @Test
+    void 미존재_사진은_empty다() {
+        assertThat(adapter.photoBytesOf(meId, diary.getId(), 999999L)).isEmpty();
+    }
+
+    @Test
+    void 행은_있으나_디스크_파일이_없으면_empty다() {
+        // 업로드 경로를 거치지 않은 행 — storage 파일이 존재하지 않는다
+        DiaryPhoto orphan = photoRepository.save(new DiaryPhoto(diary.getId(), meId,
+                meId + "/" + diary.getId() + "/missing.jpg", "image/jpeg", 8, 0));
+
+        assertThat(adapter.photoBytesOf(meId, diary.getId(), orphan.getId())).isEmpty();
+    }
+
+    @Test
+    void mood와_tags가_null이면_null과_빈목록으로_변환된다() {
+        Diary bare = diaryService.create(meId, LocalDate.of(2027, 5, 22), null, "본문만",
+                null, null, null);
+
+        Optional<SharedDiary> result = adapter.diaryOf(meId, bare.getId());
+
+        assertThat(result).isPresent();
+        assertThat(result.get().mood()).isNull();
+        assertThat(result.get().tags()).isEmpty();
+        assertThat(result.get().photos()).isEmpty();
     }
 }

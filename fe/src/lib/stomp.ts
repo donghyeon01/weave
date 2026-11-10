@@ -1,4 +1,5 @@
 import { Client } from '@stomp/stompjs'
+import type { StompSubscription } from '@stomp/stompjs'
 import { env } from '../config/env'
 import { ensureFreshToken } from './refresh'
 import { useAuthStore } from '../stores/auth-store'
@@ -17,17 +18,30 @@ export interface StompMessage {
 interface DesiredSub {
   destination: string
   onMessage: (msg: StompMessage) => void
+  live?: StompSubscription
 }
 
 let client: Client | null = null
 const subscriptions: DesiredSub[] = []
 const connectListeners = new Set<() => void>()
 
-/** destination 구독. 미연결이면 다음 onConnect에서 자동 구독된다. */
+/**
+ * destination 구독. 미연결이면 다음 onConnect에서 자동 구독된다.
+ * 반환된 해제 함수는 재구독 목록과 현재 구독 양쪽에서 제거한다 — 호출부가
+ * 컴포넌트 unmount 정리에 쓰지 않으면 비멤버 목적지가 재연결마다 재구독되어
+ * 서버 거부(ERROR+세션 종료)가 무한 반복된다.
+ */
 export function subscribeTopic(destination: string, onMessage: (msg: StompMessage) => void) {
-  subscriptions.push({ destination, onMessage })
+  const sub: DesiredSub = { destination, onMessage }
+  subscriptions.push(sub)
   if (client !== null && client.connected) {
-    client.subscribe(destination, onMessage)
+    sub.live = client.subscribe(destination, onMessage)
+  }
+  return () => {
+    const i = subscriptions.indexOf(sub)
+    if (i !== -1) subscriptions.splice(i, 1)
+    sub.live?.unsubscribe()
+    sub.live = undefined
   }
 }
 
@@ -48,7 +62,7 @@ export function publish(destination: string, body: unknown) {
 // 같은 연결에서 이 함수는 onConnect당 1회만 불리므로 중복 subscribe는 없다.
 function applySubscriptions(c: Client) {
   for (const s of subscriptions) {
-    c.subscribe(s.destination, s.onMessage)
+    s.live = c.subscribe(s.destination, s.onMessage)
   }
 }
 

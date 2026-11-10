@@ -124,4 +124,50 @@ describe('chat-room-page', () => {
     expect(input).toBeDisabled()
     expect(input).toHaveAttribute('placeholder', '대화가 종료되어 메시지를 보낼 수 없어요')
   })
+
+  it('방 목록에 없는 방(비멤버)은 토픽을 구독하지 않는다', async () => {
+    apiFetchMock.mockImplementation(async (path) => {
+      const url = typeof path === 'string' ? path : ''
+      if (url === '/api/chat/rooms') return [room(1, 'OPEN')]
+      if (url.includes('/messages')) return MESSAGES
+      if (url.endsWith('/read')) return undefined
+      throw new Error(`예상 못 한 호출: ${url}`)
+    })
+    const qc = createQueryClient()
+    qc.setQueryData(queryKeys.users.me, { id: 1 })
+    render(
+      <Routes>
+        <Route path="/app/chat/:roomId" element={<ChatRoomPage />} />
+      </Routes>,
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <MemoryRouter initialEntries={['/app/chat/9']}>
+            <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+          </MemoryRouter>
+        ),
+      },
+    )
+
+    // 방 목록 로드 후에도 9번 방은 목록에 없으므로 구독하면 안 된다
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith('/api/chat/rooms'))
+    await screen.findByText('안녕')
+    expect(subscribeTopic).not.toHaveBeenCalled()
+  })
+
+  it('방을 떠나면 구독 해제 함수가 호출된다', async () => {
+    const unsubscribe = vi.fn()
+    vi.mocked(subscribeTopic).mockReturnValue(unsubscribe)
+    mockApi('OPEN')
+    const qc = createQueryClient()
+    qc.setQueryData(queryKeys.users.me, { id: 1 })
+    const { unmount } = renderRoom(qc)
+
+    expect(await screen.findByText('약속 1')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(subscribeTopic).toHaveBeenCalledWith('/topic/rooms/1', expect.any(Function)),
+    )
+
+    unmount()
+    expect(unsubscribe).toHaveBeenCalled()
+  })
 })

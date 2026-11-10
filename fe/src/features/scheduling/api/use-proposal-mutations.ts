@@ -3,10 +3,16 @@ import { apiFetch } from '../../../lib/api-client'
 import type { ProposalResponse, Slot } from '../types'
 
 // respond는 확정 시 서버가 EVENTS를 만들므로 ['events']까지 무효화한다 (열린 캘린더 갱신).
+// 제안 생명주기는 채팅방과 연동된다(생성→OPEN, 확정·취소→CLOSED) — ['chat','rooms']도 무효화한다.
 function useProposalInvalidator(extra: string[][] = []) {
   const queryClient = useQueryClient()
   return () => {
-    for (const key of [['scheduling', 'proposals'], ['notifications'], ...extra]) {
+    for (const key of [
+      ['scheduling', 'proposals'],
+      ['notifications'],
+      ['chat', 'rooms'],
+      ...extra,
+    ]) {
       queryClient.invalidateQueries({ queryKey: key })
     }
   }

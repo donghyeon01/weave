@@ -87,14 +87,17 @@ export function ChatRoomPage() {
 
   const me = queryClient.getQueryData<UserResponse>(queryKeys.users.me)
 
-  // 방 입장 시 /topic/rooms/{id} 구독 — 수신 메시지는 목록·방 목록 무효화로 반영한다
+  // 방 입장 시 /topic/rooms/{id} 구독 — 수신 메시지는 목록·방 목록 무효화로 반영한다.
+  // 방 목록에 없는 방(비멤버·미존재)은 구독하지 않는다 — 서버 거부(ERROR+세션 종료)가
+  // 재연결 재구독과 결합해 무한 폭풍이 되는 것을 차단. cleanup으로 구독을 해제한다.
+  const roomKnown = room !== undefined
   useEffect(() => {
-    if (!Number.isFinite(roomId)) return
-    subscribeTopic(`/topic/rooms/${roomId}`, () => {
+    if (!Number.isFinite(roomId) || !roomKnown) return
+    return subscribeTopic(`/topic/rooms/${roomId}`, () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.messages(roomId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.rooms })
     })
-  }, [roomId, queryClient])
+  }, [roomId, roomKnown, queryClient])
 
   // 최신 메시지까지 읽음 처리 — 보고 있는 방의 unread를 0으로 만든다
   const latestId = messages.length > 0 ? messages[messages.length - 1].id : null

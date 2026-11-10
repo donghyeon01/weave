@@ -9,10 +9,17 @@ import type { NotificationItem } from '../types'
 const TYPE_INVALIDATIONS: Record<string, string[][]> = {
   FRIEND_REQUEST: [['notifications'], ['friends']],
   FRIEND_ACCEPTED: [['notifications'], ['friends']],
-  PROPOSAL_RECEIVED: [['notifications'], ['scheduling', 'proposals']],
+  // PROPOSAL_*는 채팅방 생명주기와 연동된다 (생성→OPEN, 확정·거절→CLOSED) —
+  // ['chat','rooms']를 빼면 방 목록·뱃지·종료 상태가 갱신되지 않는다.
+  PROPOSAL_RECEIVED: [['notifications'], ['scheduling', 'proposals'], ['chat', 'rooms']],
   PROPOSAL_ALL_ACCEPTED: [['notifications'], ['scheduling', 'proposals']],
-  PROPOSAL_CONFIRMED: [['notifications'], ['scheduling', 'proposals'], ['events']],
-  PROPOSAL_DECLINED: [['notifications'], ['scheduling', 'proposals']],
+  PROPOSAL_CONFIRMED: [
+    ['notifications'],
+    ['scheduling', 'proposals'],
+    ['events'],
+    ['chat', 'rooms'],
+  ],
+  PROPOSAL_DECLINED: [['notifications'], ['scheduling', 'proposals'], ['chat', 'rooms']],
 }
 
 // 단절 중 어떤 타입의 push를 놓쳤는지 알 수 없으므로, 재연결 시에는

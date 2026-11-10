@@ -167,26 +167,31 @@ export function NotificationBell() {
                   <div className="px-4 pb-3">
                     {/* 제안에 열린 채팅방이 있으면 방으로 바로 이동, 없으면 보관함.
                         방장 대상 알림(ALL_ACCEPTED·CONFIRMED·DECLINED)은 보낸 탭이 맞다 */}
-                    <Link
-                      to={(() => {
-                        const pid = proposalIdOf(item)
-                        const room = pid !== null
-                          ? queryClient
-                              .getQueryData<{ roomId: number; proposalId: number }[]>(
-                                queryKeys.chat.rooms,
-                              )
-                              ?.find((r) => r.proposalId === pid)
-                          : undefined
-                        if (room !== undefined) return `/app/chat/${room.roomId}`
-                        return item.type === 'PROPOSAL_RECEIVED'
-                          ? '/app/proposals'
-                          : '/app/proposals?box=sent'
-                      })()}
-                      onClick={() => setOpen(false)}
-                      className="text-xs font-semibold text-accent-text hover:underline"
-                    >
-                      제안 보관함에서 확인 →
-                    </Link>
+                    {(() => {
+                      const pid = proposalIdOf(item)
+                      const room = pid !== null
+                        ? queryClient
+                            .getQueryData<{ roomId: number; proposalId: number }[]>(
+                              queryKeys.chat.rooms,
+                            )
+                            ?.find((r) => r.proposalId === pid)
+                        : undefined
+                      const to =
+                        room !== undefined
+                          ? `/app/chat/${room.roomId}`
+                          : item.type === 'PROPOSAL_RECEIVED'
+                            ? '/app/proposals'
+                            : '/app/proposals?box=sent'
+                      return (
+                        <Link
+                          to={to}
+                          onClick={() => setOpen(false)}
+                          className="text-xs font-semibold text-accent-text hover:underline"
+                        >
+                          {room !== undefined ? '채팅방에서 확인 →' : '제안 보관함에서 확인 →'}
+                        </Link>
+                      )
+                    })()}
                   </div>
                 )}
                 {item.type === 'FRIEND_REQUEST' && (

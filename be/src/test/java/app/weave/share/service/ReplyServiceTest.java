@@ -12,6 +12,7 @@ import app.weave.share.domain.Share;
 import app.weave.share.domain.ShareItemType;
 import app.weave.share.domain.ShareReply;
 import app.weave.share.domain.ShareReplyRepository;
+import app.weave.share.domain.ShareVisibility;
 import app.weave.share.service.ReplyService.ReplyNode;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -65,8 +66,10 @@ class ReplyServiceTest {
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM share_replies");
-        jdbc.update("DELETE FROM share_targets");
         jdbc.update("DELETE FROM shares");
+        jdbc.update("DELETE FROM feed_subscriptions");
+        jdbc.update("DELETE FROM friend_group_members");
+        jdbc.update("DELETE FROM friend_groups");
         jdbc.update("DELETE FROM notifications");
         jdbc.update("DELETE FROM diary_photos");
         jdbc.update("DELETE FROM diaries");
@@ -84,8 +87,8 @@ class ReplyServiceTest {
         befriend(meId, f2Id);
         Diary diary = diaryService.create(meId, LocalDate.of(2027, 5, 20), "제주 여행",
                 "본문", Mood.HAPPY, null, List.of("제주"));
-        share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                List.of(f1Id, f2Id));
+        share = shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.FRIENDS, null);
     }
 
     private Long idOf(String email) {
@@ -139,8 +142,8 @@ class ReplyServiceTest {
     void 다른_share의_답글을_부모로_지정하면_400이다() {
         Diary other = diaryService.create(meId, LocalDate.of(2027, 5, 21), "둘째",
                 "본문", null, null, null);
-        Share share2 = shareService.create(meId, ShareItemType.DIARY, other.getId(),
-                List.of(f1Id));
+        Share share2 = shareService.upsert(meId, ShareItemType.DIARY, other.getId(),
+                ShareVisibility.FRIENDS, null);
         ShareReply foreignRoot = replyService.create(f1Id, share2.getId(), "타 공유 루트", null);
 
         assertError(ErrorCode.REPLY_PARENT_INVALID,
@@ -169,9 +172,9 @@ class ReplyServiceTest {
 
     @Test
     void 비열람자는_작성과_조회가_404다() {
-        assertError(ErrorCode.SHARE_NOT_AUDIENCE,
+        assertError(ErrorCode.SHARE_NOT_FOUND,
                 () -> replyService.create(outsiderId, share.getId(), "답글", null));
-        assertError(ErrorCode.SHARE_NOT_AUDIENCE,
+        assertError(ErrorCode.SHARE_NOT_FOUND,
                 () -> replyService.list(outsiderId, share.getId(), null, 20));
         assertError(ErrorCode.SHARE_NOT_FOUND,
                 () -> replyService.list(f1Id, 999999L, null, 20));
@@ -289,6 +292,6 @@ class ReplyServiceTest {
         replyService.delete(f1Id, share.getId(), root.getId());
 
         assertThat(shareService.detail(meId, share.getId()).replyCount()).isEqualTo(1);
-        assertThat(shareService.myShares(meId).get(0).replyCount()).isEqualTo(1);
+        assertThat(shareService.mine(meId).get(0).replyCount()).isEqualTo(1);
     }
 }

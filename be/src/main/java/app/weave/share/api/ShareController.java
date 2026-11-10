@@ -1,23 +1,22 @@
 package app.weave.share.api;
 
 import app.weave.common.port.SharedDiary;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import app.weave.common.port.SharedEvent;
 import app.weave.common.port.SharedPhotoBytes;
 import app.weave.notification.service.NotificationPayload.UserRef;
 import app.weave.share.domain.Share;
 import app.weave.share.domain.ShareItemType;
 import app.weave.share.domain.ShareReply;
+import app.weave.share.domain.ShareVisibility;
 import app.weave.share.service.ReplyService;
 import app.weave.share.service.ReplyService.ReplyNode;
 import app.weave.share.service.ShareService;
-import app.weave.share.service.ShareService.ReceivedShare;
+import app.weave.share.service.ShareService.FeedItem;
 import app.weave.share.service.ShareService.ShareDetail;
 import app.weave.share.service.ShareService.ShareView;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
-import java.net.URI;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,12 +30,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** api-contract §3.11 REST 경계 — 공유 생성·목록·피드·상세·대상 편집·해제·사진. */
+/** api-contract §3.11 REST 경계 — 공개 설정 upsert·내 목록·피드·친구별·상세·답글·사진. */
 @RestController
 @RequestMapping("/api/shares")
 public class ShareController {
@@ -49,29 +49,42 @@ public class ShareController {
         this.replyService = replyService;
     }
 
-    @PostMapping
-    public ResponseEntity<ShareDetailResponse> create(@AuthenticationPrincipal Long me,
-            @Valid @RequestBody CreateShareRequest req) {
-        Share share = service.create(me, ShareItemType.valueOf(req.itemType()), req.itemId(),
-                req.targetUserIds());
-        return ResponseEntity.created(URI.create("/api/shares/" + share.getId()))
-                .body(toDetail(service.detail(me, share.getId())));
+    /** 공개 범위 upsert — 항목당 1행의 유일한 쓰기 경로. PRIVATE 행도 남긴다(답글 보존). */
+    @PutMapping
+    public ShareDetailResponse upsert(@AuthenticationPrincipal Long me,
+            @Valid @RequestBody UpsertShareRequest req) {
+        Share share = service.upsert(me, ShareItemType.valueOf(req.itemType()), req.itemId(),
+                ShareVisibility.valueOf(req.visibility()), req.groupId());
+        return toDetail(service.detail(me, share.getId()));
     }
 
-    @GetMapping
+    /** 내 공개 설정 목록 — 관리용 (비공개 전환 항목 제외). */
+    @GetMapping("/mine")
     public List<ShareSummaryResponse> mine(@AuthenticationPrincipal Long me) {
-        return service.myShares(me).stream()
+        return service.mine(me).stream()
                 .map(s -> new ShareSummaryResponse(s.shareId(), s.itemType(), s.itemId(),
-                        s.itemTitle(), s.createdAt(), s.targetUserIds(), s.replyCount()))
+                        s.itemTitle(), s.visibility(), s.groupId(), s.createdAt(),
+                        s.replyCount()))
                 .toList();
     }
 
-    @GetMapping("/received")
-    public List<ReceivedShareResponse> received(@AuthenticationPrincipal Long me,
+    /** 친구 피드 — 친구들의 "나에게 보이는" 공개 항목 통합 타임라인 (id desc 커서). */
+    @GetMapping("/feed")
+    public List<FeedItemResponse> feed(@AuthenticationPrincipal Long me,
             @RequestParam(required = false) Long cursor,
             @RequestParam(defaultValue = "20") int limit) {
-        return service.received(me, cursor, limit).stream()
-                .map(s -> new ReceivedShareResponse(s.shareId(), s.itemType(), s.itemId(),
+        return service.feed(me, cursor, limit).stream()
+                .map(s -> new FeedItemResponse(s.shareId(), s.itemType(), s.itemId(),
+                        s.itemTitle(), s.owner(), s.createdAt(), s.replyCount()))
+                .toList();
+    }
+
+    /** 친구 프로필용 — 그 친구의 공개 항목 중 나에게 보이는 것 (비친구 404). */
+    @GetMapping("/by/{userId}")
+    public List<FeedItemResponse> byOwner(@AuthenticationPrincipal Long me,
+            @PathVariable Long userId) {
+        return service.byOwner(me, userId).stream()
+                .map(s -> new FeedItemResponse(s.shareId(), s.itemType(), s.itemId(),
                         s.itemTitle(), s.owner(), s.createdAt(), s.replyCount()))
                 .toList();
     }
@@ -80,20 +93,6 @@ public class ShareController {
     public ShareDetailResponse detail(@AuthenticationPrincipal Long me,
             @PathVariable Long id) {
         return toDetail(service.detail(me, id));
-    }
-
-    @PatchMapping("/{id}/targets")
-    public ShareDetailResponse editTargets(@AuthenticationPrincipal Long me,
-            @PathVariable Long id, @RequestBody EditTargetsRequest req) {
-        service.editTargets(me, id, req.add(), req.remove());
-        return toDetail(service.detail(me, id));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@AuthenticationPrincipal Long me,
-            @PathVariable Long id) {
-        service.delete(me, id);
-        return ResponseEntity.noContent().build();
     }
 
     /** 답글 스레드 — 루트만 id > cursor 오름차순, children에 대댓글 임베드 (§3.11). */
@@ -110,7 +109,7 @@ public class ShareController {
             @PathVariable Long id, @RequestBody ReplyRequest req) {
         ShareReply reply = replyService.create(me, id, req.content(), req.parentId());
         return ResponseEntity.created(
-                URI.create("/api/shares/" + id + "/replies/" + reply.getId()))
+                java.net.URI.create("/api/shares/" + id + "/replies/" + reply.getId()))
                 .body(toReplyNode(replyService.nodeOf(reply)));
     }
 
@@ -164,16 +163,15 @@ public class ShareController {
             }
         };
         return new ShareDetailResponse(d.shareId(), d.itemType(), d.itemId(), item, d.owner(),
-                d.targetUserIds(), d.createdAt(), d.replyCount());
+                d.visibility(), d.groupId(), d.createdAt(), d.replyCount());
     }
 
-    public record CreateShareRequest(
+    /** groupId는 visibility=GROUP일 때만 필수 — 검증은 서비스(VISIBILITY-INVALID). */
+    public record UpsertShareRequest(
             @NotNull @Pattern(regexp = "DIARY|EVENT") String itemType,
             @NotNull Long itemId,
-            List<Long> targetUserIds) {
-    }
-
-    public record EditTargetsRequest(List<Long> add, List<Long> remove) {
+            @NotNull @Pattern(regexp = "PRIVATE|FRIENDS|GROUP|PUBLIC") String visibility,
+            Long groupId) {
     }
 
     /** parentId는 PATCH에선 무시된다 — 생성·수정 요청을 하나의 record로 받는다. */
@@ -187,21 +185,18 @@ public class ShareController {
     }
 
     public record ShareSummaryResponse(Long shareId, ShareItemType itemType, Long itemId,
-            String itemTitle, LocalDateTime createdAt, List<Long> targetUserIds,
-            long replyCount) {
+            String itemTitle, ShareVisibility visibility, Long groupId,
+            LocalDateTime createdAt, long replyCount) {
     }
 
-    public record ReceivedShareResponse(Long shareId, ShareItemType itemType, Long itemId,
+    public record FeedItemResponse(Long shareId, ShareItemType itemType, Long itemId,
             String itemTitle, UserRef owner, LocalDateTime createdAt, long replyCount) {
     }
 
     /** item은 itemType별 DiaryItem|EventItem — 계약 §3.11 임베드 규칙. */
     public record ShareDetailResponse(Long shareId, ShareItemType itemType, Long itemId,
-            Object item, UserRef owner,
-            // 대상 열람자에게는 null이 아니라 키 자체를 생략한다 — §3.11 "포함하지 않는다"
-            @JsonInclude(JsonInclude.Include.NON_NULL) List<Long> targetUserIds,
-            LocalDateTime createdAt,
-            long replyCount) {
+            Object item, UserRef owner, ShareVisibility visibility, Long groupId,
+            LocalDateTime createdAt, long replyCount) {
     }
 
     public record DiaryItem(LocalDate date, String title, String content, String mood,

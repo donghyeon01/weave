@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,8 +53,10 @@ class ShareApiTest {
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM share_replies");
-        jdbc.update("DELETE FROM share_targets");
         jdbc.update("DELETE FROM shares");
+        jdbc.update("DELETE FROM feed_subscriptions");
+        jdbc.update("DELETE FROM friend_group_members");
+        jdbc.update("DELETE FROM friend_groups");
         jdbc.update("DELETE FROM notifications");
         jdbc.update("DELETE FROM diary_photos");
         jdbc.update("DELETE FROM diaries");
@@ -81,8 +84,8 @@ class ShareApiTest {
         return jdbc.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, email);
     }
 
-    private MvcResult createShare(String token, String body) throws Exception {
-        return mvc.perform(post("/api/shares")
+    private MvcResult putShare(String token, String body) throws Exception {
+        return mvc.perform(put("/api/shares")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andReturn();
@@ -93,83 +96,80 @@ class ShareApiTest {
                 .<Number>read(r.getResponse().getContentAsString(), "$.shareId").longValue();
     }
 
-    @Test
-    void 공유_생성은_201과_ShareDetail을_반환한다() throws Exception {
-        MvcResult r = createShare(meToken,
-                "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
-                        + ",\"targetUserIds\":[" + f1Id + "]}");
+    private String friendsBody() {
+        return "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
+                + ",\"visibility\":\"FRIENDS\"}";
+    }
 
-        assertThat(r.getResponse().getStatus()).isEqualTo(201);
-        assertThat(r.getResponse().getHeader("Location")).startsWith("/api/shares/");
+    @Test
+    void upsert는_200과_ShareDetail을_반환하고_같은항목_재설정은_갱신이다() throws Exception {
+        MvcResult r = putShare(meToken, friendsBody());
+
+        assertThat(r.getResponse().getStatus()).isEqualTo(200);
         Long shareId = shareIdOf(r);
         mvc.perform(get("/api/shares/" + shareId)
                         .header("Authorization", "Bearer " + meToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.itemType").value("DIARY"))
+                .andExpect(jsonPath("$.visibility").value("FRIENDS"))
                 .andExpect(jsonPath("$.item.date").value("2027-05-20"))
                 .andExpect(jsonPath("$.item.title").value("제주 여행"))
                 .andExpect(jsonPath("$.item.mood").value("happy"))
                 .andExpect(jsonPath("$.owner.nickname").value("나"))
-                .andExpect(jsonPath("$.targetUserIds[0]").value(f1Id))
                 .andExpect(jsonPath("$.replyCount").value(0));
+
+        // 같은 항목 PRIVATE 재설정 — 같은 행, 충돌이 아니라 갱신
+        MvcResult r2 = putShare(meToken,
+                "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
+                        + ",\"visibility\":\"PRIVATE\"}");
+        assertThat(r2.getResponse().getStatus()).isEqualTo(200);
+        assertThat(shareIdOf(r2)).isEqualTo(shareId);
     }
 
     @Test
-    void 생성_에러는_계약_코드로_매핑된다() throws Exception {
-        // 비친구 대상 → 400 SHARE-TARGET-INVALID
-        createShare(meToken, "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
-                        + ",\"targetUserIds\":[" + outsiderId + "]}")
-                .getResponse().getStatus();
-        mvc.perform(post("/api/shares")
-                        .header("Authorization", "Bearer " + meToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
-                                + ",\"targetUserIds\":[" + outsiderId + "]}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("SHARE-TARGET-INVALID"));
-
+    void upsert_에러는_계약_코드로_매핑된다() throws Exception {
         // 타인 항목 → 404 SHARE-ITEM-NOT-FOUND
         jdbc.update("INSERT INTO diaries(user_id,date,title,content) "
                 + "VALUES (?,'2027-05-21','남의','본문')", f1Id);
         Long othersDiary = jdbc.queryForObject(
                 "SELECT id FROM diaries WHERE user_id=?", Long.class, f1Id);
-        mvc.perform(post("/api/shares")
+        mvc.perform(put("/api/shares")
                         .header("Authorization", "Bearer " + meToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"itemType\":\"DIARY\",\"itemId\":" + othersDiary
-                                + ",\"targetUserIds\":[" + f1Id + "]}"))
+                                + ",\"visibility\":\"FRIENDS\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SHARE-ITEM-NOT-FOUND"));
 
-        // 잘못된 itemType → 400
-        mvc.perform(post("/api/shares")
+        // GROUP인데 groupId 누락 → 400 VISIBILITY-INVALID
+        mvc.perform(put("/api/shares")
                         .header("Authorization", "Bearer " + meToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"itemType\":\"TASK\",\"itemId\":1,\"targetUserIds\":["
-                                + f1Id + "]}"))
+                        .content("{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
+                                + ",\"visibility\":\"GROUP\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VISIBILITY-INVALID"));
+
+        // 잘못된 itemType·visibility → 400 (bean validation)
+        mvc.perform(put("/api/shares")
+                        .header("Authorization", "Bearer " + meToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemType\":\"TASK\",\"itemId\":1,"
+                                + "\"visibility\":\"FRIENDS\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/shares")
+                        .header("Authorization", "Bearer " + meToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
+                                + ",\"visibility\":\"EVERYONE\"}"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void 중복_공유는_409다() throws Exception {
-        String body = "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
-                + ",\"targetUserIds\":[" + f1Id + "]}";
-        assertThat(createShare(meToken, body).getResponse().getStatus()).isEqualTo(201);
+    void 피드와_상세는_범위내_친구에게만_보인다() throws Exception {
+        Long shareId = shareIdOf(putShare(meToken, friendsBody()));
 
-        mvc.perform(post("/api/shares")
-                        .header("Authorization", "Bearer " + meToken)
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("SHARE-ALREADY-EXISTS"));
-    }
-
-    @Test
-    void 받은_피드와_상세는_대상에게만_보인다() throws Exception {
-        Long shareId = shareIdOf(createShare(meToken,
-                "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
-                        + ",\"targetUserIds\":[" + f1Id + "]}"));
-
-        mvc.perform(get("/api/shares/received")
+        mvc.perform(get("/api/shares/feed")
                         .header("Authorization", "Bearer " + f1Token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
@@ -177,79 +177,62 @@ class ShareApiTest {
                 .andExpect(jsonPath("$[0].itemTitle").value("제주 여행"))
                 .andExpect(jsonPath("$[0].owner.nickname").value("나"));
 
-        // 대상 상세 — targetUserIds는 소유자에게만 노출
         mvc.perform(get("/api/shares/" + shareId)
                         .header("Authorization", "Bearer " + f1Token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.targetUserIds").doesNotExist());
+                .andExpect(status().isOk());
 
-        // 비대상은 피드 비어있고 상세 404
-        mvc.perform(get("/api/shares/received")
+        // 비친구는 피드 비어있고 상세 404
+        mvc.perform(get("/api/shares/feed")
                         .header("Authorization", "Bearer " + outsiderToken))
                 .andExpect(jsonPath("$.length()").value(0));
         mvc.perform(get("/api/shares/" + shareId)
                         .header("Authorization", "Bearer " + outsiderToken))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("SHARE-NOT-AUDIENCE"));
+                .andExpect(jsonPath("$.code").value("SHARE-NOT-FOUND"));
 
         // limit 범위 초과는 400
-        mvc.perform(get("/api/shares/received?limit=51")
+        mvc.perform(get("/api/shares/feed?limit=51")
                         .header("Authorization", "Bearer " + f1Token))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void 대상편집과_해제는_소유자만_가능하다() throws Exception {
-        Long shareId = shareIdOf(createShare(meToken,
-                "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
-                        + ",\"targetUserIds\":[" + f1Id + "]}"));
+    void 친구별_목록은_비친구에게_404다() throws Exception {
+        putShare(meToken, friendsBody());
 
-        // add → 200 + targetUserIds 갱신
-        mvc.perform(patch("/api/shares/" + shareId + "/targets")
-                        .header("Authorization", "Bearer " + meToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"add\":[" + f2Id + "]}"))
+        mvc.perform(get("/api/shares/by/" + meId)
+                        .header("Authorization", "Bearer " + f1Token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.targetUserIds.length()").value(2));
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].itemTitle").value("제주 여행"));
 
-        // 비소유자 편집·삭제는 404
-        mvc.perform(patch("/api/shares/" + shareId + "/targets")
-                        .header("Authorization", "Bearer " + f1Token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"add\":[" + f2Id + "]}"))
+        mvc.perform(get("/api/shares/by/" + meId)
+                        .header("Authorization", "Bearer " + outsiderToken))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SHARE-NOT-FOUND"));
-        mvc.perform(delete("/api/shares/" + shareId)
-                        .header("Authorization", "Bearer " + f1Token))
-                .andExpect(status().isNotFound());
-
-        // 소유자 삭제 → 204, 이후 전원 404
-        mvc.perform(delete("/api/shares/" + shareId)
-                        .header("Authorization", "Bearer " + meToken))
-                .andExpect(status().isNoContent());
-        mvc.perform(get("/api/shares/" + shareId)
-                        .header("Authorization", "Bearer " + f1Token))
-                .andExpect(status().isNotFound());
     }
 
     @Test
-    void 내_공유_목록은_대상과_제목을_보여준다() throws Exception {
-        createShare(meToken, "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
-                + ",\"targetUserIds\":[" + f1Id + "," + f2Id + "]}");
+    void 내_공개설정_목록은_범위와_제목을_보여주고_PRIVATE는_제외한다() throws Exception {
+        putShare(meToken, friendsBody());
 
-        mvc.perform(get("/api/shares")
+        mvc.perform(get("/api/shares/mine")
                         .header("Authorization", "Bearer " + meToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].itemTitle").value("제주 여행"))
-                .andExpect(jsonPath("$[0].targetUserIds.length()").value(2));
+                .andExpect(jsonPath("$[0].visibility").value("FRIENDS"));
+
+        putShare(meToken, "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
+                + ",\"visibility\":\"PRIVATE\"}");
+        mvc.perform(get("/api/shares/mine")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
     void 답글_작성은_201과_ReplyNode를_반환하고_스레드를_조회한다() throws Exception {
-        Long shareId = shareIdOf(createShare(meToken,
-                "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
-                        + ",\"targetUserIds\":[" + f1Id + "]}"));
+        Long shareId = shareIdOf(putShare(meToken, friendsBody()));
 
         MvcResult r = mvc.perform(post("/api/shares/" + shareId + "/replies")
                         .header("Authorization", "Bearer " + f1Token)
@@ -265,7 +248,6 @@ class ShareApiTest {
         Long replyId = com.jayway.jsonpath.JsonPath
                 .<Number>read(r.getResponse().getContentAsString(), "$.id").longValue();
 
-        // 대댓글 → 목록에서 루트 children에 임베드
         mvc.perform(post("/api/shares/" + shareId + "/replies")
                         .header("Authorization", "Bearer " + meToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -279,7 +261,6 @@ class ShareApiTest {
                 .andExpect(jsonPath("$[0].children.length()").value(1))
                 .andExpect(jsonPath("$[0].children[0].content").value("고마워"));
 
-        // 상세 replyCount 반영
         mvc.perform(get("/api/shares/" + shareId)
                         .header("Authorization", "Bearer " + meToken))
                 .andExpect(jsonPath("$.replyCount").value(2));
@@ -287,17 +268,15 @@ class ShareApiTest {
 
     @Test
     void 답글_에러는_계약_코드로_매핑된다() throws Exception {
-        Long shareId = shareIdOf(createShare(meToken,
-                "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
-                        + ",\"targetUserIds\":[" + f1Id + "]}"));
+        Long shareId = shareIdOf(putShare(meToken, friendsBody()));
 
-        // 비열람자 작성·조회 → 404 SHARE-NOT-AUDIENCE
+        // 비열람자 작성·조회 → 404 SHARE-NOT-FOUND
         mvc.perform(post("/api/shares/" + shareId + "/replies")
                         .header("Authorization", "Bearer " + outsiderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"x\"}"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("SHARE-NOT-AUDIENCE"));
+                .andExpect(jsonPath("$.code").value("SHARE-NOT-FOUND"));
         mvc.perform(get("/api/shares/" + shareId + "/replies")
                         .header("Authorization", "Bearer " + outsiderToken))
                 .andExpect(status().isNotFound());
@@ -326,9 +305,7 @@ class ShareApiTest {
 
     @Test
     void 답글_수정과_삭제는_작성자_또는_소유자만_가능하다() throws Exception {
-        Long shareId = shareIdOf(createShare(meToken,
-                "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
-                        + ",\"targetUserIds\":[" + f1Id + "," + f2Id + "]}"));
+        Long shareId = shareIdOf(putShare(meToken, friendsBody()));
         String f2Token = jwtProvider.createAccessToken(f2Id, List.of("ROLE_USER"));
         MvcResult r = mvc.perform(post("/api/shares/" + shareId + "/replies")
                         .header("Authorization", "Bearer " + f1Token)
@@ -373,16 +350,14 @@ class ShareApiTest {
     }
 
     @Test
-    void 사진_엔드포인트는_비대상에게_404다() throws Exception {
-        Long shareId = shareIdOf(createShare(meToken,
-                "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
-                        + ",\"targetUserIds\":[" + f1Id + "]}"));
+    void 사진_엔드포인트는_비열람자에게_404다() throws Exception {
+        Long shareId = shareIdOf(putShare(meToken, friendsBody()));
 
         mvc.perform(get("/api/shares/" + shareId + "/photos/1")
                         .header("Authorization", "Bearer " + outsiderToken))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("SHARE-NOT-AUDIENCE"));
-        // 대상이지만 사진 미존재 → SHARE-ITEM-NOT-FOUND
+                .andExpect(jsonPath("$.code").value("SHARE-NOT-FOUND"));
+        // 열람자지만 사진 미존재 → SHARE-ITEM-NOT-FOUND
         mvc.perform(get("/api/shares/" + shareId + "/photos/999999")
                         .header("Authorization", "Bearer " + f1Token))
                 .andExpect(status().isNotFound())

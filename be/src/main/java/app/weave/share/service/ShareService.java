@@ -9,38 +9,30 @@ import app.weave.common.port.EventAccess;
 import app.weave.common.port.SharedDiary;
 import app.weave.common.port.SharedEvent;
 import app.weave.common.port.SharedPhotoBytes;
+import app.weave.friend.service.FriendGroupService;
 import app.weave.friend.service.FriendService;
-import app.weave.notification.service.NotificationPayload;
 import app.weave.notification.service.NotificationPayload.UserRef;
-import app.weave.notification.service.NotificationPublisher;
 import app.weave.share.domain.Share;
 import app.weave.share.domain.ShareItemType;
 import app.weave.share.domain.ShareReplyRepository;
 import app.weave.share.domain.ShareRepository;
-import app.weave.share.domain.ShareTarget;
-import app.weave.share.domain.ShareTargetRepository;
+import app.weave.share.domain.ShareVisibility;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 일기·일정 공유 — 가시성은 share_targets 행 ∧ 실시간 ACCEPTED 친구 이중 검증.
- * friend→share 역방향 호출이 순환이라 친구 해제 통지 경로가 없으므로, 읽기 경로에서
- * 무효 대상 행을 지연 정리(lazy purge)해 회수를 영속화한다 — 재친구해도 미부활.
- * 지연 정리는 쓰기라 조회 경로도 readOnly가 아닌 트랜잭션으로 연다.
+ * 일기·일정 공개 설정 — "누구에게 보내는" 게 아니라 항목의 공개 범위를 열어두는 모델.
+ * 항목당 shares 1행, PUT upsert가 유일한 쓰기 경로다. 열람 판정(canView)은 FeedService에
+ * 위임하고, 대상 행이라는 개념이 없어 지연 정리도 없다 — 친구 해제·복원은 읽기 시점
+ * friendship 검증에 자동으로 따른다.
  * share는 diary·event 엔터티를 모른다 — 항목 조회는 common.port만 경유한다.
  */
 @Service
@@ -48,152 +40,135 @@ public class ShareService {
 
     private static final int MAX_LIMIT = 50;
 
-    /** 내 공유 목록 항목 — api-contract §3.11 ShareSummary. */
+    /** 내 공개 설정 목록 항목 — api-contract §3.11 ShareSummary. */
     public record ShareView(Long shareId, ShareItemType itemType, Long itemId,
-            String itemTitle, LocalDateTime createdAt, List<Long> targetUserIds,
-            long replyCount) {
+            String itemTitle, ShareVisibility visibility, Long groupId,
+            LocalDateTime createdAt, long replyCount) {
     }
 
-    /** 받은 공유 피드 항목 — api-contract §3.11 ReceivedShare. */
-    public record ReceivedShare(Long shareId, ShareItemType itemType, Long itemId,
+    /** 친구 피드 항목 — api-contract §3.11 FeedItem. */
+    public record FeedItem(Long shareId, ShareItemType itemType, Long itemId,
             String itemTitle, UserRef owner, LocalDateTime createdAt, long replyCount) {
     }
 
-    /**
-     * 상세 — item은 SharedDiary|SharedEvent 원본 레코드 (DTO 매핑은 컨트롤러).
-     * targetUserIds는 소유자에게만 채운다 — 대상 열람자에게는 null.
-     */
+    /** 상세 — item은 SharedDiary|SharedEvent 원본 레코드 (DTO 매핑은 컨트롤러). */
     public record ShareDetail(Long shareId, ShareItemType itemType, Long itemId, Object item,
-            UserRef owner, List<Long> targetUserIds, LocalDateTime createdAt,
+            UserRef owner, ShareVisibility visibility, Long groupId, LocalDateTime createdAt,
             long replyCount) {
     }
 
     private final ShareRepository shareRepository;
-    private final ShareTargetRepository targetRepository;
     private final ShareReplyRepository replyRepository;
     private final DiaryAccess diaryAccess;
     private final EventAccess eventAccess;
     private final FriendService friendService;
-    private final NotificationPublisher publisher;
+    private final FriendGroupService groupService;
+    private final FeedService feedService;
     private final UserRepository userRepository;
-    private final TransactionTemplate purgeTx;
 
-    public ShareService(ShareRepository shareRepository, ShareTargetRepository targetRepository,
-            ShareReplyRepository replyRepository, DiaryAccess diaryAccess,
-            EventAccess eventAccess, FriendService friendService,
-            NotificationPublisher publisher, UserRepository userRepository,
-            PlatformTransactionManager txManager) {
+    public ShareService(ShareRepository shareRepository, ShareReplyRepository replyRepository,
+            DiaryAccess diaryAccess, EventAccess eventAccess, FriendService friendService,
+            FriendGroupService groupService, FeedService feedService,
+            UserRepository userRepository) {
         this.shareRepository = shareRepository;
-        this.targetRepository = targetRepository;
         this.replyRepository = replyRepository;
         this.diaryAccess = diaryAccess;
         this.eventAccess = eventAccess;
         this.friendService = friendService;
-        this.publisher = publisher;
+        this.groupService = groupService;
+        this.feedService = feedService;
         this.userRepository = userRepository;
-        // 지연 정리 삭제는 호출 트랜잭션 롤백(BusinessException)과 무관하게
-        // 커밋돼야 회수가 영속화된다 — 별도 REQUIRES_NEW 트랜잭션으로 분리
-        this.purgeTx = new TransactionTemplate(txManager);
-        this.purgeTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     /**
-     * 공유 생성 — 항목은 본인 소유만(미존재·타인 소유 통합 404), 대상은 전원 ACCEPTED 친구.
-     * uk_shares_item 충돌은 409. 저장 후 대상 전원에게 SHARED_ITEM을 발행한다.
+     * 공개 범위 upsert — 유일한 쓰기 경로. 항목은 본인 소유만(미존재·타인 소유 통합 404).
+     * GROUP이면 groupId 필수·본인 그룹만, 나머지 범위에 groupId가 오면 VISIBILITY-INVALID.
+     * 저장 후 "이번 설정으로 새로 보이게 된" 구독자에게만 SHARED_ITEM을 발행한다.
      */
     @Transactional
-    public Share create(Long me, ShareItemType type, Long itemId, List<Long> targetUserIds) {
+    public Share upsert(Long me, ShareItemType type, Long itemId, ShareVisibility visibility,
+            Long groupId) {
         // title은 Diary에서 nullable — map 체인으로 빼면 null title이 "항목 부재"로 오인된다
         String itemTitle = titleOf(itemOf(me, type, itemId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SHARE_ITEM_NOT_FOUND)));
 
-        if (targetUserIds == null || targetUserIds.isEmpty() || targetUserIds.contains(me)) {
-            throw new BusinessException(ErrorCode.SHARE_TARGET_INVALID);
-        }
-        List<Long> targets = new ArrayList<>(new LinkedHashSet<>(targetUserIds));
-        if (!friendService.acceptedFriendIds(me).containsAll(targets)) {
-            throw new BusinessException(ErrorCode.SHARE_TARGET_INVALID);
+        if (visibility == ShareVisibility.GROUP) {
+            if (groupId == null || !groupService.ownsGroup(me, groupId)) {
+                throw new BusinessException(ErrorCode.VISIBILITY_INVALID);
+            }
+        } else if (groupId != null) {
+            throw new BusinessException(ErrorCode.VISIBILITY_INVALID);
         }
 
-        if (shareRepository.existsByOwnerIdAndItemTypeAndItemId(me, type, itemId)) {
-            throw new BusinessException(ErrorCode.SHARE_ALREADY_EXISTS);
-        }
-        Share saved;
-        try {
-            // 동시 생성 경합의 UK 충돌도 409로 매핑 — saveAndFlush로 이 트랜잭션 안에서 잡는다
-            saved = shareRepository.saveAndFlush(new Share(me, type, itemId));
-        } catch (DataIntegrityViolationException e) {
-            throw new BusinessException(ErrorCode.SHARE_ALREADY_EXISTS);
-        }
-        targetRepository.saveAll(
-                targets.stream().map(uid -> new ShareTarget(saved.getId(), uid)).toList());
+        Optional<Share> existing =
+                shareRepository.findByOwnerIdAndItemTypeAndItemId(me, type, itemId);
+        // "새로 보이게 된 구독자" 판정의 before — 기존 설정 상태에서 보이던 구독자
+        Set<Long> previouslyVisible = existing
+                .map(s -> feedService.visibleSubscribers(me, s.getVisibility(), s.getGroupId()))
+                .orElse(Set.of());
 
-        UserRef owner = ownerRef(me);
-        for (Long uid : targets) {
-            publisher.publish(uid, new NotificationPayload.SharedItem(saved.getId(),
-                    type.name(), itemId, owner, itemTitle == null ? "" : itemTitle));
-        }
+        Share saved = existing
+                .map(s -> {
+                    s.updateVisibility(visibility, groupId);
+                    return s;
+                })
+                .orElseGet(() -> shareRepository.save(
+                        new Share(me, type, itemId, visibility, groupId)));
+
+        feedService.notifyNewlyVisible(saved, itemTitle, previouslyVisible);
         return saved;
     }
 
-    /**
-     * 내 공유 목록 — 원본 삭제 항목은 제외. 친구 해제로 무효화된 대상 행은 지연 정리한다.
-     */
-    @Transactional
-    public List<ShareView> myShares(Long me) {
-        Set<Long> friendIds = friendService.acceptedFriendIds(me);
-        List<Share> shares = shareRepository.findByOwnerIdOrderByCreatedAtDesc(me);
+    /** 내 공개 설정 목록 — 관리용이라 비공개 전환(=열어둠 해제) 항목은 제외한다. 원본 삭제도 비노출. */
+    @Transactional(readOnly = true)
+    public List<ShareView> mine(Long me) {
+        List<Share> shares = shareRepository.findByOwnerIdOrderByIdDesc(me).stream()
+                .filter(s -> s.getVisibility() != ShareVisibility.PRIVATE).toList();
         Map<Long, Long> replyCounts = replyCountsOf(
                 shares.stream().map(Share::getId).toList());
         List<ShareView> result = new ArrayList<>();
         for (Share share : shares) {
-            List<Long> validTargets = validTargetsOrPurge(share.getId(), friendIds);
             Optional<Object> item = itemOf(share.getOwnerId(), share.getItemType(),
                     share.getItemId());
             if (item.isEmpty()) {
                 continue; // 원본 삭제 — 비노출
             }
             result.add(new ShareView(share.getId(), share.getItemType(), share.getItemId(),
-                    titleOf(item.get()), share.getCreatedAt(), validTargets,
-                    replyCounts.getOrDefault(share.getId(), 0L)));
+                    titleOf(item.get()), share.getVisibility(), share.getGroupId(),
+                    share.getCreatedAt(), replyCounts.getOrDefault(share.getId(), 0L)));
         }
         return result;
     }
 
     /**
-     * 받은 공유 피드 — share.id desc, id < cursor 커서. owner가 더 이상 친구가 아닌
-     * 대상 행은 지연 정리 후 제외하고, 원본 삭제 항목도 제외한다.
+     * 친구 피드 — 내 친구들의 "나에게 보이는" 공개 항목 통합 타임라인.
+     * share.id desc, id < cursor 커서. 후보는 비PRIVATE만 긁고 canView로 재검증한다
+     * (GROUP 멤버십·해제된 친구는 여기서 걸린다). 원본 삭제 항목은 제외.
      */
-    @Transactional
-    public List<ReceivedShare> received(Long me, Long cursor, int limit) {
+    @Transactional(readOnly = true)
+    public List<FeedItem> feed(Long me, Long cursor, int limit) {
         if (limit < 1 || limit > MAX_LIMIT) {
             throw new BusinessException(ErrorCode.COMMON_VALIDATION);
         }
         Set<Long> friendIds = friendService.acceptedFriendIds(me);
-        List<Long> shareIds = targetRepository.findByUserId(me).stream()
-                .map(ShareTarget::getShareId)
-                .filter(id -> cursor == null || id < cursor)
-                .sorted(Comparator.reverseOrder())
-                .toList();
-        Map<Long, Share> shares = shareRepository.findAllById(shareIds).stream()
-                .collect(Collectors.toMap(Share::getId, Function.identity()));
-        Map<Long, Long> replyCounts = replyCountsOf(shareIds);
+        if (friendIds.isEmpty()) {
+            return List.of();
+        }
+        List<Share> candidates = shareRepository
+                .findByOwnerIdInAndVisibilityNotAndIdLessThanOrderByIdDesc(friendIds,
+                        ShareVisibility.PRIVATE, cursor == null ? Long.MAX_VALUE : cursor);
+        Map<Long, Long> replyCounts = replyCountsOf(
+                candidates.stream().map(Share::getId).toList());
         Map<Long, User> owners = userRepository.findAllById(
-                shares.values().stream().map(Share::getOwnerId).distinct().toList())
+                candidates.stream().map(Share::getOwnerId).distinct().toList())
                 .stream().collect(Collectors.toMap(User::getId, Function.identity()));
 
-        List<ReceivedShare> result = new ArrayList<>();
-        for (Long shareId : shareIds) {
+        List<FeedItem> result = new ArrayList<>();
+        for (Share share : candidates) {
             if (result.size() >= limit) {
                 break;
             }
-            Share share = shares.get(shareId);
-            if (share == null) {
-                continue;
-            }
-            if (!friendIds.contains(share.getOwnerId())) {
-                // 친구 해제 — 대상 행을 삭제해 회수를 영속화하고 피드에서 제외
-                targetRepository.deleteByShareIdAndUserId(shareId, me);
+            if (!feedService.canView(me, share)) {
                 continue;
             }
             Optional<Object> item = itemOf(share.getOwnerId(), share.getItemType(),
@@ -202,91 +177,57 @@ public class ShareService {
                 continue; // 원본 삭제 — 비노출
             }
             User owner = owners.get(share.getOwnerId());
-            result.add(new ReceivedShare(share.getId(), share.getItemType(),
-                    share.getItemId(), titleOf(item.get()),
+            result.add(new FeedItem(share.getId(), share.getItemType(), share.getItemId(),
+                    titleOf(item.get()),
                     new UserRef(share.getOwnerId(), owner != null ? owner.getNickname() : null),
-                    share.getCreatedAt(),
-                    replyCounts.getOrDefault(shareId, 0L)));
+                    share.getCreatedAt(), replyCounts.getOrDefault(share.getId(), 0L)));
         }
         return result;
     }
 
-    /** 상세 — 소유자·유효 대상만. 원본 삭제 시 404 (SHARE-ITEM-NOT-FOUND). */
-    @Transactional
+    /** 친구 프로필용 공개 항목 — 비친구는 존재 비노출 404. 보이는 것만 canView로 거른다. */
+    @Transactional(readOnly = true)
+    public List<FeedItem> byOwner(Long me, Long userId) {
+        if (!friendService.isFriend(me, userId)) {
+            throw new BusinessException(ErrorCode.SHARE_NOT_FOUND);
+        }
+        List<Share> shares = shareRepository.findByOwnerIdOrderByIdDesc(userId);
+        Map<Long, Long> replyCounts = replyCountsOf(
+                shares.stream().map(Share::getId).toList());
+        UserRef owner = ownerRef(userId);
+        List<FeedItem> result = new ArrayList<>();
+        for (Share share : shares) {
+            if (!feedService.canView(me, share)) {
+                continue;
+            }
+            Optional<Object> item = itemOf(share.getOwnerId(), share.getItemType(),
+                    share.getItemId());
+            if (item.isEmpty()) {
+                continue;
+            }
+            result.add(new FeedItem(share.getId(), share.getItemType(), share.getItemId(),
+                    titleOf(item.get()), owner, share.getCreatedAt(),
+                    replyCounts.getOrDefault(share.getId(), 0L)));
+        }
+        return result;
+    }
+
+    /** 상세 — 소유자·canView 통과자만. 원본 삭제 시 404 (SHARE-ITEM-NOT-FOUND). */
+    @Transactional(readOnly = true)
     public ShareDetail detail(Long me, Long shareId) {
-        Share share = requireAudience(me, shareId);
+        Share share = requireViewer(me, shareId);
         Object item = itemOf(share.getOwnerId(), share.getItemType(), share.getItemId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.SHARE_ITEM_NOT_FOUND));
-        List<Long> targetUserIds = share.getOwnerId().equals(me)
-                ? validTargetsOrPurge(shareId, friendService.acceptedFriendIds(me))
-                : null;
         return new ShareDetail(share.getId(), share.getItemType(), share.getItemId(), item,
-                ownerRef(share.getOwnerId()), targetUserIds, share.getCreatedAt(),
+                ownerRef(share.getOwnerId()), share.getVisibility(), share.getGroupId(),
+                share.getCreatedAt(),
                 replyRepository.countByShareIdAndDeletedAtIsNull(shareId));
     }
 
-    /**
-     * 대상 편집 — 소유자만(비소유자는 SHARE-NOT-FOUND). add는 친구 검증 후
-     * 신규 대상만 SHARED_ITEM 발행, remove는 행 삭제로 즉시 비가시.
-     */
-    @Transactional
-    public void editTargets(Long me, Long shareId, List<Long> add, List<Long> remove) {
-        Share share = shareRepository.findById(shareId)
-                .filter(s -> s.getOwnerId().equals(me))
-                .orElseThrow(() -> new BusinessException(ErrorCode.SHARE_NOT_FOUND));
-
-        Set<Long> friendIds = friendService.acceptedFriendIds(me);
-        List<Long> requested = add == null
-                ? List.of() : new ArrayList<>(new LinkedHashSet<>(add));
-        if (!requested.isEmpty()) {
-            if (requested.contains(me) || !friendIds.containsAll(requested)) {
-                throw new BusinessException(ErrorCode.SHARE_TARGET_INVALID);
-            }
-            // 원본이 삭제된 공유에 대상을 얹으면 존재하지 않는 항목의 알림이 나간다 — 생성과 같은 404로 차단
-            itemOf(me, share.getItemType(), share.getItemId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.SHARE_ITEM_NOT_FOUND));
-        }
-
-        List<Long> current = validTargetsOrPurge(shareId, friendIds);
-
-        if (!requested.isEmpty()) {
-            List<Long> newTargets = requested.stream()
-                    .filter(uid -> !current.contains(uid)).toList();
-            if (!newTargets.isEmpty()) {
-                targetRepository.saveAll(newTargets.stream()
-                        .map(uid -> new ShareTarget(shareId, uid)).toList());
-                String itemTitle = itemOf(me, share.getItemType(), share.getItemId())
-                        .map(this::titleOf).orElse("");
-                UserRef owner = ownerRef(me);
-                for (Long uid : newTargets) {
-                    publisher.publish(uid, new NotificationPayload.SharedItem(shareId,
-                            share.getItemType().name(), share.getItemId(), owner,
-                            itemTitle == null ? "" : itemTitle));
-                }
-            }
-        }
-
-        if (remove != null && !remove.isEmpty()) {
-            List<Long> removing = remove.stream().filter(current::contains).toList();
-            if (!removing.isEmpty()) {
-                targetRepository.deleteByShareIdAndUserIdIn(shareId, removing);
-            }
-        }
-    }
-
-    /** 공유 해제 — 소유자만. targets·replies는 FK CASCADE 연쇄 삭제. */
-    @Transactional
-    public void delete(Long me, Long shareId) {
-        Share share = shareRepository.findById(shareId)
-                .filter(s -> s.getOwnerId().equals(me))
-                .orElseThrow(() -> new BusinessException(ErrorCode.SHARE_NOT_FOUND));
-        shareRepository.delete(share);
-    }
-
     /** 공유 일기 사진 — 열람자만, DIARY 공유만. 사진 미존재·EVENT 공유는 통합 404. */
-    @Transactional
+    @Transactional(readOnly = true)
     public SharedPhotoBytes photo(Long me, Long shareId, Long photoId) {
-        Share share = requireAudience(me, shareId);
+        Share share = requireViewer(me, shareId);
         if (share.getItemType() != ShareItemType.DIARY) {
             throw new BusinessException(ErrorCode.SHARE_ITEM_NOT_FOUND);
         }
@@ -296,27 +237,16 @@ public class ShareService {
 
     /**
      * 열람자 검증 — ReplyService·photo·detail 공용.
-     * 소유자 통과 / 대상 행 ∧ 현재 친구 통과 / 대상이지만 비친구면 지연 정리 후
-     * SHARE-NOT-AUDIENCE / 대상 행 자체가 없으면 SHARE-NOT-AUDIENCE.
+     * 소유자 통과 / canView 통과 / 그 외는 행 없음·비열람 통합 SHARE-NOT-FOUND.
      */
-    @Transactional
-    public Share requireAudience(Long me, Long shareId) {
+    @Transactional(readOnly = true)
+    public Share requireViewer(Long me, Long shareId) {
         Share share = shareRepository.findById(shareId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SHARE_NOT_FOUND));
-        if (share.getOwnerId().equals(me)) {
+        if (feedService.canView(me, share)) {
             return share;
         }
-        Optional<ShareTarget> target = targetRepository.findByShareIdAndUserId(shareId, me);
-        if (target.isPresent() && friendService.isFriend(me, share.getOwnerId())) {
-            return share;
-        }
-        if (target.isPresent()) {
-            // 친구 해제로 무효화된 대상 행 — 삭제해 회수를 영속화한다 (재친구 미부활).
-            // 이어서 던지는 예외가 호출 트랜잭션을 롤백시키므로 삭제는 REQUIRES_NEW로 커밋한다.
-            purgeTx.executeWithoutResult(
-                    tx -> targetRepository.deleteByShareIdAndUserId(shareId, me));
-        }
-        throw new BusinessException(ErrorCode.SHARE_NOT_AUDIENCE);
+        throw new BusinessException(ErrorCode.SHARE_NOT_FOUND);
     }
 
     /** owner 기준 포트 조회 — 미존재·타인 소유는 empty (share 입장에선 항목 부재와 동일). */
@@ -332,24 +262,6 @@ public class ShareService {
             return d.title();
         }
         return ((SharedEvent) item).title();
-    }
-
-    /**
-     * 현재 친구인 대상만 남기고 무효 행을 삭제한다 — 소유자 경로(myShares·detail·editTargets)
-     * 의 지연 정리. 반환값은 유효 대상 user_id 목록.
-     */
-    private List<Long> validTargetsOrPurge(Long shareId, Set<Long> friendIds) {
-        List<Long> stale = new ArrayList<>();
-        List<Long> valid = new ArrayList<>();
-        for (ShareTarget t : targetRepository.findByShareId(shareId)) {
-            (friendIds.contains(t.getUserId()) ? valid : stale).add(t.getUserId());
-        }
-        if (!stale.isEmpty()) {
-            // requireAudience와 같은 이유 — 이어지는 검증 예외가 정리를 롤백시키지 않도록 분리 커밋
-            purgeTx.executeWithoutResult(
-                    tx -> targetRepository.deleteByShareIdAndUserIdIn(shareId, stale));
-        }
-        return valid;
     }
 
     /** 공유 N개의 replyCount를 GROUP BY 1쿼리로 집계 — 목록 경로의 N+1 방지. */

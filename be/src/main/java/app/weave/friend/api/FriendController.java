@@ -1,6 +1,7 @@
 package app.weave.friend.api;
 
 import app.weave.common.port.EventRef;
+import app.weave.friend.service.FriendGroupService;
 import app.weave.friend.service.FriendService;
 import app.weave.friend.service.FriendService.FriendView;
 import jakarta.validation.Valid;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,9 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class FriendController {
 
     private final FriendService service;
+    private final FriendGroupService groupService;
 
-    public FriendController(FriendService service) {
+    public FriendController(FriendService service, FriendGroupService groupService) {
         this.service = service;
+        this.groupService = groupService;
     }
 
     @GetMapping
@@ -73,6 +77,21 @@ public class FriendController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@AuthenticationPrincipal Long me, @PathVariable Long id) {
         service.delete(me, id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 피드 알람 설정 — 친구만 가능 (비친구 400). 여기서 {userId}는 상대 사용자 id다. */
+    @PutMapping("/{userId}/feed-subscription")
+    public ResponseEntity<Void> subscribe(@AuthenticationPrincipal Long me,
+            @PathVariable Long userId) {
+        groupService.subscribe(me, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{userId}/feed-subscription")
+    public ResponseEntity<Void> unsubscribe(@AuthenticationPrincipal Long me,
+            @PathVariable Long userId) {
+        groupService.unsubscribe(me, userId);
         return ResponseEntity.noContent().build();
     }
 

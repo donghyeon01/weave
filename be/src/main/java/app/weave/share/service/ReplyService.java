@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 공유 답글 스레드 — 2단 상한(부모는 루트만), 삭제는 tombstone으로 자식을 보존한다.
- * 열람자 검증은 ShareService.requireAudience에 위임 — 대상 지연 정리 정책도 그대로 탄다.
+ * 열람자 검증은 ShareService.requireViewer에 위임 — 가시성 판정(canView)도 그대로 탄다.
  */
 @Service
 public class ReplyService {
@@ -69,7 +69,7 @@ public class ReplyService {
         if (limit < 1 || limit > MAX_LIMIT) {
             throw new BusinessException(ErrorCode.COMMON_VALIDATION);
         }
-        shareService.requireAudience(me, shareId);
+        shareService.requireViewer(me, shareId);
 
         List<ShareReply> roots = replyRepository
                 .findByShareIdAndParentIdIsNullAndIdGreaterThanOrderByIdAsc(shareId,
@@ -99,7 +99,7 @@ public class ReplyService {
      */
     @Transactional
     public ShareReply create(Long me, Long shareId, String content, Long parentId) {
-        Share share = shareService.requireAudience(me, shareId);
+        Share share = shareService.requireViewer(me, shareId);
         validateContent(content);
         if (parentId != null) {
             ShareReply parent = replyRepository.findByIdAndShareId(parentId, shareId)
@@ -121,7 +121,7 @@ public class ReplyService {
     /** 수정 — 작성자만. tombstone은 수정 불가(REPLY_NOT_FOUND), 타인은 REPLY_NOT_AUTHOR(404). */
     @Transactional
     public ShareReply update(Long me, Long shareId, Long replyId, String content) {
-        shareService.requireAudience(me, shareId);
+        shareService.requireViewer(me, shareId);
         ShareReply reply = replyRepository.findByIdAndShareId(replyId, shareId)
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.REPLY_NOT_FOUND));
@@ -137,7 +137,7 @@ public class ReplyService {
     /** 삭제 — 작성자 또는 공유 소유자. tombstone(deleted_at)으로 자식 스레드를 보존한다. */
     @Transactional
     public void delete(Long me, Long shareId, Long replyId) {
-        Share share = shareService.requireAudience(me, shareId);
+        Share share = shareService.requireViewer(me, shareId);
         ShareReply reply = replyRepository.findByIdAndShareId(replyId, shareId)
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.REPLY_NOT_FOUND));

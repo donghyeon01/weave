@@ -11,11 +11,12 @@ import app.weave.diary.domain.Diary.Mood;
 import app.weave.diary.domain.DiaryPhoto;
 import app.weave.diary.service.DiaryPhotoService;
 import app.weave.diary.service.DiaryService;
+import app.weave.friend.service.FriendGroupService;
 import app.weave.share.domain.Share;
 import app.weave.share.domain.ShareItemType;
 import app.weave.share.domain.ShareRepository;
-import app.weave.share.domain.ShareTargetRepository;
-import app.weave.share.service.ShareService.ReceivedShare;
+import app.weave.share.domain.ShareVisibility;
+import app.weave.share.service.ShareService.FeedItem;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
@@ -51,9 +52,9 @@ class ShareServiceTest {
     @Autowired
     ShareService shareService;
     @Autowired
-    ShareRepository shareRepository;
+    FriendGroupService groupService;
     @Autowired
-    ShareTargetRepository targetRepository;
+    ShareRepository shareRepository;
     @Autowired
     DiaryService diaryService;
     @Autowired
@@ -74,8 +75,10 @@ class ShareServiceTest {
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM share_replies");
-        jdbc.update("DELETE FROM share_targets");
         jdbc.update("DELETE FROM shares");
+        jdbc.update("DELETE FROM feed_subscriptions");
+        jdbc.update("DELETE FROM friend_group_members");
+        jdbc.update("DELETE FROM friend_groups");
         jdbc.update("DELETE FROM notifications");
         jdbc.update("DELETE FROM diary_photos");
         jdbc.update("DELETE FROM diaries");
@@ -115,16 +118,44 @@ class ShareServiceTest {
                 Integer.class, userId, type);
     }
 
+    private Share upsertFriends(Long itemId) {
+        return shareService.upsert(meId, ShareItemType.DIARY, itemId,
+                ShareVisibility.FRIENDS, null);
+    }
+
     @Test
-    void 생성하면_대상행과_알림이_저장된다() {
-        Share share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                List.of(f1Id, f2Id));
+    void upsert는_항목당_1행만_두고_범위를_전환한다() {
+        Share s1 = upsertFriends(diary.getId());
+        Share s2 = shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.PUBLIC, null);
+
+        assertThat(s2.getId()).isEqualTo(s1.getId());
+        assertThat(shareRepository.count()).isEqualTo(1);
+        assertThat(shareRepository.findById(s1.getId()).orElseThrow().getVisibility())
+                .isEqualTo(ShareVisibility.PUBLIC);
+    }
+
+    @Test
+    void PRIVATE_전환은_행과_답글을_남기고_열람만_차단하고_재공개하면_복원된다() {
+        Share share = upsertFriends(diary.getId());
+        jdbc.update("INSERT INTO share_replies(share_id,author_id,content) VALUES (?,?, '답글')",
+                share.getId(), f1Id);
+
+        shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.PRIVATE, null);
 
         assertThat(shareRepository.findById(share.getId())).isPresent();
-        assertThat(targetRepository.findByShareId(share.getId())).hasSize(2);
-        assertThat(notificationCount(f1Id, "SHARED_ITEM")).isEqualTo(1);
-        assertThat(notificationCount(f2Id, "SHARED_ITEM")).isEqualTo(1);
-        assertThat(notificationCount(meId, "SHARED_ITEM")).isEqualTo(0);
+        assertError(ErrorCode.SHARE_NOT_FOUND,
+                () -> shareService.detail(f1Id, share.getId()));
+        assertThat(shareService.feed(f1Id, null, 20)).isEmpty();
+        // PRIVATE 행은 내 관리 목록에서 제외
+        assertThat(shareService.mine(meId)).isEmpty();
+
+        // 재공개 — 답글·열람이 그대로 복원된다
+        shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.FRIENDS, null);
+        assertThat(shareService.detail(f1Id, share.getId()).replyCount()).isEqualTo(1);
+        assertThat(shareService.feed(f1Id, null, 20)).hasSize(1);
     }
 
     @Test
@@ -133,213 +164,175 @@ class ShareServiceTest {
                 "본문", null, null, null);
 
         assertError(ErrorCode.SHARE_ITEM_NOT_FOUND,
-                () -> shareService.create(meId, ShareItemType.DIARY, others.getId(),
-                        List.of(f1Id)));
+                () -> shareService.upsert(meId, ShareItemType.DIARY, others.getId(),
+                        ShareVisibility.FRIENDS, null));
         assertError(ErrorCode.SHARE_ITEM_NOT_FOUND,
-                () -> shareService.create(meId, ShareItemType.DIARY, 999999L, List.of(f1Id)));
+                () -> shareService.upsert(meId, ShareItemType.DIARY, 999999L,
+                        ShareVisibility.FRIENDS, null));
         assertError(ErrorCode.SHARE_ITEM_NOT_FOUND,
-                () -> shareService.create(meId, ShareItemType.EVENT, 999999L, List.of(f1Id)));
+                () -> shareService.upsert(meId, ShareItemType.EVENT, 999999L,
+                        ShareVisibility.FRIENDS, null));
     }
 
     @Test
-    void 제목_없는_일기도_공유된다() {
+    void 제목_없는_일기도_공개된다() {
         // Diary.title은 nullable — null이 "항목 부재"로 오인되면 안 된다
         Diary untitled = diaryService.create(meId, LocalDate.of(2027, 5, 22), null,
                 "본문만", null, null, null);
 
-        Share share = shareService.create(meId, ShareItemType.DIARY, untitled.getId(),
-                List.of(f1Id));
+        Share share = upsertFriends(untitled.getId());
 
         assertThat(shareRepository.findById(share.getId())).isPresent();
-        assertThat(notificationCount(f1Id, "SHARED_ITEM")).isEqualTo(1);
+        assertThat(shareService.feed(f1Id, null, 20).get(0).itemTitle()).isNull();
     }
 
     @Test
-    void 원본이_삭제된_공유에_add하면_404() {
-        Share share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                List.of(f1Id));
-        diaryService.delete(meId, diary.getDate());
+    void GROUP_설정은_groupId가_필수이고_본인_그룹만_가능하다() {
+        var f1Group = groupService.create(f1Id, "f1 그룹", List.of(meId));
 
-        assertError(ErrorCode.SHARE_ITEM_NOT_FOUND,
-                () -> shareService.editTargets(meId, share.getId(), List.of(f2Id), null));
-    }
-
-    @Test
-    void 비친구_본인_빈_대상은_400() {
-        assertError(ErrorCode.SHARE_TARGET_INVALID,
-                () -> shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                        List.of(outsiderId)));
-        assertError(ErrorCode.SHARE_TARGET_INVALID,
-                () -> shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                        List.of(f1Id, outsiderId)));
-        assertError(ErrorCode.SHARE_TARGET_INVALID,
-                () -> shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                        List.of(meId)));
-        assertError(ErrorCode.SHARE_TARGET_INVALID,
-                () -> shareService.create(meId, ShareItemType.DIARY, diary.getId(), List.of()));
-        assertError(ErrorCode.SHARE_TARGET_INVALID,
-                () -> shareService.create(meId, ShareItemType.DIARY, diary.getId(), null));
+        // groupId 누락
+        assertError(ErrorCode.VISIBILITY_INVALID,
+                () -> shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                        ShareVisibility.GROUP, null));
+        // 타인 그룹
+        assertError(ErrorCode.VISIBILITY_INVALID,
+                () -> shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                        ShareVisibility.GROUP, f1Group.groupId()));
+        // GROUP 아닌 범위에 groupId를 보내면 거절
+        assertError(ErrorCode.VISIBILITY_INVALID,
+                () -> shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                        ShareVisibility.FRIENDS, f1Group.groupId()));
         assertThat(shareRepository.count()).isZero();
     }
 
     @Test
-    void 같은_항목_재공유는_409() {
-        shareService.create(meId, ShareItemType.DIARY, diary.getId(), List.of(f1Id));
+    void 피드는_범위에_포함된_친구에게만_노출된다() {
+        // FRIENDS — 친구 전원에게 보이고 비친구는 안 보인다
+        Share friendsShare = upsertFriends(diary.getId());
+        assertThat(shareService.feed(f1Id, null, 20)).hasSize(1);
+        assertThat(shareService.feed(f2Id, null, 20)).hasSize(1);
+        assertThat(shareService.feed(outsiderId, null, 20)).isEmpty();
 
-        assertError(ErrorCode.SHARE_ALREADY_EXISTS,
-                () -> shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                        List.of(f2Id)));
-    }
+        // GROUP — 그룹 멤버(f1)만 보이고 비멤버 친구(f2)는 안 보인다
+        Diary second = diaryService.create(meId, LocalDate.of(2027, 5, 21), "둘째",
+                "본문", null, null, null);
+        var group = groupService.create(meId, "그룹", List.of(f1Id));
+        Share groupShare = shareService.upsert(meId, ShareItemType.DIARY, second.getId(),
+                ShareVisibility.GROUP, group.groupId());
 
-    @Test
-    void received_피드는_대상에게만_노출된다() {
-        Share s1 = shareService.create(meId, ShareItemType.DIARY, diary.getId(), List.of(f1Id));
-        jdbc.update("INSERT INTO events(user_id,title,start_time,end_time) "
-                + "VALUES (?,'캡스톤 회의','2027-06-01 10:00:00','2027-06-01 11:00:00')", meId);
-        Long eventId = jdbc.queryForObject("SELECT id FROM events LIMIT 1", Long.class);
-        Share s2 = shareService.create(meId, ShareItemType.EVENT, eventId, List.of(f1Id));
-
-        List<ReceivedShare> feed = shareService.received(f1Id, null, 20);
-        assertThat(feed).extracting(ReceivedShare::shareId)
-                .containsExactly(s2.getId(), s1.getId()); // share.id desc
-        assertThat(feed.get(0).itemType()).isEqualTo(ShareItemType.EVENT);
-        assertThat(feed.get(0).owner().nickname()).isEqualTo("나");
-        assertThat(feed.get(1).itemTitle()).isEqualTo("제주 여행");
+        assertThat(shareService.feed(f1Id, null, 20)).extracting(FeedItem::shareId)
+                .containsExactly(groupShare.getId(), friendsShare.getId());
+        assertThat(shareService.feed(f2Id, null, 20)).extracting(FeedItem::shareId)
+                .containsExactly(friendsShare.getId());
 
         // 커서 경계 — id < cursor
-        List<ReceivedShare> second = shareService.received(f1Id, s2.getId(), 20);
-        assertThat(second).extracting(ReceivedShare::shareId).containsExactly(s1.getId());
-
-        // 비대상 사용자는 비어있다
-        assertThat(shareService.received(outsiderId, null, 20)).isEmpty();
-        assertThat(shareService.received(f2Id, null, 20)).isEmpty();
+        assertThat(shareService.feed(f1Id, groupShare.getId(), 20))
+                .extracting(FeedItem::shareId).containsExactly(friendsShare.getId());
 
         assertError(ErrorCode.COMMON_VALIDATION,
-                () -> shareService.received(f1Id, null, 0));
+                () -> shareService.feed(f1Id, null, 0));
         assertError(ErrorCode.COMMON_VALIDATION,
-                () -> shareService.received(f1Id, null, 51));
+                () -> shareService.feed(f1Id, null, 51));
     }
 
     @Test
-    void detail은_소유자와_유효대상만_조회하고_대상목록은_소유자에게만_보인다() {
-        Share share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                List.of(f1Id));
+    void PUBLIC도_V2에서는_친구에게만_노출된다() {
+        shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.PUBLIC, null);
+
+        assertThat(shareService.feed(f1Id, null, 20)).hasSize(1);
+        assertThat(shareService.feed(outsiderId, null, 20)).isEmpty();
+        assertError(ErrorCode.SHARE_NOT_FOUND,
+                () -> shareService.detail(outsiderId,
+                        shareRepository.findAll().get(0).getId()));
+    }
+
+    @Test
+    void detail은_소유자와_canView_통과자만_조회한다() {
+        Share share = upsertFriends(diary.getId());
 
         var ownerView = shareService.detail(meId, share.getId());
-        assertThat(ownerView.targetUserIds()).containsExactly(f1Id);
         assertThat(ownerView.item()).isInstanceOf(app.weave.common.port.SharedDiary.class);
+        assertThat(ownerView.visibility()).isEqualTo(ShareVisibility.FRIENDS);
 
-        var targetView = shareService.detail(f1Id, share.getId());
-        assertThat(targetView.targetUserIds()).isNull();
-
-        assertError(ErrorCode.SHARE_NOT_AUDIENCE,
+        assertThat(shareService.detail(f1Id, share.getId()).item()).isNotNull();
+        assertError(ErrorCode.SHARE_NOT_FOUND,
                 () -> shareService.detail(outsiderId, share.getId()));
         assertError(ErrorCode.SHARE_NOT_FOUND,
                 () -> shareService.detail(meId, 999999L));
     }
 
     @Test
-    void 친구해제후_detail은_404고_대상행이_지연정리되어_재친구해도_부활하지않는다() {
-        Share share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                List.of(f1Id));
+    void 친구해제_즉시_비가시이고_재친구하면_복원된다() {
+        Share share = upsertFriends(diary.getId());
         jdbc.update("DELETE FROM friendships WHERE user_id=? AND friend_id=?", meId, f1Id);
 
-        assertError(ErrorCode.SHARE_NOT_AUDIENCE,
+        assertError(ErrorCode.SHARE_NOT_FOUND,
                 () -> shareService.detail(f1Id, share.getId()));
-        assertThat(targetRepository.findByShareId(share.getId())).isEmpty();
+        assertThat(shareService.feed(f1Id, null, 20)).isEmpty();
+        assertThat(shareService.feed(outsiderId, null, 20)).isEmpty();
 
-        // 재친구 — 대상 행이 지연 정리됐으므로 공유는 부활하지 않는다
+        // 재친구 — 열어둠 모델이라 공개 항목이 그대로 다시 보인다
         befriend(meId, f1Id);
-        assertError(ErrorCode.SHARE_NOT_AUDIENCE,
-                () -> shareService.detail(f1Id, share.getId()));
-        assertThat(shareService.received(f1Id, null, 20)).isEmpty();
+        assertThat(shareService.detail(f1Id, share.getId()).item()).isNotNull();
+        assertThat(shareService.feed(f1Id, null, 20)).hasSize(1);
     }
 
     @Test
-    void 친구해제후_received가_지연정리하고_소유자목록도_대상을_정리한다() {
-        Share share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                List.of(f1Id, f2Id));
-        jdbc.update("DELETE FROM friendships WHERE user_id=? AND friend_id=?", meId, f1Id);
+    void 그룹삭제는_참조_공개항목을_비공개취급한다() {
+        var group = groupService.create(meId, "그룹", List.of(f1Id));
+        Share share = shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.GROUP, group.groupId());
 
-        assertThat(shareService.received(f1Id, null, 20)).isEmpty();
-        assertThat(targetRepository.findByShareIdAndUserId(share.getId(), f1Id)).isEmpty();
-        // 유효 대상 f2는 남는다
-        assertThat(targetRepository.findByShareIdAndUserId(share.getId(), f2Id)).isPresent();
-        assertThat(shareService.myShares(meId).get(0).targetUserIds())
-                .containsExactly(f2Id);
+        groupService.delete(meId, group.groupId());
+
+        // group_id SET NULL → 소유자 외 비가시 = 비공개 취급
+        Share reloaded = shareRepository.findById(share.getId()).orElseThrow();
+        assertThat(reloaded.getGroupId()).isNull();
+        assertThat(reloaded.getVisibility()).isEqualTo(ShareVisibility.GROUP);
+        assertError(ErrorCode.SHARE_NOT_FOUND,
+                () -> shareService.detail(f1Id, share.getId()));
+        assertThat(shareService.feed(f1Id, null, 20)).isEmpty();
+        assertThat(shareService.detail(meId, share.getId()).item()).isNotNull();
     }
 
     @Test
     void 원본삭제후_피드와_목록과_상세에서_비노출이다() {
-        Share share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                List.of(f1Id));
+        Share share = upsertFriends(diary.getId());
         jdbc.update("DELETE FROM diaries WHERE id=?", diary.getId());
 
-        assertThat(shareService.received(f1Id, null, 20)).isEmpty();
-        assertThat(shareService.myShares(meId)).isEmpty();
+        assertThat(shareService.feed(f1Id, null, 20)).isEmpty();
+        assertThat(shareService.mine(meId)).isEmpty();
         assertError(ErrorCode.SHARE_ITEM_NOT_FOUND,
                 () -> shareService.detail(f1Id, share.getId()));
-        // share 행 자체는 남는다 — 원본 재생성 시 같은 itemId로 재노출되는 정책은 아님
+        // share 행 자체는 남는다
         assertThat(shareRepository.findById(share.getId())).isPresent();
     }
 
     @Test
-    void editTargets_add는_알림을_보내고_remove는_즉시_비가시다() {
-        Share share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                List.of(f1Id));
-        int before = notificationCount(f2Id, "SHARED_ITEM");
+    void by_owner는_친구에게만_보이는_항목을_반환한다() {
+        Share friendsShare = upsertFriends(diary.getId());
+        Diary second = diaryService.create(meId, LocalDate.of(2027, 5, 21), "둘째",
+                "본문", null, null, null);
+        var group = groupService.create(meId, "그룹", List.of(f1Id));
+        Share groupShare = shareService.upsert(meId, ShareItemType.DIARY, second.getId(),
+                ShareVisibility.GROUP, group.groupId());
 
-        shareService.editTargets(meId, share.getId(), List.of(f2Id), null);
-        assertThat(notificationCount(f2Id, "SHARED_ITEM")).isEqualTo(before + 1);
-        assertThat(shareService.detail(f2Id, share.getId()).item()).isNotNull();
+        // 멤버 f1은 둘 다, 비멤버 f2는 FRIENDS 항목만
+        assertThat(shareService.byOwner(f1Id, meId)).extracting(FeedItem::shareId)
+                .containsExactlyInAnyOrder(friendsShare.getId(), groupShare.getId());
+        assertThat(shareService.byOwner(f2Id, meId)).extracting(FeedItem::shareId)
+                .containsExactly(friendsShare.getId());
 
-        // 이미 대상인 사용자를 add해도 알림은 중복 발행되지 않는다
-        shareService.editTargets(meId, share.getId(), List.of(f1Id), null);
-        assertThat(notificationCount(f1Id, "SHARED_ITEM")).isEqualTo(1);
-
-        // 비친구 add는 400
-        assertError(ErrorCode.SHARE_TARGET_INVALID,
-                () -> shareService.editTargets(meId, share.getId(), List.of(outsiderId), null));
-
-        shareService.editTargets(meId, share.getId(), null, List.of(f1Id));
-        assertError(ErrorCode.SHARE_NOT_AUDIENCE,
-                () -> shareService.detail(f1Id, share.getId()));
-        assertThat(shareService.detail(meId, share.getId()).targetUserIds())
-                .containsExactly(f2Id);
-    }
-
-    @Test
-    void editTargets와_delete는_비소유자에게_404다() {
-        Share share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                List.of(f1Id));
-
+        // 비친구는 존재 비노출 404
         assertError(ErrorCode.SHARE_NOT_FOUND,
-                () -> shareService.editTargets(f1Id, share.getId(), List.of(f2Id), null));
-        assertError(ErrorCode.SHARE_NOT_FOUND,
-                () -> shareService.delete(f1Id, share.getId()));
-    }
-
-    @Test
-    void 공유해제는_targets와_replies를_연쇄삭제한다() {
-        Share share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                List.of(f1Id));
-        jdbc.update("INSERT INTO share_replies(share_id,author_id,content) VALUES (?,?, '답글')",
-                share.getId(), f1Id);
-
-        shareService.delete(meId, share.getId());
-
-        assertThat(shareRepository.findById(share.getId())).isEmpty();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM share_targets WHERE share_id=?",
-                Integer.class, share.getId())).isEqualTo(0);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM share_replies WHERE share_id=?",
-                Integer.class, share.getId())).isEqualTo(0);
+                () -> shareService.byOwner(outsiderId, meId));
     }
 
     @Test
     void 사진은_열람자에게만_서빙되고_EVENT공유는_404다() {
         DiaryPhoto photo = photoService.upload(meId, diary, jpeg());
-        Share share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
-                List.of(f1Id));
+        Share share = upsertFriends(diary.getId());
 
         SharedPhotoBytes bytes = shareService.photo(f1Id, share.getId(), photo.getId());
         assertThat(bytes.contentType()).isEqualTo("image/jpeg");
@@ -347,7 +340,7 @@ class ShareServiceTest {
         assertThat(shareService.photo(meId, share.getId(), photo.getId()).bytes())
                 .isEqualTo(jpeg());
 
-        assertError(ErrorCode.SHARE_NOT_AUDIENCE,
+        assertError(ErrorCode.SHARE_NOT_FOUND,
                 () -> shareService.photo(outsiderId, share.getId(), photo.getId()));
         assertError(ErrorCode.SHARE_ITEM_NOT_FOUND,
                 () -> shareService.photo(f1Id, share.getId(), 999999L));
@@ -355,9 +348,52 @@ class ShareServiceTest {
         jdbc.update("INSERT INTO events(user_id,title,start_time,end_time) "
                 + "VALUES (?,'회의','2027-06-01 10:00:00','2027-06-01 11:00:00')", meId);
         Long eventId = jdbc.queryForObject("SELECT id FROM events LIMIT 1", Long.class);
-        Share eventShare = shareService.create(meId, ShareItemType.EVENT, eventId,
-                List.of(f1Id));
+        Share eventShare = shareService.upsert(meId, ShareItemType.EVENT, eventId,
+                ShareVisibility.FRIENDS, null);
         assertError(ErrorCode.SHARE_ITEM_NOT_FOUND,
                 () -> shareService.photo(f1Id, eventShare.getId(), photo.getId()));
+    }
+
+    @Test
+    void 구독한_친구의_신규공개는_알림이_가고_비구독과_비공개는_안_간다() {
+        groupService.subscribe(f1Id, meId);
+
+        // FRIENDS 신규 공개 — f1이 볼 수 있으므로 알림
+        upsertFriends(diary.getId());
+        assertThat(notificationCount(f1Id, "SHARED_ITEM")).isEqualTo(1);
+        // 비구독 친구 f2는 무알림
+        assertThat(notificationCount(f2Id, "SHARED_ITEM")).isEqualTo(0);
+        assertThat(notificationCount(meId, "SHARED_ITEM")).isEqualTo(0);
+
+        // PRIVATE 전환은 새로 보이는 대상이 없어 무알림, 비공개 신규 항목도 무알림
+        Diary second = diaryService.create(meId, LocalDate.of(2027, 5, 21), "둘째",
+                "본문", null, null, null);
+        shareService.upsert(meId, ShareItemType.DIARY, second.getId(),
+                ShareVisibility.PRIVATE, null);
+        assertThat(notificationCount(f1Id, "SHARED_ITEM")).isEqualTo(1);
+    }
+
+    @Test
+    void 범위를_상향해_새로_보이게된_구독자에게만_알림이_간다() {
+        groupService.subscribe(f1Id, meId);
+        groupService.subscribe(f2Id, meId);
+        var group = groupService.create(meId, "그룹", List.of(f1Id));
+
+        // GROUP 공개 — 멤버 f1만 알림, 비멤버 f2는 못 보니 무알림
+        Share share = shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.GROUP, group.groupId());
+        assertThat(notificationCount(f1Id, "SHARED_ITEM")).isEqualTo(1);
+        assertThat(notificationCount(f2Id, "SHARED_ITEM")).isEqualTo(0);
+
+        // 같은 설정 재저장 — 새로 보이는 대상이 없어 중복 알림 없음
+        shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.GROUP, group.groupId());
+        assertThat(notificationCount(f1Id, "SHARED_ITEM")).isEqualTo(1);
+
+        // FRIENDS로 상향 — f2가 새로 보이게 되므로 알림, f1은 이미 보던 중이라 무알림
+        shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.FRIENDS, null);
+        assertThat(notificationCount(f2Id, "SHARED_ITEM")).isEqualTo(1);
+        assertThat(notificationCount(f1Id, "SHARED_ITEM")).isEqualTo(1);
     }
 }

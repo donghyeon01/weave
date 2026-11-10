@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '../../../components/ui/button'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
@@ -42,8 +42,9 @@ function ReplyForm({ placeholder, initial = '', pending, onSubmit, onCancel }: R
     e.preventDefault()
     const content = value.trim()
     if (content === '' || content.length > MAX_LEN) return
+    // 입력은 성공 시점에만 비운다 — 즉시 클리어하면 실패 시 작성 내용이 날아간다.
+    // 클리어는 호출부가 담당한다 (루트 폼은 key 리마운트, 답글·수정 폼은 언마운트).
     onSubmit(content)
-    if (initial === '') setValue('')
   }
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">
@@ -207,9 +208,11 @@ export function ReplyThread({
   shareId: number
   shareOwnerId: number
 }) {
-  const queryClient = useQueryClient()
-  // useMe는 profile feature라 import할 수 없다 — 캐시 직접 조회 (chat-room-page 선례).
-  const me = queryClient.getQueryData<UserResponse>(queryKeys.users.me)
+  // useMe는 profile feature라 import할 수 없다 — 캐시 구독만 한다 (enabled:false → fetch 없음).
+  const me = useQuery<UserResponse>({
+    queryKey: queryKeys.users.me,
+    enabled: false,
+  }).data
   const repliesQuery = useShareReplies(shareId)
   const createReply = useCreateReply(shareId)
   const deleteReply = useDeleteReply(shareId)
@@ -217,6 +220,7 @@ export function ReplyThread({
   const [replyingTo, setReplyingTo] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [rootFormKey, setRootFormKey] = useState(0)
 
   const roots = repliesQuery.data?.pages.flat() ?? []
 
@@ -261,12 +265,16 @@ export function ReplyThread({
         </Button>
       )}
       <ReplyForm
+        key={rootFormKey}
         placeholder="답글을 남겨 보세요"
         pending={createReply.isPending}
         onSubmit={(content) =>
           createReply.mutate(
             { content },
-            { onError: () => setToast('답글 등록에 실패했어요. 다시 시도해 주세요.') },
+            {
+              onSuccess: () => setRootFormKey((k) => k + 1),
+              onError: () => setToast('답글 등록에 실패했어요. 다시 시도해 주세요.'),
+            },
           )
         }
       />

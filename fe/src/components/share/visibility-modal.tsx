@@ -141,7 +141,12 @@ export function VisibilityModal({ open, onClose, itemType, itemId }: VisibilityM
                       {g.name} ({g.memberIds.length}명)
                     </button>
                   ))}
-                  {groups.length === 0 && (
+                  {groupsQuery.isError && (
+                    <span className="text-xs font-semibold text-danger-text">
+                      그룹을 불러오지 못했어요. 다시 열어 주세요.
+                    </span>
+                  )}
+                  {!groupsQuery.isError && groups.length === 0 && (
                     <span className="text-xs text-text-secondary">아직 그룹이 없어요</span>
                   )}
                   <button

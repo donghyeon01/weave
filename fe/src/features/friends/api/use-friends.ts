@@ -6,7 +6,7 @@ import type { FriendshipItem } from '../types'
 // GET /api/friends — status=ACCEPTED만 오는 친구 목록.
 export function useFriends() {
   return useQuery({
-    queryKey: ['friends', 'list'],
+    queryKey: queryKeys.friends.list,
     queryFn: () => apiFetch<FriendshipItem[]>('/api/friends'),
   })
 }

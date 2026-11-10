@@ -236,6 +236,28 @@ class ShareServiceTest {
     }
 
     @Test
+    void 피드는_필터된_후보배치를_넘어_더_오래된_보이는_항목까지_채운다() {
+        // 최신 5건이 비멤버 GROUP — limit=1이면 후보 배치(limit×4=4건) 전부가 f2에게 비가시다.
+        // 루프가 다음 후보 배치를 이어 받아야 더 오래된 FRIENDS 항목이 도달한다.
+        Diary old = diaryService.create(meId, LocalDate.of(2027, 5, 10), "오래된 일기",
+                "본문", null, null, null);
+        Share friendsShare = shareService.upsert(meId, ShareItemType.DIARY, old.getId(),
+                ShareVisibility.FRIENDS, null);
+        var group = groupService.create(meId, "그룹", List.of(f1Id)); // f2는 비멤버
+        for (int i = 0; i < 5; i++) {
+            Diary d = diaryService.create(meId, LocalDate.of(2027, 5, 11).plusDays(i),
+                    "g" + i, "본문", null, null, null);
+            shareService.upsert(meId, ShareItemType.DIARY, d.getId(),
+                    ShareVisibility.GROUP, group.groupId());
+        }
+
+        // 멤버 f1은 최신 순 그대로 1건, 비멤버 f2는 배치를 넘어 FRIENDS 항목에 도달한다
+        assertThat(shareService.feed(f1Id, null, 1)).hasSize(1);
+        assertThat(shareService.feed(f2Id, null, 1)).extracting(FeedItem::shareId)
+                .containsExactly(friendsShare.getId());
+    }
+
+    @Test
     void 피드_항목은_미리보기를_포함한다() {
         // 일기 — 본문 발췌 (140자 초과 시 말줄임)
         Diary longDiary = diaryService.create(meId, LocalDate.of(2027, 5, 21), "긴 일기",

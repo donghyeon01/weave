@@ -34,6 +34,7 @@ export const queryKeys = {
   },
   friends: {
     all: ['friends'],
+    list: ['friends', 'list'],
     requestsReceived: ['friends', 'requests', 'received'],
     requestsSent: ['friends', 'requests', 'sent'],
     feedSubscriptions: ['friends', 'feed-subscriptions'],

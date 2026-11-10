@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '../../../components/ui/button'
 import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
@@ -106,8 +106,11 @@ export function SharedDetailPage() {
   const { shareId } = useParams<{ shareId: string }>()
   const id = shareId !== undefined ? Number(shareId) : undefined
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const me = queryClient.getQueryData<UserResponse>(queryKeys.users.me)
+  // 캐시 구독 전용 — provider가 채운 users.me를 읽는다. enabled:false라 여기서 fetch하지 않는다.
+  const me = useQuery<UserResponse>({
+    queryKey: queryKeys.users.me,
+    enabled: false,
+  }).data
   const detailQuery = useShareDetail(Number.isFinite(id) ? id : undefined)
   const [visibilityOpen, setVisibilityOpen] = useState(false)
 
@@ -122,7 +125,7 @@ export function SharedDetailPage() {
           onClick={() => navigate(-1)}
           className="text-sm font-bold text-text-secondary transition duration-150 hover:text-text"
         >
-          ← 피드
+          ← 돌아가기
         </button>
         {detail !== undefined && (
           <div className="flex items-center gap-3">

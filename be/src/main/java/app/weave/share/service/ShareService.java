@@ -169,36 +169,44 @@ public class ShareService {
         if (friendIds.isEmpty()) {
             return List.of();
         }
-        // 후보는 limit×4로 바운드 — 필터 후 limit 미만이면 남은 건 다음 커서 페이지로 넘긴다
-        List<Share> candidates = shareRepository
-                .findByOwnerIdInAndVisibilityNotAndIdLessThanOrderByIdDesc(friendIds,
-                        ShareVisibility.PRIVATE, cursor == null ? Long.MAX_VALUE : cursor,
-                        PageRequest.of(0, limit * 4));
-        Map<Long, Long> replyCounts = replyCountsOf(
-                candidates.stream().map(Share::getId).toList());
-        Map<Long, User> owners = userRepository.findAllById(
-                candidates.stream().map(Share::getOwnerId).distinct().toList())
-                .stream().collect(Collectors.toMap(User::getId, Function.identity()));
-
+        // 후보를 limit×4 배치로 긁어 필터 — 못 채우면 다음 배치(더 오래된 id)를 이어 받아
+        // limit까지 채우거나 후보 소진 시 끝낸다. 커서는 반환된 마지막 share.id 기준 id < cursor.
         List<FeedItem> result = new ArrayList<>();
-        for (Share share : candidates) {
-            if (result.size() >= limit) {
+        long candidateCursor = cursor == null ? Long.MAX_VALUE : cursor;
+        while (result.size() < limit) {
+            List<Share> candidates = shareRepository
+                    .findByOwnerIdInAndVisibilityNotAndIdLessThanOrderByIdDesc(friendIds,
+                            ShareVisibility.PRIVATE, candidateCursor,
+                            PageRequest.of(0, limit * 4));
+            if (candidates.isEmpty()) {
                 break;
             }
-            if (!feedService.canView(me, share, friendIds)) {
-                continue;
+            candidateCursor = candidates.get(candidates.size() - 1).getId();
+            Map<Long, Long> replyCounts = replyCountsOf(
+                    candidates.stream().map(Share::getId).toList());
+            Map<Long, User> owners = userRepository.findAllById(
+                    candidates.stream().map(Share::getOwnerId).distinct().toList())
+                    .stream().collect(Collectors.toMap(User::getId, Function.identity()));
+            for (Share share : candidates) {
+                if (result.size() >= limit) {
+                    break;
+                }
+                if (!feedService.canView(me, share, friendIds)) {
+                    continue;
+                }
+                Optional<Object> item = itemOf(share.getOwnerId(), share.getItemType(),
+                        share.getItemId());
+                if (item.isEmpty()) {
+                    continue; // 원본 삭제 — 비노출
+                }
+                User owner = owners.get(share.getOwnerId());
+                result.add(new FeedItem(share.getId(), share.getItemType(), share.getItemId(),
+                        titleOf(item.get()),
+                        new UserRef(share.getOwnerId(),
+                                owner != null ? owner.getNickname() : null),
+                        share.getCreatedAt(), replyCounts.getOrDefault(share.getId(), 0L),
+                        previewOf(item.get())));
             }
-            Optional<Object> item = itemOf(share.getOwnerId(), share.getItemType(),
-                    share.getItemId());
-            if (item.isEmpty()) {
-                continue; // 원본 삭제 — 비노출
-            }
-            User owner = owners.get(share.getOwnerId());
-            result.add(new FeedItem(share.getId(), share.getItemType(), share.getItemId(),
-                    titleOf(item.get()),
-                    new UserRef(share.getOwnerId(), owner != null ? owner.getNickname() : null),
-                    share.getCreatedAt(), replyCounts.getOrDefault(share.getId(), 0L),
-                    previewOf(item.get())));
         }
         return result;
     }

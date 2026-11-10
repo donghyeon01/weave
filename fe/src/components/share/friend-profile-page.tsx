@@ -20,10 +20,24 @@ export function FriendProfilePage() {
   const id = Number(userId)
   const navigate = useNavigate()
   const friendsQuery = useFriends()
-  const sharesQuery = useSharesByUser(id)
+  // 무효 id는 조회 없이 에러 표시로 종결 (shared-detail-page와 동일 가드)
+  const sharesQuery = useSharesByUser(Number.isFinite(id) ? id : 0)
   const subscriptionsQuery = useFeedSubscriptions()
   const setSubscription = useSetFeedSubscription()
   const [toast, setToast] = useState<string | null>(null)
+
+  if (!Number.isFinite(id)) {
+    return (
+      <div className="w-full">
+        <p className="text-sm text-text-secondary">잘못된 프로필 주소예요.</p>
+        <div className="mt-4">
+          <Link to="/app/friends" className="text-sm font-bold text-accent-text hover:underline">
+            친구 목록으로 돌아가기
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   const friend = (friendsQuery.data ?? []).find((f) => f.user.id === id)
   const items = sharesQuery.data ?? []

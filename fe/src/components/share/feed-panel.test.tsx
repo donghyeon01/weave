@@ -67,4 +67,16 @@ describe('feed-panel', () => {
       expect.stringContaining('cursor=81'),
     )
   })
+
+  // 서버가 limit까지 채워 반환하므로 limit 미만 페이지는 실제 마지막이다 — 더 보기를 숨긴다
+  it('첫 페이지가 limit 미만이면 더 보기를 표시하지 않는다', async () => {
+    apiFetchMock.mockResolvedValue(
+      Array.from({ length: 5 }, (_, i) => feedItem(10 - i)),
+    )
+    renderPanel()
+
+    expect(await screen.findByText('항목 10')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument()
+    expect(apiFetchMock).toHaveBeenCalledTimes(1)
+  })
 })

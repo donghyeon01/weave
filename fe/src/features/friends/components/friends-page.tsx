@@ -30,7 +30,7 @@ type Tab = 'all' | 'received' | 'sent' | 'groups' | 'feed'
 
 const TAB_KEYS: readonly Tab[] = ['all', 'received', 'sent', 'groups', 'feed']
 
-function initialTab(param: string | null): Tab {
+function parseTab(param: string | null): Tab {
   return TAB_KEYS.find((t) => t === param) ?? 'all'
 }
 
@@ -94,7 +94,7 @@ function KebabIcon() {
 // 상태 메시지·접속 표시(presence)는 V2 이연이라 렌더하지 않는다 (이탈 원장).
 export function FriendsPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const friendsQuery = useFriends()
   const receivedQuery = useReceivedRequests()
   const sentQuery = useSentRequests()
@@ -103,7 +103,10 @@ export function FriendsPage() {
   const acceptRequest = useAcceptRequest()
   const deleteFriendship = useDeleteFriendship()
 
-  const [tab, setTab] = useState<Tab>(() => initialTab(searchParams.get('tab')))
+  // 탭 상태는 ?tab=이 진실 원천 — 딥링크·탭 전환 모두 URL과 동기화 (replace로 이력 오염 방지)
+  const tab = parseTab(searchParams.get('tab'))
+  const setTab = (t: Tab) =>
+    setSearchParams(t === 'all' ? {} : { tab: t }, { replace: true })
   const [inviteOpen, setInviteOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)

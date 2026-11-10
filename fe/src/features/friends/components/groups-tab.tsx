@@ -82,11 +82,22 @@ function GroupFormModal({ group, friends, onClose, onAskDelete }: GroupFormProps
       memberIds.length !== group.memberIds.length ||
       memberIds.some((id) => !group.memberIds.includes(id))
     const done = { onSuccess: onClose, onError: fail }
+    // 이름 저장 후 멤버 교체가 실패하면 부분 성공 상태다 — 어느 쪽이 실패했는지 구분해 알린다
+    const membersDone = {
+      onSuccess: onClose,
+      onError: (e: unknown) => {
+        if (e instanceof ApiError && e.code === 'GROUP-MEMBER-INVALID') {
+          fail(e)
+          return
+        }
+        setError('이름은 저장됐지만 멤버 변경에 실패했어요. 다시 저장해 주세요.')
+      },
+    }
     if (renameNeeded) {
       renameGroup.mutate({ groupId: group.groupId, name: trimmed }, {
         onSuccess: () => {
           if (membersChanged) {
-            replaceMembers.mutate({ groupId: group.groupId, memberIds }, done)
+            replaceMembers.mutate({ groupId: group.groupId, memberIds }, membersDone)
           } else {
             onClose()
           }

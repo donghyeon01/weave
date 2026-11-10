@@ -4,9 +4,13 @@ import { queryKeys } from '../../../lib/react-query'
 import type { FriendshipItem } from '../types'
 
 // 모든 mutation은 성공 시 ['friends'] 프리픽스 무효화 — 받은·보낸·목록 3캐시를 일괄 정합한다.
+// 친구 관계 변동은 피드 가시성(canView)에도 영향을 주므로 ['share']도 함께 무효화한다.
 function useInvalidateFriends() {
   const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: queryKeys.friends.all })
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.friends.all })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.share.all })
+  }
 }
 
 export function useSendRequest() {

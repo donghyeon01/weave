@@ -49,7 +49,7 @@ export function useShareFeed() {
     queryKey: queryKeys.share.feed,
     queryFn: ({ pageParam }) => shareFeed(pageParam, PAGE_SIZE),
     initialPageParam: undefined as number | undefined,
-    // 서버는 필터링 때문에 페이지가 limit 미만으로 돌아올 수 있다 — 빈 페이지가 나오면 끝으로 간주
+    // 서버가 비는 자리를 다음 후보 배치로 채워 limit까지 반환한다 — limit 미만은 실제 마지막 페이지
     getNextPageParam: (lastPage: FeedItem[]) =>
       lastPage.length === PAGE_SIZE ? lastPage[lastPage.length - 1].shareId : undefined,
   })

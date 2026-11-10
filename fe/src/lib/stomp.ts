@@ -45,9 +45,12 @@ export function subscribeTopic(destination: string, onMessage: (msg: StompMessag
   }
 }
 
-/** 매 연결(재연결 포함) 때마다 호출 — 유실 push 복원용 REST 재조회 등에 사용. */
+/** 매 연결(재연결 포함) 때마다 호출 — 유실 push 복원용 REST 재조회 등에 사용. 해제 함수를 반환한다. */
 export function onStompConnect(listener: () => void) {
   connectListeners.add(listener)
+  return () => {
+    connectListeners.delete(listener)
+  }
 }
 
 /** STOMP SEND — 미연결이면 throw해 호출부가 사용자에게 실패를 표면화하게 한다. */

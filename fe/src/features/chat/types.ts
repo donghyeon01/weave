@@ -13,10 +13,10 @@ export interface ChatRoomSummary {
   slot: Slot
   unreadCount: number
   status: RoomStatus
-  // 계약 확장 중인 필드 — 응답에 있으면 목록 카드·메타 라인에 반영한다.
-  lastMessage?: string
-  lastMessageAt?: string
-  memberCount?: number
+  // 목록 카드 프리뷰·메타 라인 — 메시지 없는 방은 lastMessage·lastMessageAt이 null (계약 §3.10)
+  lastMessage: string | null
+  lastMessageAt: string | null
+  memberCount: number
 }
 
 export interface ChatMessage {

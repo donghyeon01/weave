@@ -40,9 +40,14 @@ public class ChatService {
     private static final int MAX_CONTENT = 2000;
     private static final int MAX_CLIENT_MESSAGE_ID = 64;
 
-    /** 방 목록 항목 — slot은 생성 시 스냅샷 그대로. status로 CLOSED 읽기 전용을 구분한다. */
+    /**
+     * 방 목록 항목 — slot은 생성 시 스냅샷 그대로. status로 CLOSED 읽기 전용을 구분한다.
+     * lastMessage·lastMessageAt·memberCount는 목록 카드 프리뷰·메타 라인용 — 메시지가
+     * 없는 방은 lastMessage·lastMessageAt이 null이다 (api-contract §3.10).
+     */
     public record RoomSummary(Long roomId, Long proposalId, String title, SlotView slot,
-            long unreadCount, Status status) {
+            long unreadCount, Status status, String lastMessage,
+            LocalDateTime lastMessageAt, long memberCount) {
     }
 
     /** 스냅샷 슬롯 — fe의 Slot 동형 직렬화는 Task 4 DTO에서 결정한다. */
@@ -89,18 +94,38 @@ public class ChatService {
         roomRepository.findByProposalIdForUpdate(proposalId).ifPresent(ChatRoom::close);
     }
 
-    /** 내가 멤버인 전체 방 (OPEN + CLOSED) — CLOSED는 status로 표시, 읽기 전용. */
+    /**
+     * 내가 멤버인 전체 방 (OPEN + CLOSED) — CLOSED는 status로 표시, 읽기 전용.
+     * unread·lastMessage·memberCount는 각각 방 N개를 GROUP BY 1회로 집계한다 (N+1 방지).
+     */
     @Transactional(readOnly = true)
     public List<RoomSummary> myRooms(Long me) {
         List<ChatRoom> rooms = roomRepository.findRoomsByMember(me);
-        Map<Long, Long> unread = memberRepository.countUnreadByRoom(me,
-                        rooms.stream().map(ChatRoom::getId).toList()).stream()
+        if (rooms.isEmpty()) {
+            return List.of();
+        }
+        List<Long> roomIds = rooms.stream().map(ChatRoom::getId).toList();
+        Map<Long, Long> unread = memberRepository.countUnreadByRoom(me, roomIds).stream()
                 .collect(Collectors.toMap(ChatRoomMemberRepository.UnreadRow::getRoomId,
                         ChatRoomMemberRepository.UnreadRow::getUnread));
+        Map<Long, Long> memberCount = memberRepository.countMembersByRoom(roomIds).stream()
+                .collect(Collectors.toMap(ChatRoomMemberRepository.CountRow::getRoomId,
+                        ChatRoomMemberRepository.CountRow::getCnt));
+        List<Long> lastIds = messageRepository.findLastIdByRoomIds(roomIds).stream()
+                .map(ChatMessageRepository.LastIdRow::getLastId).toList();
+        Map<Long, ChatMessage> lastByRoom = new HashMap<>();
+        messageRepository.findAllById(lastIds)
+                .forEach(m -> lastByRoom.put(m.getRoomId(), m));
         return rooms.stream()
-                .map(room -> new RoomSummary(room.getId(), room.getProposalId(), room.getTitle(),
-                        new SlotView(room.getMode(), room.getStartTime(), room.getEndTime()),
-                        unread.getOrDefault(room.getId(), 0L), room.getStatus()))
+                .map(room -> {
+                    ChatMessage last = lastByRoom.get(room.getId());
+                    return new RoomSummary(room.getId(), room.getProposalId(), room.getTitle(),
+                            new SlotView(room.getMode(), room.getStartTime(), room.getEndTime()),
+                            unread.getOrDefault(room.getId(), 0L), room.getStatus(),
+                            last != null ? last.getContent() : null,
+                            last != null ? last.getCreatedAt() : null,
+                            memberCount.getOrDefault(room.getId(), 0L));
+                })
                 .toList();
     }
 

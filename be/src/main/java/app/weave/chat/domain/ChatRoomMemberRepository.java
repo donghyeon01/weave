@@ -15,6 +15,12 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
         Long getUnread();
     }
 
+    /** 방 목록 카드 메타용 — 방별 멤버 수 집계 행. */
+    interface CountRow {
+        Long getRoomId();
+        Long getCnt();
+    }
+
     boolean existsByRoomIdAndUserId(Long roomId, Long userId);
 
     Optional<ChatRoomMember> findByRoomIdAndUserId(Long roomId, Long userId);
@@ -43,4 +49,9 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
             + "where m.userId = :me and m.roomId in :roomIds group by m.roomId")
     List<UnreadRow> countUnreadByRoom(@Param("me") Long me,
             @Param("roomIds") List<Long> roomIds);
+
+    /** 방별 멤버 수 배치 집계 — 목록의 memberCount 원천. */
+    @Query("select m.roomId as roomId, count(m.userId) as cnt from ChatRoomMember m "
+            + "where m.roomId in :roomIds group by m.roomId")
+    List<CountRow> countMembersByRoom(@Param("roomIds") List<Long> roomIds);
 }

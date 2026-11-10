@@ -2,11 +2,13 @@ import { apiFetch } from '../../../lib/api-client'
 import type { ChatMessage, ChatRoomSummary } from '../types'
 
 // api-contract §3.10 — 채팅 REST 래퍼. STOMP 송수신은 lib/stomp이 담당한다.
+export const CHAT_PAGE_LIMIT = 50
+
 export function fetchChatRooms() {
   return apiFetch<ChatRoomSummary[]>('/api/chat/rooms')
 }
 
-export function fetchChatMessages(roomId: number, cursor?: number, limit = 50) {
+export function fetchChatMessages(roomId: number, cursor?: number, limit = CHAT_PAGE_LIMIT) {
   const params = new URLSearchParams()
   if (cursor !== undefined) params.set('cursor', String(cursor))
   params.set('limit', String(limit))

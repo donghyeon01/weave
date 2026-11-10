@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -17,11 +17,23 @@ vi.mock('../../../lib/api-client', async (importOriginal) => {
 
 vi.mock('../../../lib/stomp', () => ({
   publish: vi.fn(),
-  subscribeTopic: vi.fn(),
+  subscribeTopic: vi.fn(() => () => {}),
+  onStompConnect: vi.fn(() => () => {}),
 }))
 
 const apiFetchMock = vi.mocked(apiFetch)
 const publishMock = vi.mocked(publish)
+
+// jsdom에는 IntersectionObserver가 없다 — 콜백을 수집해 수동으로 교차를 발생시킨다
+const ioCallbacks: IntersectionObserverCallback[] = []
+class FakeIntersectionObserver {
+  constructor(cb: IntersectionObserverCallback) {
+    ioCallbacks.push(cb)
+  }
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
 
 function room(roomId: number, status: RoomStatus): ChatRoomSummary {
   return {
@@ -32,6 +44,8 @@ function room(roomId: number, status: RoomStatus): ChatRoomSummary {
     unreadCount: 0,
     status,
     memberCount: 3,
+    lastMessage: '최근 메시지',
+    lastMessageAt: '2026-05-11T12:30:00',
   }
 }
 
@@ -68,6 +82,8 @@ beforeEach(() => {
   apiFetchMock.mockReset()
   publishMock.mockReset()
   vi.mocked(subscribeTopic).mockReset()
+  ioCallbacks.length = 0
+  vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver)
   // jsdom에는 scrollIntoView가 없다 — 스크롤 효과 자체는 검증 대상이 아니라 스텁한다
   Element.prototype.scrollIntoView = vi.fn()
 })
@@ -152,6 +168,53 @@ describe('chat-room-page', () => {
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith('/api/chat/rooms'))
     await screen.findByText('안녕')
     expect(subscribeTopic).not.toHaveBeenCalled()
+  })
+
+  it('상단 sentinel이 보이면 이전 메시지 페이지를 앞에 붙인다', async () => {
+    const latest50 = Array.from({ length: 50 }, (_, i) => ({
+      id: 51 + i,
+      senderId: i % 2 === 0 ? 1 : 2,
+      nickname: i % 2 === 0 ? '나' : '지우',
+      content: `메시지 ${51 + i}`,
+      createdAt: `2026-05-11T10:${String(i % 60).padStart(2, '0')}:00`,
+    }))
+    apiFetchMock.mockImplementation(async (path) => {
+      const url = typeof path === 'string' ? path : ''
+      if (url === '/api/chat/rooms') return [room(1, 'OPEN')]
+      if (url.includes('cursor=')) {
+        return [
+          {
+            id: 50,
+            senderId: 2,
+            nickname: '지우',
+            content: '가장 오래된 메시지',
+            createdAt: '2026-05-10T09:00:00',
+          },
+        ]
+      }
+      if (url.includes('/messages')) return latest50
+      if (url.endsWith('/read')) return undefined
+      throw new Error(`예상 못 한 호출: ${url}`)
+    })
+    const qc = createQueryClient()
+    qc.setQueryData(queryKeys.users.me, { id: 1 })
+    renderRoom(qc)
+
+    expect(await screen.findByText('메시지 100')).toBeInTheDocument()
+    expect(apiFetchMock).toHaveBeenCalledWith('/api/chat/rooms/1/messages?limit=50')
+
+    act(() => {
+      for (const cb of ioCallbacks) {
+        cb([{ isIntersecting: true } as IntersectionObserverEntry], {} as never)
+      }
+    })
+
+    expect(await screen.findByText('가장 오래된 메시지')).toBeInTheDocument()
+    // 최신 페이지도 그대로 뒤에 남는다
+    expect(screen.getByText('메시지 100')).toBeInTheDocument()
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      '/api/chat/rooms/1/messages?cursor=51&limit=50',
+    )
   })
 
   it('방을 떠나면 구독 해제 함수가 호출된다', async () => {

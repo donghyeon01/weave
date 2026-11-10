@@ -42,6 +42,15 @@ public enum ErrorCode {
     CHAT_NOT_MEMBER("CHAT-NOT-MEMBER", 404, "채팅방 멤버가 아닙니다."),
     CHAT_ROOM_CLOSED("CHAT-ROOM-CLOSED", 409, "종료된 채팅방입니다."),
     CHAT_MESSAGE_INVALID("CHAT-MESSAGE-INVALID", 400, "메시지가 올바르지 않습니다."),
+    SHARE_NOT_FOUND("SHARE-NOT-FOUND", 404, "공유를 찾을 수 없습니다."),
+    SHARE_NOT_AUDIENCE("SHARE-NOT-AUDIENCE", 404, "공유를 찾을 수 없습니다."),
+    SHARE_ITEM_NOT_FOUND("SHARE-ITEM-NOT-FOUND", 404, "공유 대상 항목을 찾을 수 없습니다."),
+    SHARE_TARGET_INVALID("SHARE-TARGET-INVALID", 400, "공유 대상이 올바르지 않습니다."),
+    SHARE_ALREADY_EXISTS("SHARE-ALREADY-EXISTS", 409, "이미 공유 중인 항목입니다."),
+    REPLY_NOT_FOUND("REPLY-NOT-FOUND", 404, "답글을 찾을 수 없습니다."),
+    REPLY_PARENT_INVALID("REPLY-PARENT-INVALID", 400, "답글 대상이 올바르지 않습니다."),
+    REPLY_INVALID("REPLY-INVALID", 400, "답글 내용이 올바르지 않습니다."),
+    REPLY_NOT_AUTHOR("REPLY-NOT-AUTHOR", 404, "답글을 찾을 수 없습니다."),
     INTERNAL_ERROR("INTERNAL-ERROR", 500, "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
 
     private final String code;

@@ -2,6 +2,7 @@ package app.weave.common.port;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * event 모듈이 소유한 일정 데이터의 읽기 전용 포트.
@@ -18,4 +19,7 @@ public interface EventAccess {
 
     /** source=PROPOSAL인 미래 일정 — 친구 nextEvent 조합용 (startTime 오름차순). */
     List<EventRef> proposalEventsAfter(Long userId, LocalDateTime from);
+
+    /** 소유 검증 포함 일정 상세 — share의 항목 검증·노출용. 미존재·타인 소유는 empty. */
+    Optional<SharedEvent> eventDetailOf(Long ownerId, Long eventId);
 }

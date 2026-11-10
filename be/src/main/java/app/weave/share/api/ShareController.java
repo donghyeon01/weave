@@ -1,6 +1,7 @@
 package app.weave.share.api;
 
 import app.weave.common.port.SharedDiary;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import app.weave.common.port.SharedEvent;
 import app.weave.common.port.SharedPhotoBytes;
 import app.weave.notification.service.NotificationPayload.UserRef;
@@ -142,7 +143,10 @@ public class ShareController {
 
     /** item은 itemType별 DiaryItem|EventItem — 계약 §3.11 임베드 규칙. */
     public record ShareDetailResponse(Long shareId, ShareItemType itemType, Long itemId,
-            Object item, UserRef owner, List<Long> targetUserIds, LocalDateTime createdAt,
+            Object item, UserRef owner,
+            // 대상 열람자에게는 null이 아니라 키 자체를 생략한다 — §3.11 "포함하지 않는다"
+            @JsonInclude(JsonInclude.Include.NON_NULL) List<Long> targetUserIds,
+            LocalDateTime createdAt,
             long replyCount) {
     }
 

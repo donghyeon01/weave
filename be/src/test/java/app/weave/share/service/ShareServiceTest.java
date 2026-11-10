@@ -142,6 +142,29 @@ class ShareServiceTest {
     }
 
     @Test
+    void 제목_없는_일기도_공유된다() {
+        // Diary.title은 nullable — null이 "항목 부재"로 오인되면 안 된다
+        Diary untitled = diaryService.create(meId, LocalDate.of(2027, 5, 22), null,
+                "본문만", null, null, null);
+
+        Share share = shareService.create(meId, ShareItemType.DIARY, untitled.getId(),
+                List.of(f1Id));
+
+        assertThat(shareRepository.findById(share.getId())).isPresent();
+        assertThat(notificationCount(f1Id, "SHARED_ITEM")).isEqualTo(1);
+    }
+
+    @Test
+    void 원본이_삭제된_공유에_add하면_404() {
+        Share share = shareService.create(meId, ShareItemType.DIARY, diary.getId(),
+                List.of(f1Id));
+        diaryService.delete(meId, diary.getDate());
+
+        assertError(ErrorCode.SHARE_ITEM_NOT_FOUND,
+                () -> shareService.editTargets(meId, share.getId(), List.of(f2Id), null));
+    }
+
+    @Test
     void 비친구_본인_빈_대상은_400() {
         assertError(ErrorCode.SHARE_TARGET_INVALID,
                 () -> shareService.create(meId, ShareItemType.DIARY, diary.getId(),

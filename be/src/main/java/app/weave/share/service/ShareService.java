@@ -103,9 +103,9 @@ public class ShareService {
      */
     @Transactional
     public Share create(Long me, ShareItemType type, Long itemId, List<Long> targetUserIds) {
-        String itemTitle = itemOf(me, type, itemId)
-                .map(this::titleOf)
-                .orElseThrow(() -> new BusinessException(ErrorCode.SHARE_ITEM_NOT_FOUND));
+        // title은 Diary에서 nullable — map 체인으로 빼면 null title이 "항목 부재"로 오인된다
+        String itemTitle = titleOf(itemOf(me, type, itemId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SHARE_ITEM_NOT_FOUND)));
 
         if (targetUserIds == null || targetUserIds.isEmpty() || targetUserIds.contains(me)) {
             throw new BusinessException(ErrorCode.SHARE_TARGET_INVALID);
@@ -232,13 +232,20 @@ public class ShareService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.SHARE_NOT_FOUND));
 
         Set<Long> friendIds = friendService.acceptedFriendIds(me);
-        List<Long> current = validTargetsOrPurge(shareId, friendIds);
-
-        if (add != null && !add.isEmpty()) {
-            List<Long> requested = new ArrayList<>(new LinkedHashSet<>(add));
+        List<Long> requested = add == null
+                ? List.of() : new ArrayList<>(new LinkedHashSet<>(add));
+        if (!requested.isEmpty()) {
             if (requested.contains(me) || !friendIds.containsAll(requested)) {
                 throw new BusinessException(ErrorCode.SHARE_TARGET_INVALID);
             }
+            // 원본이 삭제된 공유에 대상을 얹으면 존재하지 않는 항목의 알림이 나간다 — 생성과 같은 404로 차단
+            itemOf(me, share.getItemType(), share.getItemId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.SHARE_ITEM_NOT_FOUND));
+        }
+
+        List<Long> current = validTargetsOrPurge(shareId, friendIds);
+
+        if (!requested.isEmpty()) {
             List<Long> newTargets = requested.stream()
                     .filter(uid -> !current.contains(uid)).toList();
             if (!newTargets.isEmpty()) {
@@ -334,7 +341,9 @@ public class ShareService {
             (friendIds.contains(t.getUserId()) ? valid : stale).add(t.getUserId());
         }
         if (!stale.isEmpty()) {
-            targetRepository.deleteByShareIdAndUserIdIn(shareId, stale);
+            // requireAudience와 같은 이유 — 이어지는 검증 예외가 정리를 롤백시키지 않도록 분리 커밋
+            purgeTx.executeWithoutResult(
+                    tx -> targetRepository.deleteByShareIdAndUserIdIn(shareId, stale));
         }
         return valid;
     }

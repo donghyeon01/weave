@@ -48,9 +48,10 @@ public class ShareService {
             LocalDateTime createdAt, long replyCount) {
     }
 
-    /** 친구 피드 항목 — api-contract §3.11 FeedItem. */
+    /** 친구 피드 항목 — api-contract §3.11 FeedItem. itemPreview는 카드 발췌 라인. */
     public record FeedItem(Long shareId, ShareItemType itemType, Long itemId,
-            String itemTitle, UserRef owner, LocalDateTime createdAt, long replyCount) {
+            String itemTitle, UserRef owner, LocalDateTime createdAt, long replyCount,
+            String itemPreview) {
     }
 
     /** 상세 — item은 SharedDiary|SharedEvent 원본 레코드 (DTO 매핑은 컨트롤러). */
@@ -196,7 +197,8 @@ public class ShareService {
             result.add(new FeedItem(share.getId(), share.getItemType(), share.getItemId(),
                     titleOf(item.get()),
                     new UserRef(share.getOwnerId(), owner != null ? owner.getNickname() : null),
-                    share.getCreatedAt(), replyCounts.getOrDefault(share.getId(), 0L)));
+                    share.getCreatedAt(), replyCounts.getOrDefault(share.getId(), 0L),
+                    previewOf(item.get())));
         }
         return result;
     }
@@ -224,7 +226,7 @@ public class ShareService {
             }
             result.add(new FeedItem(share.getId(), share.getItemType(), share.getItemId(),
                     titleOf(item.get()), owner, share.getCreatedAt(),
-                    replyCounts.getOrDefault(share.getId(), 0L)));
+                    replyCounts.getOrDefault(share.getId(), 0L), previewOf(item.get())));
         }
         return result;
     }
@@ -279,6 +281,48 @@ public class ShareService {
             return d.title();
         }
         return ((SharedEvent) item).title();
+    }
+
+    private static final int PREVIEW_MAX = 140;
+
+    /**
+     * 피드 카드 발췌 — 일기는 본문 앞부분, 일정은 "M월 d일 (요일) HH:mm–HH:mm · 장소 — 설명"
+     * 형태로 서버에서 조합한다 (시안 195:597 발췌 라인).
+     */
+    private String previewOf(Object item) {
+        if (item instanceof SharedDiary d) {
+            return truncate(d.content());
+        }
+        SharedEvent e = (SharedEvent) item;
+        StringBuilder sb = new StringBuilder(scheduleLine(e));
+        if (e.location() != null && !e.location().isBlank()) {
+            sb.append(" · ").append(e.location());
+        }
+        if (e.description() != null && !e.description().isBlank()) {
+            sb.append(" — ").append(truncate(e.description()));
+        }
+        return sb.toString();
+    }
+
+    private String scheduleLine(SharedEvent e) {
+        var start = e.startTime();
+        var end = e.endTime();
+        String base = start.getMonthValue() + "월 " + start.getDayOfMonth() + "일 ("
+                + "월화수목금토일".charAt(start.getDayOfWeek().getValue() - 1) + ")";
+        if (e.allDay()) {
+            return start.toLocalDate().equals(end.toLocalDate())
+                    ? base + " 종일"
+                    : base + " 종일 ~ " + end.getMonthValue() + "월 " + end.getDayOfMonth() + "일";
+        }
+        return base + " " + String.format("%02d:%02d", start.getHour(), start.getMinute())
+                + "–" + String.format("%02d:%02d", end.getHour(), end.getMinute());
+    }
+
+    private String truncate(String text) {
+        if (text == null || text.length() <= PREVIEW_MAX) {
+            return text;
+        }
+        return text.substring(0, PREVIEW_MAX) + "…";
     }
 
     /** 공유 N개의 replyCount를 GROUP BY 1쿼리로 집계 — 목록 경로의 N+1 방지. */

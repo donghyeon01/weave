@@ -236,6 +236,27 @@ class ShareServiceTest {
     }
 
     @Test
+    void 피드_항목은_미리보기를_포함한다() {
+        // 일기 — 본문 발췌 (140자 초과 시 말줄임)
+        Diary longDiary = diaryService.create(meId, LocalDate.of(2027, 5, 21), "긴 일기",
+                "가".repeat(200), null, null, null);
+        upsertFriends(longDiary.getId());
+        FeedItem diaryItem = shareService.feed(f1Id, null, 20).get(0);
+        assertThat(diaryItem.itemPreview()).hasSize(141).endsWith("…");
+
+        // 일정 — "M월 d일 (요일) HH:mm–HH:mm · 장소 — 설명" 조합
+        jdbc.update("INSERT INTO events(user_id,title,description,start_time,end_time,location) "
+                + "VALUES (?,'회의','안건 정리','2027-06-01 10:00:00','2027-06-01 11:30:00','연남동')",
+                meId);
+        Long eventId = jdbc.queryForObject("SELECT id FROM events LIMIT 1", Long.class);
+        shareService.upsert(meId, ShareItemType.EVENT, eventId,
+                ShareVisibility.FRIENDS, null);
+        FeedItem eventItem = shareService.feed(f1Id, null, 20).get(0);
+        assertThat(eventItem.itemPreview())
+                .isEqualTo("6월 1일 (화) 10:00–11:30 · 연남동 — 안건 정리");
+    }
+
+    @Test
     void PUBLIC도_V2에서는_친구에게만_노출된다() {
         shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
                 ShareVisibility.PUBLIC, null);

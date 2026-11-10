@@ -109,6 +109,13 @@ public class FriendGroupService {
         subscriptionRepository.deleteBySubscriberIdAndFriendUserId(me, friendUserId);
     }
 
+    /** 내가 구독 중인 친구 user_id 목록 — fe 토글 초기 상태용 (계약 §3.6). */
+    @Transactional(readOnly = true)
+    public List<Long> subscribedIds(Long me) {
+        return subscriptionRepository.findBySubscriberId(me).stream()
+                .map(FeedSubscription::getFriendUserId).toList();
+    }
+
     // --- share 모듈이 소비하는 판정 ---
 
     /** owner가 groupId를 소유하는지 — GROUP 공개 설정의 groupId 검증. */

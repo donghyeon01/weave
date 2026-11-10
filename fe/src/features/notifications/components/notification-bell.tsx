@@ -17,6 +17,16 @@ function readTitle(item: NotificationItem): string {
       ? `${name}님이 친구 요청을 보냈어요`
       : `${name}님이 친구 요청을 수락했어요`
   }
+  if (item.type === 'SHARED_ITEM' || item.type === 'SHARE_REPLY') {
+    const who =
+      (p.owner as { nickname?: string } | undefined)?.nickname ??
+      (p.author as { nickname?: string } | undefined)?.nickname ??
+      '친구'
+    const itemTitle = typeof p.itemTitle === 'string' ? p.itemTitle : '항목'
+    return item.type === 'SHARED_ITEM'
+      ? `${who}님이 새 항목을 공개했어요: ${itemTitle}`
+      : `${who}님이 답글을 남겼어요: ${itemTitle}`
+  }
   const title = typeof p.title === 'string' ? p.title : '제안'
   if (item.type === 'PROPOSAL_RECEIVED') return `일정 제안이 도착했어요: ${title}`
   if (item.type === 'PROPOSAL_ALL_ACCEPTED') return `모든 참여자가 수락했어요: ${title}`
@@ -194,6 +204,18 @@ export function NotificationBell() {
                     })()}
                   </div>
                 )}
+                {(item.type === 'SHARED_ITEM' || item.type === 'SHARE_REPLY') &&
+                  typeof item.payload.shareId === 'number' && (
+                    <div className="px-4 pb-3">
+                      <Link
+                        to={`/app/shared/${item.payload.shareId}`}
+                        onClick={() => setOpen(false)}
+                        className="text-xs font-semibold text-accent-text hover:underline"
+                      >
+                        공유 항목 보기 →
+                      </Link>
+                    </div>
+                  )}
                 {item.type === 'FRIEND_REQUEST' && (
                   <div className="px-4 pb-3">
                     <Link

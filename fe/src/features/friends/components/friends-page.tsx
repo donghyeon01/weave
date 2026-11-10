@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
@@ -18,12 +18,21 @@ import {
   useReceivedRequests,
   useSentRequests,
 } from '../api/use-friends'
+import { useFriendGroups } from '../api/use-friend-groups'
 import type { FriendshipItem } from '../types'
+import { GroupsTab } from './groups-tab'
+import { ShareFeedPanel } from '../../../components/share/feed-panel'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
 
-type Tab = 'all' | 'received' | 'sent'
+type Tab = 'all' | 'received' | 'sent' | 'groups' | 'feed'
+
+const TAB_KEYS: readonly Tab[] = ['all', 'received', 'sent', 'groups', 'feed']
+
+function initialTab(param: string | null): Tab {
+  return TAB_KEYS.find((t) => t === param) ?? 'all'
+}
 
 type PendingAction =
   | { kind: 'reject'; item: FriendshipItem }
@@ -85,14 +94,16 @@ function KebabIcon() {
 // 상태 메시지·접속 표시(presence)는 V2 이연이라 렌더하지 않는다 (이탈 원장).
 export function FriendsPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const friendsQuery = useFriends()
   const receivedQuery = useReceivedRequests()
   const sentQuery = useSentRequests()
+  const groupsQuery = useFriendGroups()
   const sendRequest = useSendRequest()
   const acceptRequest = useAcceptRequest()
   const deleteFriendship = useDeleteFriendship()
 
-  const [tab, setTab] = useState<Tab>('all')
+  const [tab, setTab] = useState<Tab>(() => initialTab(searchParams.get('tab')))
   const [inviteOpen, setInviteOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
@@ -166,10 +177,14 @@ export function FriendsPage() {
     })
   }
 
+  const groupCount = groupsQuery.data?.length ?? 0
+  // 시안 194:545 — 5개 세그먼트. 피드는 건수를 세지 않는다 (시안에 카운트 없음).
   const tabs: { key: Tab; label: string }[] = [
     { key: 'all', label: `전체 친구 (${friends.length})` },
     { key: 'received', label: `받은 요청 (${received.length})` },
     { key: 'sent', label: `보낸 요청 (${sent.length})` },
+    { key: 'groups', label: `그룹 (${groupCount})` },
+    { key: 'feed', label: '피드' },
   ]
 
   return (
@@ -314,10 +329,15 @@ export function FriendsPage() {
                 className="flex flex-col justify-between rounded-lg border border-border bg-surface p-5 shadow-card-sm"
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/app/friends/${f.user.id}`)}
+                    aria-label={`${f.user.nickname} 프로필`}
+                    className="flex items-center gap-3 text-left transition duration-150 hover:opacity-80"
+                  >
                     <Avatar user={f.user} size="lg" />
                     <p className="text-sm font-bold text-text">{f.user.nickname}</p>
-                  </div>
+                  </button>
                   <div className="relative">
                     <button
                       type="button"
@@ -448,6 +468,12 @@ export function FriendsPage() {
           ))}
         </ul>
       )}
+
+      {tab === 'groups' && (
+        <GroupsTab onToast={(message) => setToast({ variant: 'success', message })} />
+      )}
+
+      {tab === 'feed' && <ShareFeedPanel />}
 
       {/* 친구 초대 모달 — 이메일 입력 (patterns.md 확정 인터랙션) */}
       <Modal

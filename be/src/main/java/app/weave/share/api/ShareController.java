@@ -85,7 +85,8 @@ public class ShareController {
             @RequestParam(defaultValue = "20") int limit) {
         return service.feed(me, cursor, limit).stream()
                 .map(s -> new FeedItemResponse(s.shareId(), s.itemType(), s.itemId(),
-                        s.itemTitle(), s.owner(), s.createdAt(), s.replyCount()))
+                        s.itemTitle(), s.owner(), s.createdAt(), s.replyCount(),
+                        s.itemPreview()))
                 .toList();
     }
 
@@ -95,7 +96,8 @@ public class ShareController {
             @PathVariable Long userId) {
         return service.byOwner(me, userId).stream()
                 .map(s -> new FeedItemResponse(s.shareId(), s.itemType(), s.itemId(),
-                        s.itemTitle(), s.owner(), s.createdAt(), s.replyCount()))
+                        s.itemTitle(), s.owner(), s.createdAt(), s.replyCount(),
+                        s.itemPreview()))
                 .toList();
     }
 
@@ -199,8 +201,10 @@ public class ShareController {
             LocalDateTime createdAt, long replyCount) {
     }
 
+    /** itemPreview — 일기는 본문 발췌, 일정은 일시·장소·설명 조합 (시안 피드 카드 발췌 라인). */
     public record FeedItemResponse(Long shareId, ShareItemType itemType, Long itemId,
-            String itemTitle, UserRef owner, LocalDateTime createdAt, long replyCount) {
+            String itemTitle, UserRef owner, LocalDateTime createdAt, long replyCount,
+            String itemPreview) {
     }
 
     /** item은 itemType별 DiaryItem|EventItem — 계약 §3.11 임베드 규칙. */

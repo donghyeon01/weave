@@ -154,9 +154,20 @@ class FriendGroupApiTest {
 
     @Test
     void 피드구독_토글은_친구에게만_가능하다() throws Exception {
+        // 구독 전 목록은 비어 있다
+        mvc.perform(get("/api/friends/feed-subscriptions")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
         mvc.perform(put("/api/friends/" + f1Id + "/feed-subscription")
                         .header("Authorization", "Bearer " + meToken))
                 .andExpect(status().isNoContent());
+
+        mvc.perform(get("/api/friends/feed-subscriptions")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value(f1Id));
 
         // 비친구 구독 → 400 SUBSCRIPTION-INVALID
         mvc.perform(put("/api/friends/" + outsiderId + "/feed-subscription")
@@ -167,5 +178,10 @@ class FriendGroupApiTest {
         mvc.perform(delete("/api/friends/" + f1Id + "/feed-subscription")
                         .header("Authorization", "Bearer " + meToken))
                 .andExpect(status().isNoContent());
+
+        mvc.perform(get("/api/friends/feed-subscriptions")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 }

@@ -95,6 +95,12 @@ public class FriendController {
         return ResponseEntity.noContent().build();
     }
 
+    /** 내 피드 알림 구독 목록 — 구독 중인 친구의 user_id 배열 (토글 초기 상태용). */
+    @GetMapping("/feed-subscriptions")
+    public List<Long> feedSubscriptions(@AuthenticationPrincipal Long me) {
+        return groupService.subscribedIds(me);
+    }
+
     private FriendshipResponse toResponse(FriendView view) {
         var u = view.counterparty();
         EventRef next = view.nextEvent();

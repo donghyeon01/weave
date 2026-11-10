@@ -15,6 +15,8 @@ export type NotificationType =
   | 'PROPOSAL_ALL_ACCEPTED'
   | 'PROPOSAL_CONFIRMED'
   | 'PROPOSAL_DECLINED'
+  | 'SHARED_ITEM'
+  | 'SHARE_REPLY'
 
 export interface NotificationItem {
   id: number

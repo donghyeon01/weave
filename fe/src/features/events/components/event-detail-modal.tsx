@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { EventItem } from '../types'
+import { VisibilityModal } from '../../../components/share/visibility-modal'
 import { Button } from '../../../components/ui/button'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
 import { Modal } from '../../../components/ui/modal'
@@ -23,6 +24,7 @@ function formatDateRange(event: EventItem): string {
 
 export function EventDetailModal({ event, onClose, onEdit, onDeleted }: EventDetailModalProps) {
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [visibilityOpen, setVisibilityOpen] = useState(false)
   const deleteEvent = useDeleteEvent()
 
   const handleDelete = () => {
@@ -76,6 +78,9 @@ export function EventDetailModal({ event, onClose, onEdit, onDeleted }: EventDet
           )}
         </dl>
         <div className="mt-6 flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setVisibilityOpen(true)}>
+            공개 범위
+          </Button>
           <Button variant="danger" size="sm" onClick={() => setConfirmOpen(true)}>
             삭제
           </Button>
@@ -84,6 +89,14 @@ export function EventDetailModal({ event, onClose, onEdit, onDeleted }: EventDet
           </Button>
         </div>
       </Modal>
+      {visibilityOpen && (
+        <VisibilityModal
+          open
+          onClose={() => setVisibilityOpen(false)}
+          itemType="EVENT"
+          itemId={event.id}
+        />
+      )}
       <ConfirmModal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}

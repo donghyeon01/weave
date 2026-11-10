@@ -31,6 +31,12 @@ const ChatRoute = lazy(() => import('./routes/app/chat').then((m) => ({ default:
 const ChatRoomRoute = lazy(() =>
   import('./routes/app/chat-room').then((m) => ({ default: m.ChatRoomRoute })),
 )
+const FriendProfileRoute = lazy(() =>
+  import('./routes/app/friend-profile').then((m) => ({ default: m.FriendProfileRoute })),
+)
+const SharedRoute = lazy(() =>
+  import('./routes/app/shared').then((m) => ({ default: m.SharedRoute })),
+)
 
 const routeFallback = (
   <div className="flex min-h-screen items-center justify-center bg-background">
@@ -61,6 +67,8 @@ export const router = createBrowserRouter([
       { path: 'calendar', element: lazyElement(<CalendarRoute />) },
       { path: 'diary', element: lazyElement(<DiaryRoute />) },
       { path: 'friends', element: lazyElement(<FriendsRoute />) },
+      { path: 'friends/:userId', element: lazyElement(<FriendProfileRoute />) },
+      { path: 'shared/:shareId', element: lazyElement(<SharedRoute />) },
       { path: 'scheduling', element: lazyElement(<SchedulingRoute />) },
       { path: 'profile', element: lazyElement(<ProfileRoute />) },
       { path: 'proposals', element: lazyElement(<ProposalsRoute />) },

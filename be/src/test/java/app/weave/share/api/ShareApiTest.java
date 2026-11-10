@@ -162,7 +162,8 @@ class ShareApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
                                 + ",\"visibility\":\"EVERYONE\"}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VISIBILITY-INVALID"));
     }
 
     @Test

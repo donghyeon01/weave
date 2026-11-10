@@ -166,7 +166,7 @@ public class FriendService {
                 .isPresent();
     }
 
-    /** ACCEPTED 상대 id 집합 — share 피드 필터·무효 대상 지연 정리용. */
+    /** ACCEPTED 상대 id 집합 — share 피드 후보 필터·그룹 멤버의 친구 검증용. */
     @Transactional(readOnly = true)
     public Set<Long> acceptedFriendIds(Long me) {
         return repository.findAcceptedFriendships(me).stream()

@@ -1,5 +1,7 @@
 package app.weave.share.api;
 
+import app.weave.common.error.BusinessException;
+import app.weave.common.error.ErrorCode;
 import app.weave.common.port.SharedDiary;
 import app.weave.common.port.SharedEvent;
 import app.weave.common.port.SharedPhotoBytes;
@@ -53,8 +55,16 @@ public class ShareController {
     @PutMapping
     public ShareDetailResponse upsert(@AuthenticationPrincipal Long me,
             @Valid @RequestBody UpsertShareRequest req) {
+        // visibility는 bean validation을 거치지 않고 여기서 파싱한다 — enum 외 값은
+        // 계약상 COMMON-VALIDATION이 아니라 VISIBILITY-INVALID로 매핑해야 한다
+        ShareVisibility visibility;
+        try {
+            visibility = ShareVisibility.valueOf(req.visibility());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.VISIBILITY_INVALID);
+        }
         Share share = service.upsert(me, ShareItemType.valueOf(req.itemType()), req.itemId(),
-                ShareVisibility.valueOf(req.visibility()), req.groupId());
+                visibility, req.groupId());
         return toDetail(service.detail(me, share.getId()));
     }
 
@@ -170,7 +180,7 @@ public class ShareController {
     public record UpsertShareRequest(
             @NotNull @Pattern(regexp = "DIARY|EVENT") String itemType,
             @NotNull Long itemId,
-            @NotNull @Pattern(regexp = "PRIVATE|FRIENDS|GROUP|PUBLIC") String visibility,
+            @NotNull String visibility,
             Long groupId) {
     }
 

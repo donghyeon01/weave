@@ -40,12 +40,13 @@ CREATE TABLE shares (
     visibility  VARCHAR(7)   NOT NULL,
     group_id    BIGINT       NULL,
     created_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    updated_at  DATETIME(6)  NULL,
+    updated_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT uk_shares_item UNIQUE (owner_id, item_type, item_id),
     CONSTRAINT chk_shares_item_type CHECK (item_type IN ('DIARY', 'EVENT')),
     CONSTRAINT chk_shares_visibility CHECK (visibility IN ('PRIVATE', 'FRIENDS', 'GROUP', 'PUBLIC')),
     CONSTRAINT fk_shares_owner FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE,
-    CONSTRAINT fk_shares_group FOREIGN KEY (group_id) REFERENCES friend_groups (id) ON DELETE SET NULL
+    CONSTRAINT fk_shares_group FOREIGN KEY (group_id) REFERENCES friend_groups (id) ON DELETE SET NULL,
+    INDEX idx_shares_owner_vis_id (owner_id, visibility, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE share_replies (
@@ -55,7 +56,7 @@ CREATE TABLE share_replies (
     author_id  BIGINT       NOT NULL,
     content    VARCHAR(500) NOT NULL,
     created_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    updated_at DATETIME(6)  NULL,
+    updated_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     deleted_at DATETIME(6)  NULL,
     CONSTRAINT fk_share_replies_share  FOREIGN KEY (share_id)  REFERENCES shares (id) ON DELETE CASCADE,
     CONSTRAINT fk_share_replies_parent FOREIGN KEY (parent_id) REFERENCES share_replies (id) ON DELETE CASCADE,

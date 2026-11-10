@@ -25,6 +25,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -112,8 +114,20 @@ public class ShareService {
                     s.updateVisibility(visibility, groupId);
                     return s;
                 })
-                .orElseGet(() -> shareRepository.save(
-                        new Share(me, type, itemId, visibility, groupId)));
+                .orElseGet(() -> {
+                    try {
+                        // saveAndFlush — UK 충돌을 커밋이 아닌 여기서 잡아 재시도하기 위함
+                        return shareRepository.saveAndFlush(
+                                new Share(me, type, itemId, visibility, groupId));
+                    } catch (DataIntegrityViolationException e) {
+                        // 동시 PUT 경합 — uk_shares_item에 진 자는 승자 행을 재조회해 갱신으로 수렴 (재시도 1회)
+                        Share raced = shareRepository
+                                .findByOwnerIdAndItemTypeAndItemId(me, type, itemId)
+                                .orElseThrow(() -> e);
+                        raced.updateVisibility(visibility, groupId);
+                        return raced;
+                    }
+                });
 
         feedService.notifyNewlyVisible(saved, itemTitle, previouslyVisible);
         return saved;
@@ -154,9 +168,11 @@ public class ShareService {
         if (friendIds.isEmpty()) {
             return List.of();
         }
+        // 후보는 limit×4로 바운드 — 필터 후 limit 미만이면 남은 건 다음 커서 페이지로 넘긴다
         List<Share> candidates = shareRepository
                 .findByOwnerIdInAndVisibilityNotAndIdLessThanOrderByIdDesc(friendIds,
-                        ShareVisibility.PRIVATE, cursor == null ? Long.MAX_VALUE : cursor);
+                        ShareVisibility.PRIVATE, cursor == null ? Long.MAX_VALUE : cursor,
+                        PageRequest.of(0, limit * 4));
         Map<Long, Long> replyCounts = replyCountsOf(
                 candidates.stream().map(Share::getId).toList());
         Map<Long, User> owners = userRepository.findAllById(
@@ -168,7 +184,7 @@ public class ShareService {
             if (result.size() >= limit) {
                 break;
             }
-            if (!feedService.canView(me, share)) {
+            if (!feedService.canView(me, share, friendIds)) {
                 continue;
             }
             Optional<Object> item = itemOf(share.getOwnerId(), share.getItemType(),
@@ -188,6 +204,7 @@ public class ShareService {
     /** 친구 프로필용 공개 항목 — 비친구는 존재 비노출 404. 보이는 것만 canView로 거른다. */
     @Transactional(readOnly = true)
     public List<FeedItem> byOwner(Long me, Long userId) {
+        // 본인 항목은 /mine 경유 — 여기선 isFriend(me,me)=false라 의도적으로 404다
         if (!friendService.isFriend(me, userId)) {
             throw new BusinessException(ErrorCode.SHARE_NOT_FOUND);
         }

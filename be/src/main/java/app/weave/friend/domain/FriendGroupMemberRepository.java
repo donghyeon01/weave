@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface FriendGroupMemberRepository
         extends JpaRepository<FriendGroupMember, FriendGroupMemberId> {
 
-    List<FriendGroupMember> findByGroupId(Long groupId);
+    List<FriendGroupMember> findByGroupIdOrderByUserIdAsc(Long groupId);
 
     List<FriendGroupMember> findByGroupIdIn(Collection<Long> groupIds);
 

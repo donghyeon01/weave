@@ -279,6 +279,39 @@ class ShareServiceTest {
     }
 
     @Test
+    void GROUP_항목도_친구해제_즉시_비가시이고_재친구하면_복원된다() {
+        // 그룹 멤버 행은 해제로 지워지지 않는다 — friendship 합성이 비가시를 보장한다
+        var group = groupService.create(meId, "그룹", List.of(f1Id));
+        Share share = shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.GROUP, group.groupId());
+        assertThat(shareService.feed(f1Id, null, 20)).hasSize(1);
+
+        jdbc.update("DELETE FROM friendships WHERE user_id=? AND friend_id=?", meId, f1Id);
+        assertThat(shareService.feed(f1Id, null, 20)).isEmpty();
+        assertError(ErrorCode.SHARE_NOT_FOUND,
+                () -> shareService.detail(f1Id, share.getId()));
+
+        befriend(meId, f1Id);
+        assertThat(shareService.feed(f1Id, null, 20)).hasSize(1);
+        assertThat(shareService.detail(f1Id, share.getId()).item()).isNotNull();
+    }
+
+    @Test
+    void PRIVATE에서_FRIENDS로_상향하면_구독자에게_알림이_간다() {
+        groupService.subscribe(f1Id, meId);
+
+        // PRIVATE 신규 공개 — 아무도 못 보니 무알림
+        shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.PRIVATE, null);
+        assertThat(notificationCount(f1Id, "SHARED_ITEM")).isEqualTo(0);
+
+        // PRIVATE→FRIENDS 상향 — f1이 새로 보이게 되므로 SHARED_ITEM 발행
+        shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),
+                ShareVisibility.FRIENDS, null);
+        assertThat(notificationCount(f1Id, "SHARED_ITEM")).isEqualTo(1);
+    }
+
+    @Test
     void 그룹삭제는_참조_공개항목을_비공개취급한다() {
         var group = groupService.create(meId, "그룹", List.of(f1Id));
         Share share = shareService.upsert(meId, ShareItemType.DIARY, diary.getId(),

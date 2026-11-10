@@ -56,6 +56,27 @@ public class FeedService {
         };
     }
 
+    /**
+     * 피드용 canView — 친구 관계 다리는 미리 적재한 friendIds 집합으로 판정해
+     * 후보 행마다 isFriend 쿼리를 날리지 않는다. GROUP 멤버십만 행 단위로 확인한다.
+     * friendIds는 요청 시점 스냅샷이라 처리 도중 해제된 관계는 다음 읽기에서 반영된다.
+     */
+    @Transactional(readOnly = true)
+    public boolean canView(Long viewerId, Share share, Set<Long> friendIds) {
+        if (viewerId.equals(share.getOwnerId())) {
+            return true;
+        }
+        if (!friendIds.contains(share.getOwnerId())) {
+            return false;
+        }
+        return switch (share.getVisibility()) {
+            case PRIVATE -> false;
+            case FRIENDS, PUBLIC -> true;
+            case GROUP -> share.getGroupId() != null
+                    && groupService.isGroupMember(share.getGroupId(), viewerId);
+        };
+    }
+
     @Transactional(readOnly = true)
     public boolean canView(Long viewerId, Share share) {
         return canView(viewerId, share.getOwnerId(), share.getVisibility(),

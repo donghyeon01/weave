@@ -58,6 +58,8 @@ public class FriendGroupService {
 
     @Transactional
     public GroupView create(Long me, String name, List<Long> memberIds) {
+        // 스펙상 앱 레벨 검증 — count→insert 사이 동시 생성 경합으로 4개째가 들어갈 수 있으나
+        // 허용된 race window다 (잠금·직렬화는 도입하지 않음)
         if (groupRepository.countByOwnerId(me) >= MAX_GROUPS) {
             throw new BusinessException(ErrorCode.GROUP_LIMIT_EXCEEDED);
         }
@@ -149,7 +151,7 @@ public class FriendGroupService {
     }
 
     private List<Long> memberIdsOf(Long groupId) {
-        return memberRepository.findByGroupId(groupId).stream()
+        return memberRepository.findByGroupIdOrderByUserIdAsc(groupId).stream()
                 .map(FriendGroupMember::getUserId).toList();
     }
 }

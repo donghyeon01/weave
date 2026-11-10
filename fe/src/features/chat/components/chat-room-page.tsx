@@ -7,7 +7,7 @@ import { SkeletonRow } from '../../../components/ui/skeleton-row'
 import { queryKeys } from '../../../lib/react-query'
 import { onStompConnect, onStompError, subscribeTopic } from '../../../lib/stomp'
 import type { UserResponse } from '../../../types/auth'
-import { cx } from '../../../utils/cx'
+import { ChatHeader } from './chat-page'
 import {
   appendRoomMessage,
   useChatMessages,
@@ -18,9 +18,6 @@ import {
 import type { ChatMessage, Slot } from '../types'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const
-
-const INPUT_CLASS =
-  'w-full rounded-xl border-2 border-input bg-surface px-3 py-2 text-sm text-text outline-none transition duration-150 focus:border-accent disabled:cursor-not-allowed disabled:opacity-60'
 
 // Map으로 둔다 — object 리터럴은 서버 code가 'toString' 같은 프로토타입 키일 때
 // 함수를 반환해 React child로 렌더되며 크래시한다
@@ -219,74 +216,78 @@ export function ChatRoomPage() {
 
   return (
     <div className="flex w-full flex-col">
-      <div className="flex items-center gap-3">
-        <Link
-          to="/app/chat"
-          className="inline-flex items-center gap-2 rounded-xl border-2 border-border-strong bg-surface px-3 py-1.5 text-sm font-semibold text-text shadow-brutal-sm transition duration-200 hover:bg-surface-muted"
-        >
-          ← 목록
-        </Link>
-      </div>
+      <ChatHeader />
 
-      <div className="mt-4 flex flex-col gap-1.5">
-        <h1 className="font-display text-[28px] leading-normal">
-          {room?.title ?? '채팅방'}
-        </h1>
-        {room !== undefined && (
-          <p className="text-sm font-medium text-text-secondary">
-            {formatSlotHuman(room.slot)}
-            {` · 멤버 ${room.memberCount}명`}
+      <div className="mt-6 rounded-2xl border border-border bg-surface p-6 shadow-card">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/app/chat"
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border-2 border-border-strong bg-surface px-3 py-1.5 text-sm font-semibold text-text shadow-brutal-sm transition duration-200 hover:bg-surface-muted"
+          >
+            ← 목록
+          </Link>
+          <h2 className="truncate text-lg font-bold text-text">
+            {room?.title ?? '채팅방'}
+          </h2>
+          {room !== undefined && (
+            <p className="shrink-0 text-sm font-medium text-text-secondary">
+              {formatSlotHuman(room.slot)}
+              {` · 멤버 ${room.memberCount}명`}
+            </p>
+          )}
+        </div>
+
+        {closed && (
+          <div className="mt-4 rounded-xl border border-border bg-surface-muted px-4 py-3 text-sm font-semibold text-text-secondary">
+            종료된 채팅방이에요. 읽기만 가능합니다
+          </div>
+        )}
+
+        {messagesQuery.isPending && <SkeletonRow rows={4} className="mt-6" />}
+        <QueryErrorToast
+          show={messagesQuery.isError}
+          message="메시지를 불러오지 못했어요. 다시 시도해 주세요."
+        />
+
+        <div ref={topSentinelRef} />
+        {messagesQuery.isFetchingPreviousPage && (
+          <p className="mt-4 text-center text-sm font-medium text-text-muted">
+            이전 메시지를 불러오는 중…
+          </p>
+        )}
+        <ul className="mt-4 flex flex-col gap-4">
+          {messages.map((m) => (
+            <MessageBubble key={m.id} message={m} mine={m.senderId === me?.id} />
+          ))}
+        </ul>
+        <div ref={bottomRef} />
+
+        {closed ? (
+          <p className="mt-6 rounded-xl bg-surface-muted px-4 py-2.5 text-sm font-medium text-text-secondary">
+            대화가 종료되어 메시지를 보낼 수 없어요
+          </p>
+        ) : (
+          <form onSubmit={onSubmit} className="mt-6 flex gap-2">
+            <input
+              type="text"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              maxLength={2000}
+              placeholder="메시지를 입력하세요"
+              aria-label="메시지 입력"
+              className="flex-1 rounded-xl bg-surface-muted px-4 py-2.5 text-sm font-medium text-text outline-none transition duration-150 placeholder:text-text-muted focus:ring-2 focus:ring-ring"
+            />
+            <Button type="submit" variant="ghost" size="md" disabled={send.isPending}>
+              전송
+            </Button>
+          </form>
+        )}
+        {sendError !== null && (
+          <p role="alert" className="mt-2 text-sm font-semibold text-danger-text">
+            {sendError}
           </p>
         )}
       </div>
-
-      {closed && (
-        <div className="mt-4 rounded-xl border border-border bg-surface-muted px-4 py-3 text-sm font-semibold text-text-secondary">
-          종료된 채팅방이에요. 읽기만 가능합니다
-        </div>
-      )}
-
-      {messagesQuery.isPending && <SkeletonRow rows={4} className="mt-6" />}
-      <QueryErrorToast
-        show={messagesQuery.isError}
-        message="메시지를 불러오지 못했어요. 다시 시도해 주세요."
-      />
-
-      <div ref={topSentinelRef} />
-      {messagesQuery.isFetchingPreviousPage && (
-        <p className="mt-4 text-center text-sm font-medium text-text-muted">
-          이전 메시지를 불러오는 중…
-        </p>
-      )}
-      <ul className="mt-4 flex flex-col gap-4">
-        {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} mine={m.senderId === me?.id} />
-        ))}
-      </ul>
-      <div ref={bottomRef} />
-
-      <form onSubmit={onSubmit} className="sticky bottom-0 mt-6 flex gap-2 bg-background pb-2 pt-2">
-        <input
-          type="text"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          maxLength={2000}
-          disabled={closed}
-          placeholder={
-            closed ? '대화가 종료되어 메시지를 보낼 수 없어요' : '메시지를 입력하세요'
-          }
-          aria-label="메시지 입력"
-          className={cx(INPUT_CLASS, 'flex-1')}
-        />
-        <Button type="submit" variant="brutal" size="md" disabled={closed || send.isPending}>
-          전송
-        </Button>
-      </form>
-      {sendError !== null && (
-        <p role="alert" className="mt-2 text-sm font-semibold text-danger-text">
-          {sendError}
-        </p>
-      )}
     </div>
   )
 }

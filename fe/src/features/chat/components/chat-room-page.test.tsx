@@ -166,16 +166,18 @@ describe('chat-room-page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('종료')
   })
 
-  it('CLOSED 방은 종료 배너와 비활성 입력을 보여준다', async () => {
+  it('CLOSED 방은 종료 배너와 종료 안내 바를 보여준다', async () => {
     mockApi('CLOSED')
     renderRoom(createQueryClient())
 
     expect(
       await screen.findByText('종료된 채팅방이에요. 읽기만 가능합니다'),
     ).toBeInTheDocument()
-    const input = screen.getByLabelText('메시지 입력')
-    expect(input).toBeDisabled()
-    expect(input).toHaveAttribute('placeholder', '대화가 종료되어 메시지를 보낼 수 없어요')
+    expect(
+      screen.getByText('대화가 종료되어 메시지를 보낼 수 없어요'),
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText('메시지 입력')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '전송' })).not.toBeInTheDocument()
   })
 
   it('방 목록에 없는 방(비멤버)은 토픽을 구독하지 않는다', async () => {

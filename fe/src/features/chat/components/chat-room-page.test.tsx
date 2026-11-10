@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiFetch } from '../../../lib/api-client'
 import { createQueryClient, queryKeys } from '../../../lib/react-query'
-import { publish, subscribeTopic } from '../../../lib/stomp'
+import { onStompError, publish, subscribeTopic } from '../../../lib/stomp'
 import type { ChatRoomSummary, RoomStatus } from '../types'
 import { ChatRoomPage } from './chat-room-page'
 
@@ -19,6 +19,7 @@ vi.mock('../../../lib/stomp', () => ({
   publish: vi.fn(),
   subscribeTopic: vi.fn(() => () => {}),
   onStompConnect: vi.fn(() => () => {}),
+  onStompError: vi.fn(() => () => {}),
 }))
 
 const apiFetchMock = vi.mocked(apiFetch)
@@ -82,6 +83,9 @@ beforeEach(() => {
   apiFetchMock.mockReset()
   publishMock.mockReset()
   vi.mocked(subscribeTopic).mockReset()
+  vi.mocked(subscribeTopic).mockImplementation(() => () => {})
+  vi.mocked(onStompError).mockReset()
+  vi.mocked(onStompError).mockImplementation(() => () => {})
   ioCallbacks.length = 0
   vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver)
   // jsdom에는 scrollIntoView가 없다 — 스크롤 효과 자체는 검증 대상이 아니라 스텁한다
@@ -127,6 +131,39 @@ describe('chat-room-page', () => {
         }),
       ),
     )
+  })
+
+  it('서버가 SEND를 거부하면 입력이 복원되고 에러가 표시된다', async () => {
+    const errListeners: Array<
+      (e: { code: string | null; clientMessageId: string | null }) => void
+    > = []
+    vi.mocked(onStompError).mockImplementation((cb) => {
+      errListeners.push(cb)
+      return () => {}
+    })
+    mockApi('OPEN')
+    const qc = createQueryClient()
+    qc.setQueryData(queryKeys.users.me, { id: 1 })
+    renderRoom(qc)
+    await screen.findByText('안녕')
+
+    await userEvent.type(screen.getByLabelText('메시지 입력'), '다들 뭐해?')
+    await userEvent.click(screen.getByRole('button', { name: '전송' }))
+    await waitFor(() => expect(publishMock).toHaveBeenCalled())
+    const clientMessageId = (
+      publishMock.mock.calls[0][1] as { clientMessageId: string }
+    ).clientMessageId
+    // publish 성공으로 입력은 지워진 상태
+    expect(screen.getByLabelText('메시지 입력')).toHaveValue('')
+
+    act(() => {
+      for (const l of errListeners) {
+        l({ code: 'CHAT-ROOM-CLOSED', clientMessageId })
+      }
+    })
+
+    expect(screen.getByLabelText('메시지 입력')).toHaveValue('다들 뭐해?')
+    expect(await screen.findByRole('alert')).toHaveTextContent('종료')
   })
 
   it('CLOSED 방은 종료 배너와 비활성 입력을 보여준다', async () => {

@@ -15,6 +15,13 @@ export interface StompMessage {
   body: string
 }
 
+export interface StompErrorInfo {
+  /** be ERROR 프레임 message 헤더의 {"code":"..."}에서 파싱 — 비JSON(연결 인증 실패 등)이면 null */
+  code: string | null
+  /** 거부된 SEND의 clientMessageId — 봉투에 실릴 때만 (SEND 외 프레임 거부는 null) */
+  clientMessageId: string | null
+}
+
 interface DesiredSub {
   destination: string
   onMessage: (msg: StompMessage) => void
@@ -24,6 +31,7 @@ interface DesiredSub {
 let client: Client | null = null
 const subscriptions: DesiredSub[] = []
 const connectListeners = new Set<() => void>()
+const errorListeners = new Set<(e: StompErrorInfo) => void>()
 
 /**
  * destination 구독. 미연결이면 다음 onConnect에서 자동 구독된다.
@@ -50,6 +58,14 @@ export function onStompConnect(listener: () => void) {
   connectListeners.add(listener)
   return () => {
     connectListeners.delete(listener)
+  }
+}
+
+/** STOMP ERROR 프레임 수신 — 서버 거부를 호출부가 표면화하게 한다. 해제 함수를 반환한다. */
+export function onStompError(listener: (e: StompErrorInfo) => void) {
+  errorListeners.add(listener)
+  return () => {
+    errorListeners.delete(listener)
   }
 }
 
@@ -88,8 +104,21 @@ export function startStompClient() {
       for (const listener of connectListeners) listener()
     },
     onStompError: (frame) => {
-      // ERROR 프레임(대개 토큰 만료) — 다음 재시도는 beforeConnect가 최신 토큰을 넣는다
-      void frame
+      // be는 거부 사유를 {"code":"...","clientMessageId":"..."} JSON으로 message 헤더에 싣는다 (api-contract §3.10)
+      let parsed: { code?: string; clientMessageId?: string } | null = null
+      try {
+        const raw: unknown = JSON.parse(frame.headers['message'] ?? '')
+        if (raw !== null && typeof raw === 'object') {
+          parsed = raw as { code?: string; clientMessageId?: string }
+        }
+      } catch {
+        // 인증 실패 등 비JSON ERROR — code·clientMessageId 모두 null로 둔다
+      }
+      const info: StompErrorInfo = {
+        code: parsed?.code ?? null,
+        clientMessageId: parsed?.clientMessageId ?? null,
+      }
+      for (const listener of errorListeners) listener(info)
     },
   })
   // activate 전에 동기 할당 — ensureFreshToken 대기 구간에 client가 null이면

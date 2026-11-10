@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { queryKeys } from '../../../lib/react-query'
 import { publish } from '../../../lib/stomp'
 import type { ChatSendPayload } from '../types'
@@ -11,10 +16,18 @@ export function useChatRooms() {
   })
 }
 
+// 커서 페이지네이션 — 첫 페이지는 최신 50건, fetchPreviousPage로 더 오래된
+// 페이지를 앞에 붙인다. pages[0]이 가장 오래된 페이지라 flat() 순서가 오름차순.
 export function useChatMessages(roomId: number | null) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: queryKeys.chat.messages(roomId ?? 0),
-    queryFn: () => fetchChatMessages(roomId ?? 0),
+    queryFn: ({ pageParam }) => fetchChatMessages(roomId ?? 0, pageParam),
+    initialPageParam: undefined as number | undefined,
+    // 최신 방향 페이지는 없다 — 새 메시지는 STOMP 브로드캐스트 → 무효화로 반영한다
+    getNextPageParam: () => undefined,
+    // 반환 건수가 limit(50) 미만이면 더 이상 옛날 메시지가 없다
+    getPreviousPageParam: (firstPage) =>
+      firstPage.length >= 50 ? firstPage[0]?.id : undefined,
     enabled: roomId !== null,
   })
 }

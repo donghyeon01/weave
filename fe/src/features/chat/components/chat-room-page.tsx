@@ -82,10 +82,25 @@ export function ChatRoomPage() {
   const lastReadSentRef = useRef<number | null>(null)
 
   const room = roomsQuery.data?.find((r) => r.roomId === roomId)
-  const messages = messagesQuery.data ?? []
+  // useInfiniteQuery — pages[0]이 가장 오래된 페이지라 flat()이 createdAt 오름차순
+  const messages = messagesQuery.data?.pages.flat() ?? []
   const closed = room?.status === 'CLOSED'
 
   const me = queryClient.getQueryData<UserResponse>(queryKeys.users.me)
+
+  // 스트림 상단 sentinel — 뷰포트에 들어오면 이전 페이지 로드.
+  // hasPreviousPage=false면 fetchPreviousPage가 no-op이라 상시 관찰해도 안전하다.
+  const topSentinelRef = useRef<HTMLDivElement>(null)
+  const fetchPreviousPage = messagesQuery.fetchPreviousPage
+  useEffect(() => {
+    const el = topSentinelRef.current
+    if (el === null) return
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) void fetchPreviousPage()
+    })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [fetchPreviousPage])
 
   // 방 입장 시 /topic/rooms/{id} 구독 — 수신 메시지는 목록·방 목록 무효화로 반영한다.
   // 방 목록에 없는 방(비멤버·미존재)은 구독하지 않는다 — 서버 거부(ERROR+세션 종료)가
@@ -107,10 +122,10 @@ export function ChatRoomPage() {
     markRead.mutate(latestId)
   }, [latestId, markRead])
 
-  // 새 메시지가 오면 스트림 하단으로 스크롤
+  // 최신 메시지 id가 바뀔 때만 하단으로 — 이전 페이지 prepend는 스크롤을 건드리지 않는다
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' })
-  }, [messages.length])
+  }, [latestId])
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -163,6 +178,12 @@ export function ChatRoomPage() {
         message="메시지를 불러오지 못했어요. 다시 시도해 주세요."
       />
 
+      <div ref={topSentinelRef} />
+      {messagesQuery.isFetchingPreviousPage && (
+        <p className="mt-4 text-center text-sm font-medium text-text-muted">
+          이전 메시지를 불러오는 중…
+        </p>
+      )}
       <ul className="mt-4 flex flex-col gap-4">
         {messages.map((m) => (
           <MessageBubble key={m.id} message={m} mine={m.senderId === me?.id} />

@@ -5,7 +5,7 @@ import { Button } from '../../../components/ui/button'
 import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
 import { queryKeys } from '../../../lib/react-query'
-import { onStompConnect, subscribeTopic } from '../../../lib/stomp'
+import { onStompConnect, onStompError, subscribeTopic } from '../../../lib/stomp'
 import type { UserResponse } from '../../../types/auth'
 import { cx } from '../../../utils/cx'
 import {
@@ -21,6 +21,16 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const
 
 const INPUT_CLASS =
   'w-full rounded-xl border-2 border-input bg-surface px-3 py-2 text-sm text-text outline-none transition duration-150 focus:border-accent disabled:cursor-not-allowed disabled:opacity-60'
+
+// Map으로 둔다 — object 리터럴은 서버 code가 'toString' 같은 프로토타입 키일 때
+// 함수를 반환해 React child로 렌더되며 크래시한다
+const SEND_ERROR_MESSAGES: ReadonlyMap<string, string> = new Map([
+  ['CHAT-ROOM-CLOSED', '채팅방이 종료되어 메시지를 보낼 수 없어요'],
+  ['CHAT-NOT-MEMBER', '이 채팅방에는 메시지를 보낼 수 없어요'],
+  ['CHAT-ROOM-NOT-FOUND', '이 채팅방에는 메시지를 보낼 수 없어요'],
+  ['CHAT-MESSAGE-INVALID', '메시지 형식이 올바르지 않아요'],
+])
+const SEND_ERROR_FALLBACK = '메시지를 보내지 못했어요. 잠시 후 다시 시도해 주세요.'
 
 // "5월 18일 (일) 12:30–14:00" — 제안 보관함 행 표기와 동일 포맷
 function formatSlotHuman(slot: Slot): string {
@@ -86,6 +96,9 @@ export function ChatRoomPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   // 같은 마지막 메시지로 read POST를 반복하지 않기 위한 가드
   const lastReadSentRef = useRef<number | null>(null)
+  // SEND 거부(ERROR 프레임)의 입력 복원용 — clientMessageId → 보낸 본문.
+  // 봉투의 clientMessageId와 일치할 때만 복원 — 상한을 두어 성공 송신 잔여를 정리한다.
+  const pendingSendsRef = useRef(new Map<string, string>())
 
   const room = roomsQuery.data?.find((r) => r.roomId === roomId)
   // useInfiniteQuery — pages[0]이 가장 오래된 페이지라 flat()이 createdAt 오름차순
@@ -145,6 +158,30 @@ export function ChatRoomPage() {
     }
   }, [roomId, roomKnown, queryClient])
 
+  // 서버 송신 거부(ERROR) 표면화 — 봉투 clientMessageId가 pending 송신과 일치하면 입력 복원.
+  // 매칭이 안 돼도 봉투 code가 있으면 거부 사실 자체는 사용자에게 보인다 (무표시 유실 방지)
+  useEffect(() => {
+    return onStompError(({ code, clientMessageId }) => {
+      if (code === null) return // 인증 실패 등 비JSON ERROR — 송신과 무관
+      if (clientMessageId !== null) {
+        const content = pendingSendsRef.current.get(clientMessageId)
+        if (content !== undefined) {
+          pendingSendsRef.current.delete(clientMessageId)
+          setContent(content)
+        }
+      }
+      setSendError(SEND_ERROR_MESSAGES.get(code) ?? SEND_ERROR_FALLBACK)
+      // 방 상태가 뒤바뀐 거부는 목록을 갱신해 closed 표시를 즉시 반영한다
+      if (
+        code === 'CHAT-ROOM-CLOSED' ||
+        code === 'CHAT-NOT-MEMBER' ||
+        code === 'CHAT-ROOM-NOT-FOUND'
+      ) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.chat.rooms })
+      }
+    })
+  }, [queryClient])
+
   // 최신 메시지까지 읽음 처리 — 보고 있는 방의 unread를 0으로 만든다.
   // 페이지는 createdAt 오름차순이라 max(id)를 써야 커서 역전이 없다
   const latestId = messages.length > 0 ? Math.max(...messages.map((m) => m.id)) : null
@@ -164,14 +201,18 @@ export function ChatRoomPage() {
     e.preventDefault()
     const trimmed = content.trim()
     if (trimmed.length === 0 || closed || send.isPending) return
+    const clientMessageId = crypto.randomUUID()
+    const pending = pendingSendsRef.current
+    if (pending.size >= 20) pending.delete(pending.keys().next().value!)
+    pending.set(clientMessageId, trimmed)
     send.mutate(
-      { content: trimmed, clientMessageId: crypto.randomUUID() },
+      { content: trimmed, clientMessageId },
       {
         onSuccess: () => {
           setContent('')
           setSendError(null)
         },
-        onError: () => setSendError('메시지를 보내지 못했어요. 잠시 후 다시 시도해 주세요.'),
+        onError: () => setSendError(SEND_ERROR_FALLBACK),
       },
     )
   }

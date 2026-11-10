@@ -331,4 +331,18 @@ class ChatStompIntegrationTest {
         assertThat(second.get("id")).isEqualTo(first.get("id"));
         assertThat(chatService.history(meId, r.getId(), null, null)).hasSize(1);
     }
+
+    @Test
+    void 거부된_SEND의_ERROR는_code와_clientMessageId를_실는다() throws Exception {
+        ChatRoom r = room(8L, List.of(meId));
+        chatService.closeRoom(8L);
+        Conn me = connect(meId);
+
+        me.session().send("/app/rooms/" + r.getId(),
+                Map.of("content", "hi", "clientMessageId", "cm-1"));
+
+        String raw = me.errors().nextError();
+        assertThat(raw).contains("CHAT-ROOM-CLOSED")
+                .contains("\"clientMessageId\":\"cm-1\"");
+    }
 }

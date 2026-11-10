@@ -25,6 +25,7 @@ function room(roomId: number, status: RoomStatus, unreadCount = 0): ChatRoomSumm
     status,
     lastMessage: `마지막 메시지 ${roomId}`,
     lastMessageAt: '2026-05-11T12:30:00',
+    memberCount: 3,
   }
 }
 

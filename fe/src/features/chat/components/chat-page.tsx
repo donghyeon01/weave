@@ -37,7 +37,7 @@ function RoomCard({ room }: { room: ChatRoomSummary }) {
                 <span className="text-sm font-bold text-accent-text">{room.unreadCount}</span>
               </>
             )}
-            {room.lastMessageAt !== undefined && (
+            {room.lastMessageAt !== null && (
               <span className="text-xs font-medium text-text-muted">
                 {formatTime(room.lastMessageAt)}
               </span>

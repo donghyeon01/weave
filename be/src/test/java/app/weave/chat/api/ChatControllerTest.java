@@ -1,5 +1,7 @@
 package app.weave.chat.api;
 
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -94,6 +96,12 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$[?(@.proposalId==1)].slot.endTime").value("12:00"))
                 .andExpect(jsonPath("$[?(@.proposalId==1)].unreadCount").value(1))
                 .andExpect(jsonPath("$[?(@.proposalId==1)].status").value("OPEN"))
+                .andExpect(jsonPath("$[?(@.proposalId==1)].lastMessage").value("unread"))
+                .andExpect(jsonPath("$[?(@.proposalId==1)].lastMessageAt").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.proposalId==1)].memberCount").value(2))
+                .andExpect(jsonPath("$[?(@.proposalId==2)].lastMessage")
+                        .value(hasItem(nullValue())))
+                .andExpect(jsonPath("$[?(@.proposalId==2)].memberCount").value(2))
                 .andExpect(jsonPath("$[?(@.proposalId==2)].slot.type").value("DATE"))
                 .andExpect(jsonPath("$[?(@.proposalId==2)].slot.startDate").value("2026-12-05"))
                 .andExpect(jsonPath("$[?(@.proposalId==2)].slot.endDate").value("2026-12-07"))

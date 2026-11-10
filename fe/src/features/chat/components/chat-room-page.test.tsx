@@ -17,7 +17,8 @@ vi.mock('../../../lib/api-client', async (importOriginal) => {
 
 vi.mock('../../../lib/stomp', () => ({
   publish: vi.fn(),
-  subscribeTopic: vi.fn(),
+  subscribeTopic: vi.fn(() => () => {}),
+  onStompConnect: vi.fn(() => () => {}),
 }))
 
 const apiFetchMock = vi.mocked(apiFetch)
@@ -43,6 +44,8 @@ function room(roomId: number, status: RoomStatus): ChatRoomSummary {
     unreadCount: 0,
     status,
     memberCount: 3,
+    lastMessage: '최근 메시지',
+    lastMessageAt: '2026-05-11T12:30:00',
   }
 }
 

@@ -45,11 +45,12 @@ public class ChatMessageHandler {
         try {
             view = chatService.send(me, roomId, payload.content(), payload.clientMessageId());
         } catch (BusinessException e) {
-            throw StompRoomAuthInterceptor.error(e.getErrorCode());
+            throw StompRoomAuthInterceptor.error(e.getErrorCode(), payload.clientMessageId());
         } catch (RuntimeException e) {
             // 비도메인 예외는 내부 메시지가 ERROR 프레임에 새지 않도록 봉투로 변환한다
             log.warn("chat send 실패 roomId={} userId={}", roomId, me, e);
-            throw StompRoomAuthInterceptor.error(ErrorCode.INTERNAL_ERROR);
+            throw StompRoomAuthInterceptor.error(ErrorCode.INTERNAL_ERROR,
+                    payload.clientMessageId());
         }
         template.convertAndSend("/topic/rooms/" + roomId, view);
     }

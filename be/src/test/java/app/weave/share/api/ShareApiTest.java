@@ -246,6 +246,133 @@ class ShareApiTest {
     }
 
     @Test
+    void 답글_작성은_201과_ReplyNode를_반환하고_스레드를_조회한다() throws Exception {
+        Long shareId = shareIdOf(createShare(meToken,
+                "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
+                        + ",\"targetUserIds\":[" + f1Id + "]}"));
+
+        MvcResult r = mvc.perform(post("/api/shares/" + shareId + "/replies")
+                        .header("Authorization", "Bearer " + f1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"잘 봤어\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.author.id").value(f1Id))
+                .andExpect(jsonPath("$.author.nickname").value("일"))
+                .andExpect(jsonPath("$.content").value("잘 봤어"))
+                .andExpect(jsonPath("$.deleted").value(false))
+                .andExpect(jsonPath("$.children").isArray())
+                .andReturn();
+        Long replyId = com.jayway.jsonpath.JsonPath
+                .<Number>read(r.getResponse().getContentAsString(), "$.id").longValue();
+
+        // 대댓글 → 목록에서 루트 children에 임베드
+        mvc.perform(post("/api/shares/" + shareId + "/replies")
+                        .header("Authorization", "Bearer " + meToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"고마워\",\"parentId\":" + replyId + "}"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(get("/api/shares/" + shareId + "/replies")
+                        .header("Authorization", "Bearer " + f1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].children.length()").value(1))
+                .andExpect(jsonPath("$[0].children[0].content").value("고마워"));
+
+        // 상세 replyCount 반영
+        mvc.perform(get("/api/shares/" + shareId)
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(jsonPath("$.replyCount").value(2));
+    }
+
+    @Test
+    void 답글_에러는_계약_코드로_매핑된다() throws Exception {
+        Long shareId = shareIdOf(createShare(meToken,
+                "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
+                        + ",\"targetUserIds\":[" + f1Id + "]}"));
+
+        // 비열람자 작성·조회 → 404 SHARE-NOT-AUDIENCE
+        mvc.perform(post("/api/shares/" + shareId + "/replies")
+                        .header("Authorization", "Bearer " + outsiderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"x\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SHARE-NOT-AUDIENCE"));
+        mvc.perform(get("/api/shares/" + shareId + "/replies")
+                        .header("Authorization", "Bearer " + outsiderToken))
+                .andExpect(status().isNotFound());
+
+        // 공백·초과 → 400 REPLY-INVALID
+        mvc.perform(post("/api/shares/" + shareId + "/replies")
+                        .header("Authorization", "Bearer " + f1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"  \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REPLY-INVALID"));
+
+        // 없는 부모 → 400 REPLY-PARENT-INVALID
+        mvc.perform(post("/api/shares/" + shareId + "/replies")
+                        .header("Authorization", "Bearer " + f1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"x\",\"parentId\":999999}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REPLY-PARENT-INVALID"));
+
+        // limit 범위 초과 → 400
+        mvc.perform(get("/api/shares/" + shareId + "/replies?limit=51")
+                        .header("Authorization", "Bearer " + f1Token))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 답글_수정과_삭제는_작성자_또는_소유자만_가능하다() throws Exception {
+        Long shareId = shareIdOf(createShare(meToken,
+                "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId
+                        + ",\"targetUserIds\":[" + f1Id + "," + f2Id + "]}"));
+        String f2Token = jwtProvider.createAccessToken(f2Id, List.of("ROLE_USER"));
+        MvcResult r = mvc.perform(post("/api/shares/" + shareId + "/replies")
+                        .header("Authorization", "Bearer " + f1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"원문\"}"))
+                .andReturn();
+        Long replyId = com.jayway.jsonpath.JsonPath
+                .<Number>read(r.getResponse().getContentAsString(), "$.id").longValue();
+
+        // 작성자 아닌 열람자 수정 → 404 REPLY-NOT-AUTHOR
+        mvc.perform(patch("/api/shares/" + shareId + "/replies/" + replyId)
+                        .header("Authorization", "Bearer " + f2Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"남의 글 수정\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("REPLY-NOT-AUTHOR"));
+
+        // 작성자 수정 → 200
+        mvc.perform(patch("/api/shares/" + shareId + "/replies/" + replyId)
+                        .header("Authorization", "Bearer " + f1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"고침\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("고침"));
+
+        // 다른 share 경로의 rid → 404 REPLY-NOT-FOUND
+        mvc.perform(patch("/api/shares/" + shareId + "/replies/999999")
+                        .header("Authorization", "Bearer " + f1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"x\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("REPLY-NOT-FOUND"));
+
+        // 소유자 삭제 → 204, 이후 목록에서 tombstone 마스킹
+        mvc.perform(delete("/api/shares/" + shareId + "/replies/" + replyId)
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/shares/" + shareId + "/replies")
+                        .header("Authorization", "Bearer " + f1Token))
+                .andExpect(jsonPath("$[0].deleted").value(true))
+                .andExpect(jsonPath("$[0].content").value(""));
+    }
+
+    @Test
     void 사진_엔드포인트는_비대상에게_404다() throws Exception {
         Long shareId = shareIdOf(createShare(meToken,
                 "{\"itemType\":\"DIARY\",\"itemId\":" + diaryId

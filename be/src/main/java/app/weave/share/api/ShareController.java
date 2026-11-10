@@ -7,6 +7,9 @@ import app.weave.common.port.SharedPhotoBytes;
 import app.weave.notification.service.NotificationPayload.UserRef;
 import app.weave.share.domain.Share;
 import app.weave.share.domain.ShareItemType;
+import app.weave.share.domain.ShareReply;
+import app.weave.share.service.ReplyService;
+import app.weave.share.service.ReplyService.ReplyNode;
 import app.weave.share.service.ShareService;
 import app.weave.share.service.ShareService.ReceivedShare;
 import app.weave.share.service.ShareService.ShareDetail;
@@ -39,9 +42,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ShareController {
 
     private final ShareService service;
+    private final ReplyService replyService;
 
-    public ShareController(ShareService service) {
+    public ShareController(ShareService service, ReplyService replyService) {
         this.service = service;
+        this.replyService = replyService;
     }
 
     @PostMapping
@@ -91,6 +96,38 @@ public class ShareController {
         return ResponseEntity.noContent().build();
     }
 
+    /** 답글 스레드 — 루트만 id > cursor 오름차순, children에 대댓글 임베드 (§3.11). */
+    @GetMapping("/{id}/replies")
+    public List<ReplyNodeResponse> replies(@AuthenticationPrincipal Long me,
+            @PathVariable Long id, @RequestParam(required = false) Long cursor,
+            @RequestParam(defaultValue = "20") int limit) {
+        return replyService.list(me, id, cursor, limit).stream()
+                .map(this::toReplyNode).toList();
+    }
+
+    @PostMapping("/{id}/replies")
+    public ResponseEntity<ReplyNodeResponse> createReply(@AuthenticationPrincipal Long me,
+            @PathVariable Long id, @RequestBody ReplyRequest req) {
+        ShareReply reply = replyService.create(me, id, req.content(), req.parentId());
+        return ResponseEntity.created(
+                URI.create("/api/shares/" + id + "/replies/" + reply.getId()))
+                .body(toReplyNode(replyService.nodeOf(reply)));
+    }
+
+    @PatchMapping("/{id}/replies/{rid}")
+    public ReplyNodeResponse updateReply(@AuthenticationPrincipal Long me,
+            @PathVariable Long id, @PathVariable Long rid,
+            @RequestBody ReplyRequest req) {
+        return toReplyNode(replyService.nodeOf(replyService.update(me, id, rid, req.content())));
+    }
+
+    @DeleteMapping("/{id}/replies/{rid}")
+    public ResponseEntity<Void> deleteReply(@AuthenticationPrincipal Long me,
+            @PathVariable Long id, @PathVariable Long rid) {
+        replyService.delete(me, id, rid);
+        return ResponseEntity.noContent().build();
+    }
+
     /** 사진 서빙 — <img>가 Authorization을 못 보내므로 fe는 인증 fetch→objectURL로 표시한다. */
     @GetMapping("/{id}/photos/{photoId}")
     public ResponseEntity<byte[]> photo(@AuthenticationPrincipal Long me,
@@ -100,6 +137,13 @@ public class ShareController {
                 .contentType(MediaType.parseMediaType(photo.contentType()))
                 .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePrivate().immutable())
                 .body(photo.bytes());
+    }
+
+    /** ReplyNode → 계약 형태 — author는 {"id","nickname"} 객체로 감싼다. */
+    private ReplyNodeResponse toReplyNode(ReplyNode n) {
+        return new ReplyNodeResponse(n.id(), new UserRef(n.authorId(), n.nickname()),
+                n.content(), n.createdAt(), n.updatedAt(), n.deleted(),
+                n.children().stream().map(this::toReplyNode).toList());
     }
 
     private ShareDetailResponse toDetail(ShareDetail d) {
@@ -130,6 +174,16 @@ public class ShareController {
     }
 
     public record EditTargetsRequest(List<Long> add, List<Long> remove) {
+    }
+
+    /** parentId는 PATCH에선 무시된다 — 생성·수정 요청을 하나의 record로 받는다. */
+    public record ReplyRequest(String content, Long parentId) {
+    }
+
+    /** 계약 §3.11 ReplyNode — deleted=true면 content는 "" (tombstone). */
+    public record ReplyNodeResponse(Long id, UserRef author, String content,
+            LocalDateTime createdAt, LocalDateTime updatedAt, boolean deleted,
+            List<ReplyNodeResponse> children) {
     }
 
     public record ShareSummaryResponse(Long shareId, ShareItemType itemType, Long itemId,

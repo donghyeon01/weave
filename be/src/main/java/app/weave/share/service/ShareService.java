@@ -142,8 +142,11 @@ public class ShareService {
     @Transactional
     public List<ShareView> myShares(Long me) {
         Set<Long> friendIds = friendService.acceptedFriendIds(me);
+        List<Share> shares = shareRepository.findByOwnerIdOrderByCreatedAtDesc(me);
+        Map<Long, Long> replyCounts = replyCountsOf(
+                shares.stream().map(Share::getId).toList());
         List<ShareView> result = new ArrayList<>();
-        for (Share share : shareRepository.findByOwnerIdOrderByCreatedAtDesc(me)) {
+        for (Share share : shares) {
             List<Long> validTargets = validTargetsOrPurge(share.getId(), friendIds);
             Optional<Object> item = itemOf(share.getOwnerId(), share.getItemType(),
                     share.getItemId());
@@ -152,7 +155,7 @@ public class ShareService {
             }
             result.add(new ShareView(share.getId(), share.getItemType(), share.getItemId(),
                     titleOf(item.get()), share.getCreatedAt(), validTargets,
-                    replyRepository.countByShareIdAndDeletedAtIsNull(share.getId())));
+                    replyCounts.getOrDefault(share.getId(), 0L)));
         }
         return result;
     }
@@ -174,6 +177,7 @@ public class ShareService {
                 .toList();
         Map<Long, Share> shares = shareRepository.findAllById(shareIds).stream()
                 .collect(Collectors.toMap(Share::getId, Function.identity()));
+        Map<Long, Long> replyCounts = replyCountsOf(shareIds);
         Map<Long, User> owners = userRepository.findAllById(
                 shares.values().stream().map(Share::getOwnerId).distinct().toList())
                 .stream().collect(Collectors.toMap(User::getId, Function.identity()));
@@ -202,7 +206,7 @@ public class ShareService {
                     share.getItemId(), titleOf(item.get()),
                     new UserRef(share.getOwnerId(), owner != null ? owner.getNickname() : null),
                     share.getCreatedAt(),
-                    replyRepository.countByShareIdAndDeletedAtIsNull(shareId)));
+                    replyCounts.getOrDefault(shareId, 0L)));
         }
         return result;
     }
@@ -346,6 +350,16 @@ public class ShareService {
                     tx -> targetRepository.deleteByShareIdAndUserIdIn(shareId, stale));
         }
         return valid;
+    }
+
+    /** 공유 N개의 replyCount를 GROUP BY 1쿼리로 집계 — 목록 경로의 N+1 방지. */
+    private Map<Long, Long> replyCountsOf(List<Long> shareIds) {
+        if (shareIds.isEmpty()) {
+            return Map.of();
+        }
+        return replyRepository.countByShareIds(shareIds).stream()
+                .collect(Collectors.toMap(ShareReplyRepository.ReplyCountRow::getShareId,
+                        ShareReplyRepository.ReplyCountRow::getCnt));
     }
 
     private UserRef ownerRef(Long ownerId) {

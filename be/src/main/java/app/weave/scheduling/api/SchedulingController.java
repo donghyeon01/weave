@@ -31,7 +31,13 @@ public class SchedulingController {
             @Valid @RequestBody RecommendRequest req) {
         List<Candidate> candidates = service.recommend(me, req.mode(), req.rangeStart(),
                 req.rangeEnd(), req.participantIds(), req.windowStart(), req.windowEnd(),
-                req.slotMinutes(), req.durationDays());
+                req.windows() == null ? null
+                        : req.windows().stream()
+                                // null 원소는 [null,null]로 통과시켜 service 계층의 400 검증으로 위임
+                                .map(w -> w == null ? new LocalTime[]{null, null}
+                                        : new LocalTime[]{w.startTime(), w.endTime()})
+                                .toList(),
+                req.stepMinutes(), req.slotMinutes(), req.durationDays());
         return new CandidatesResponse(candidates);
     }
 
@@ -39,7 +45,13 @@ public class SchedulingController {
             @NotNull LocalDate rangeEnd, List<Long> participantIds,
             @JsonFormat(pattern = "HH:mm") LocalTime windowStart,
             @JsonFormat(pattern = "HH:mm") LocalTime windowEnd,
+            List<TimeWindow> windows, Integer stepMinutes,
             Integer slotMinutes, Integer durationDays) {
+    }
+
+    /** 다중 탐색 창 — windows가 있으면 windowStart/End보다 우선한다 (계약 §3.8). */
+    public record TimeWindow(@JsonFormat(pattern = "HH:mm") LocalTime startTime,
+            @JsonFormat(pattern = "HH:mm") LocalTime endTime) {
     }
 
     public record CandidatesResponse(List<Candidate> candidates) {

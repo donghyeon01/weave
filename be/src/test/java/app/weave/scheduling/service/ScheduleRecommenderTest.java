@@ -2,10 +2,12 @@ package app.weave.scheduling.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import app.weave.scheduling.domain.Mode;
 import app.weave.scheduling.service.ScheduleRecommender.BusyInterval;
 import app.weave.scheduling.service.ScheduleRecommender.Candidate;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -23,11 +25,15 @@ class ScheduleRecommenderTest {
         return new BusyInterval(s, e);
     }
 
+    private static List<LocalTime[]> win(int sh, int sm, int eh, int em) {
+        return List.<LocalTime[]>of(new LocalTime[]{LocalTime.of(sh, sm), LocalTime.of(eh, em)});
+    }
+
     @Test
     void 전원이_비어있는_슬롯은_percent_100이다() {
         Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of(), 2L, List.of());
         List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
-                LocalTime.of(9, 0), LocalTime.of(12, 0), 60, null, busy);
+                win(9, 0, 12, 0), 30, 60, null, busy);
 
         assertThat(out).isNotEmpty();
         assertThat(out.get(0).percent()).isEqualTo(100);
@@ -43,7 +49,7 @@ class ScheduleRecommenderTest {
                 1L, List.of(), 2L, List.of(), 3L, List.of(),
                 4L, List.of(busy(d1.atTime(10, 30), d1.atTime(11, 30))));
         List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
-                LocalTime.of(10, 0), LocalTime.of(12, 0), 120, null, busy);
+                win(10, 0, 12, 0), 120, 120, null, busy);
 
         assertThat(out).hasSize(1);
         assertThat(out.get(0).percent()).isEqualTo(75);
@@ -55,7 +61,7 @@ class ScheduleRecommenderTest {
     void slotMinutes_생략_시_고정_4블록을_쓴다() {
         Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
         List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
-                null, null, null, null, busy);
+                null, 30, null, null, busy);
 
         assertThat(out).hasSize(3); // 상위 3개
         // 고정 블록의 첫 슬롯은 10-12
@@ -74,7 +80,7 @@ class ScheduleRecommenderTest {
                 1L, List.of(),
                 2L, List.of(busy(d2.atTime(10, 0), d2.atTime(11, 0))));
         List<Candidate> out = recommender.recommend(Mode.DATE, d1, d1.plusDays(3),
-                null, null, null, 2, busy);
+                null, 30, null, 2, busy);
 
         assertThat(out.get(0).percent()).isEqualTo(100);
         Slot.Days first = (Slot.Days) out.get(0).slot();
@@ -90,7 +96,7 @@ class ScheduleRecommenderTest {
                 1L, List.of(busy(d1.atTime(9, 0), d1.atTime(10, 0))),
                 2L, List.of());
         List<Candidate> out = recommender.recommend(Mode.TIME, d1, d2,
-                LocalTime.of(9, 0), LocalTime.of(11, 0), 120, null, busy);
+                win(9, 0, 11, 0), 120, 120, null, busy);
 
         assertThat(out).hasSize(2);
         assertThat(out.get(0).percent()).isEqualTo(100);
@@ -105,20 +111,20 @@ class ScheduleRecommenderTest {
         Map<Long, List<BusyInterval>> busy = Map.of(
                 1L, List.of(busy(d1.atStartOfDay(), d1.plusDays(1).atStartOfDay())));
         List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
-                LocalTime.of(9, 0), LocalTime.of(22, 0), 60, null, busy);
+                win(9, 0, 22, 0), 30, 60, null, busy);
 
         assertThat(out).isEmpty();
     }
 
     @Test
-    void 스텝이_자정을_넘어도_종료한다() {
-        // windowEnd 도달 전 t+step이 자정을 넘어 wrap되면 LocalTime 비교는 영구 거짓 —
+    void 슬롯_끝이_자정을_넘으면_창_초과로_종료한다() {
+        // windowEnd 도달 전 슬롯 끝이 자정을 넘어 wrap되면 LocalTime 비교는 영구 거짓 —
         // 과거 무한 루프로 OOM을 일으킨 입력 (화면 기본값 창 12~22시·120분과 동형).
         Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
-        List<Candidate> out = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
-                java.time.Duration.ofSeconds(10),
+        List<Candidate> out = assertTimeoutPreemptively(
+                Duration.ofSeconds(10),
                 () -> recommender.recommend(Mode.TIME, d1, d1,
-                        LocalTime.of(22, 0), LocalTime.of(23, 59), 120, null, busy));
+                        win(22, 0, 23, 59), 120, 120, null, busy));
 
         // 22:00 슬롯만 생성 (22:00+120은 익일 → 창 초과로 종료)
         assertThat(out).isEmpty();
@@ -129,18 +135,74 @@ class ScheduleRecommenderTest {
         // 12~22시 2시간 스텝 → 12·14·16·18·20시 5슬롯 (20시 슬롯은 정확히 22:00에 맞닿아 포함).
         // LocalTime 비교라면 22:00 스텝이 익일 00:00으로 wrap돼 무한 루프였다.
         Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
-        List<Candidate> out = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
-                java.time.Duration.ofSeconds(10),
+        List<Candidate> out = assertTimeoutPreemptively(
+                Duration.ofSeconds(10),
                 () -> recommender.recommend(Mode.TIME, d1, d1,
-                        LocalTime.of(12, 0), LocalTime.of(22, 0), 120, null, busy));
+                        win(12, 0, 22, 0), 120, 120, null, busy));
 
         assertThat(out).hasSize(3); // 상위 3개만 반환
     }
 
     @Test
+    void step이_슬롯보다_짧으면_중간_후보도_탐색한다() {
+        // 09~13시·slot120·step30 — 09:00~10:00 busy라 10:00~12:00이 첫 전원 가능 후보.
+        // 기존(step=slot 120)엔 11:00~13:00만 남아 10시대 후보를 놓쳤다.
+        Map<Long, List<BusyInterval>> busy = Map.of(
+                1L, List.of(busy(d1.atTime(9, 0), d1.atTime(10, 0))));
+        List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
+                win(9, 0, 13, 0), 30, 120, null, busy);
+
+        assertThat(out).isNotEmpty();
+        Slot.Time first = (Slot.Time) out.get(0).slot();
+        assertThat(first.startTime()).isEqualTo(LocalTime.of(10, 0));
+        assertThat(first.endTime()).isEqualTo(LocalTime.of(12, 0));
+    }
+
+    @Test
+    void windows가_여러개면_각_창을_독립_탐색한다() {
+        // 09~11시·18~20시 두 창 — 양쪽 모두에서 후보가 나와야 한다
+        Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
+        List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
+                List.of(
+                        new LocalTime[]{LocalTime.of(9, 0), LocalTime.of(11, 0)},
+                        new LocalTime[]{LocalTime.of(18, 0), LocalTime.of(20, 0)}),
+                60, 60, null, busy);
+
+        List<LocalTime> starts = out.stream()
+                .map(c -> ((Slot.Time) c.slot()).startTime()).toList();
+        assertThat(starts).contains(LocalTime.of(9, 0), LocalTime.of(18, 0));
+    }
+
+    @Test
+    void 겹치는_windows는_동일_슬롯을_중복_생성하지_않는다() {
+        // 동일 창 2개 — dedupe 없으면 같은 슬롯이 후보에 중복으로 오른다
+        Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
+        List<LocalTime[]> windows = List.of(
+                new LocalTime[]{LocalTime.of(9, 0), LocalTime.of(11, 0)},
+                new LocalTime[]{LocalTime.of(9, 0), LocalTime.of(11, 0)});
+        List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
+                windows, 60, 60, null, busy);
+
+        List<LocalTime> starts = out.stream()
+                .map(c -> ((Slot.Time) c.slot()).startTime()).toList();
+        assertThat(starts).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void stepMinutes가_슬롯보다_크거나_1미만이면_계약_위반이다() {
+        Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
+        assertThatThrownBy(() -> recommender.recommend(Mode.TIME, d1, d1,
+                win(9, 0, 12, 0), 90, 60, null, busy))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> recommender.recommend(Mode.TIME, d1, d1,
+                win(9, 0, 12, 0), 0, 60, null, busy))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void 참여자가_없으면_계약_위반이다() {
         assertThatThrownBy(() -> recommender.recommend(Mode.TIME, d1, d1,
-                LocalTime.of(9, 0), LocalTime.of(12, 0), 60, null, Map.of()))
+                win(9, 0, 12, 0), 30, 60, null, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -148,7 +210,7 @@ class ScheduleRecommenderTest {
     void 역창_범위는_계약_위반이다() {
         Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
         assertThatThrownBy(() -> recommender.recommend(Mode.TIME, d2, d1,
-                LocalTime.of(9, 0), LocalTime.of(12, 0), 60, null, busy))
+                win(9, 0, 12, 0), 30, 60, null, busy))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -156,7 +218,7 @@ class ScheduleRecommenderTest {
     void DATE_모드의_durationDays_누락은_계약_위반이다() {
         Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
         assertThatThrownBy(() -> recommender.recommend(Mode.DATE, d1, d2,
-                null, null, null, null, busy))
+                null, 30, null, null, busy))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -164,7 +226,7 @@ class ScheduleRecommenderTest {
     void slotMinutes가_있으면_유효_창이_필수다() {
         Map<Long, List<BusyInterval>> busy = Map.of(1L, List.of());
         assertThatThrownBy(() -> recommender.recommend(Mode.TIME, d1, d1,
-                LocalTime.of(12, 0), LocalTime.of(9, 0), 60, null, busy))
+                win(12, 0, 9, 0), 30, 60, null, busy))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

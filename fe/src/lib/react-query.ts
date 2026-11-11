@@ -34,8 +34,21 @@ export const queryKeys = {
   },
   friends: {
     all: ['friends'],
+    list: ['friends', 'list'],
     requestsReceived: ['friends', 'requests', 'received'],
     requestsSent: ['friends', 'requests', 'sent'],
+    feedSubscriptions: ['friends', 'feed-subscriptions'],
+  },
+  friendGroups: {
+    all: ['friendGroups'],
+  },
+  share: {
+    all: ['share'],
+    mine: ['share', 'mine'],
+    feed: ['share', 'feed'],
+    byOwner: (userId: number) => ['share', 'by', userId],
+    detail: (shareId: number) => ['share', 'detail', shareId],
+    replies: (shareId: number) => ['share', 'detail', shareId, 'replies'],
   },
   notifications: {
     list: (page?: number, size?: number) => ['notifications', 'list', page, size],

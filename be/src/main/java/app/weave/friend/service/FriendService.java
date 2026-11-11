@@ -21,6 +21,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -153,6 +155,23 @@ public class FriendService {
     @Transactional(readOnly = true)
     public List<FriendView> listSent(Long me) {
         return toViews(repository.findByUserIdAndStatus(me, Status.PENDING), me);
+    }
+
+    /** ACCEPTED 여부 양방향 판정 — share 가시성 검증 원천 (행 존재만으론 통과 금지). */
+    @Transactional(readOnly = true)
+    public boolean isFriend(Long me, Long other) {
+        return repository.findByUserIdAndFriendIdAndStatus(me, other, Status.ACCEPTED)
+                .isPresent()
+                || repository.findByUserIdAndFriendIdAndStatus(other, me, Status.ACCEPTED)
+                .isPresent();
+    }
+
+    /** ACCEPTED 상대 id 집합 — share 피드 후보 필터·그룹 멤버의 친구 검증용. */
+    @Transactional(readOnly = true)
+    public Set<Long> acceptedFriendIds(Long me) {
+        return repository.findAcceptedFriendships(me).stream()
+                .map(f -> f.counterpartyOf(me))
+                .collect(Collectors.toSet());
     }
 
     private List<FriendView> toViews(List<Friendship> rows, Long me) {

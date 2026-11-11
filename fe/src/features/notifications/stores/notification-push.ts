@@ -20,6 +20,9 @@ const TYPE_INVALIDATIONS: Record<string, string[][]> = {
     ['chat', 'rooms'],
   ],
   PROPOSAL_DECLINED: [['notifications'], ['scheduling', 'proposals'], ['chat', 'rooms']],
+  // 구독 친구의 신규 공개 — 피드·프로필 항목 목록(share)과 친구 화면 카운트를 갱신한다.
+  SHARED_ITEM: [['notifications'], ['share'], ['friends']],
+  SHARE_REPLY: [['notifications'], ['share']],
 }
 
 // 단절 중 어떤 타입의 push를 놓쳤는지 알 수 없으므로, 재연결 시에는

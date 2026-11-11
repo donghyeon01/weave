@@ -112,6 +112,34 @@ public sealed interface NotificationPayload {
         }
     }
 
+    record SharedItem(Long shareId, String itemType, Long itemId, UserRef owner,
+            String itemTitle) implements NotificationPayload {
+        @Override
+        public NotificationType type() {
+            return NotificationType.SHARED_ITEM;
+        }
+
+        @Override
+        public Map<String, Object> toMap() {
+            return Map.of("shareId", shareId, "itemType", itemType, "itemId", itemId,
+                    "owner", owner.toMap(), "itemTitle", itemTitle);
+        }
+    }
+
+    record ShareReply(Long shareId, Long replyId, String itemType, UserRef author,
+            String itemTitle) implements NotificationPayload {
+        @Override
+        public NotificationType type() {
+            return NotificationType.SHARE_REPLY;
+        }
+
+        @Override
+        public Map<String, Object> toMap() {
+            return Map.of("shareId", shareId, "replyId", replyId, "itemType", itemType,
+                    "author", author.toMap(), "itemTitle", itemTitle);
+        }
+    }
+
     record ProposalDeclined(Long proposalId, String title, UserRef declinedBy)
             implements NotificationPayload {
         @Override

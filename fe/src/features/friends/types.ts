@@ -23,3 +23,10 @@ export interface FriendshipItem {
   nextEvent?: NextEvent | null
   createdAt: string
 }
+
+// api-contract §3.6 — FriendGroupController.GroupResponse (V2 wave-2)
+export interface FriendGroup {
+  groupId: number
+  name: string
+  memberIds: number[]
+}

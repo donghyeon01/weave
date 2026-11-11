@@ -3,10 +3,12 @@ package app.weave.event.service;
 import app.weave.common.port.BusyBlock;
 import app.weave.common.port.EventAccess;
 import app.weave.common.port.EventRef;
+import app.weave.common.port.SharedEvent;
 import app.weave.event.domain.Event;
 import app.weave.event.domain.EventRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /** EventAccess 구현 — event 데이터의 읽기 전용 출구 (capability-map 조회 포트 규약). */
@@ -40,5 +42,13 @@ public class EventAccessAdapter implements EventAccess {
                 .map(e -> new EventRef(e.getId(), e.getUserId(), e.getTitle(), e.getStartTime(),
                         e.getEndTime(), e.getProposalId()))
                 .toList();
+    }
+
+    @Override
+    public Optional<SharedEvent> eventDetailOf(Long ownerId, Long eventId) {
+        return repository.findByIdAndUserId(eventId, ownerId)
+                .map(e -> new SharedEvent(e.getId(), e.getUserId(), e.getTitle(),
+                        e.getDescription(), e.getStartTime(), e.getEndTime(),
+                        e.getLocation(), e.isAllDay()));
     }
 }

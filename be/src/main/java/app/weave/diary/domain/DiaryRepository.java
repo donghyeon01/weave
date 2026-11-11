@@ -9,6 +9,9 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
 
     Optional<Diary> findByUserIdAndDate(Long userId, LocalDate date);
 
+    /** 소유권 포함 조회 — Diary에 getUserId가 없어 소유 검증은 이 쿼리로만 한다 (IDOR 방지). */
+    Optional<Diary> findByIdAndUserId(Long id, Long userId);
+
     // 월 목록: Between은 양끝 포함이라 말일 다음날까지 잡히므로 LessThan 배타 상한 사용
     List<Diary> findByUserIdAndDateGreaterThanEqualAndDateLessThanOrderByDateAsc(
             Long userId, LocalDate first, LocalDate nextMonthFirst);

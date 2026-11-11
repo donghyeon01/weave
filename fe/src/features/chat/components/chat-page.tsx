@@ -52,6 +52,18 @@ function RoomCard({ room }: { room: ChatRoomSummary }) {
   )
 }
 
+// 목록·상세 공통 페이지 헤더 — Figma 180:1751·170:568
+export function ChatHeader() {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <h1 className="font-display text-[32px] leading-normal">채팅</h1>
+      <p className="text-base font-medium text-text-secondary">
+        확정을 준비 중인 약속의 단체 채팅방이에요
+      </p>
+    </div>
+  )
+}
+
 export function ChatPage() {
   const [tab, setTab] = useState<Tab>('OPEN')
   const roomsQuery = useChatRooms()
@@ -62,12 +74,7 @@ export function ChatPage() {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-2.5">
-        <h1 className="font-display text-[32px] leading-normal">채팅</h1>
-        <p className="text-base font-medium text-text-secondary">
-          확정을 준비 중인 약속의 단체 채팅방이에요
-        </p>
-      </div>
+      <ChatHeader />
 
       <div
         role="tablist"

@@ -42,6 +42,17 @@ public enum ErrorCode {
     CHAT_NOT_MEMBER("CHAT-NOT-MEMBER", 404, "채팅방 멤버가 아닙니다."),
     CHAT_ROOM_CLOSED("CHAT-ROOM-CLOSED", 409, "종료된 채팅방입니다."),
     CHAT_MESSAGE_INVALID("CHAT-MESSAGE-INVALID", 400, "메시지가 올바르지 않습니다."),
+    SHARE_NOT_FOUND("SHARE-NOT-FOUND", 404, "공유를 찾을 수 없습니다."),
+    SHARE_ITEM_NOT_FOUND("SHARE-ITEM-NOT-FOUND", 404, "공유 대상 항목을 찾을 수 없습니다."),
+    VISIBILITY_INVALID("VISIBILITY-INVALID", 400, "공개 범위가 올바르지 않습니다."),
+    GROUP_NOT_FOUND("GROUP-NOT-FOUND", 404, "그룹을 찾을 수 없습니다."),
+    GROUP_LIMIT_EXCEEDED("GROUP-LIMIT-EXCEEDED", 409, "그룹은 최대 3개까지 만들 수 있습니다."),
+    GROUP_MEMBER_INVALID("GROUP-MEMBER-INVALID", 400, "그룹 멤버가 올바르지 않습니다."),
+    SUBSCRIPTION_INVALID("SUBSCRIPTION-INVALID", 400, "피드 알람은 친구에게만 설정할 수 있습니다."),
+    REPLY_NOT_FOUND("REPLY-NOT-FOUND", 404, "답글을 찾을 수 없습니다."),
+    REPLY_PARENT_INVALID("REPLY-PARENT-INVALID", 400, "답글 대상이 올바르지 않습니다."),
+    REPLY_INVALID("REPLY-INVALID", 400, "답글 내용이 올바르지 않습니다."),
+    REPLY_NOT_AUTHOR("REPLY-NOT-AUTHOR", 404, "답글을 찾을 수 없습니다."),
     INTERNAL_ERROR("INTERNAL-ERROR", 500, "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
 
     private final String code;

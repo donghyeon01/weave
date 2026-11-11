@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../../../lib/api-client'
+import { VisibilityModal } from '../../../components/share/visibility-modal'
 import { Button } from '../../../components/ui/button'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
 import { Toast } from '../../../components/ui/toast'
@@ -43,17 +44,21 @@ function DiaryEditorForm({
   date,
   initial,
   hasRecord,
+  diaryId,
   draftRestored,
   photos,
 }: {
   date: string
   initial: EditorInitial
   hasRecord: boolean
+  diaryId: number | null
   draftRestored: string | null
   photos: DiaryPhotoMeta[]
 }) {
   const saveDiary = useSaveDiary()
   const deleteDiary = useDeleteDiary()
+
+  const [visibilityOpen, setVisibilityOpen] = useState(false)
 
   const [title, setTitle] = useState(initial.title)
   const [content, setContent] = useState(initial.content)
@@ -240,6 +245,11 @@ function DiaryEditorForm({
         )}
 
         <div className="flex items-center justify-end gap-3">
+          {hasRecord && diaryId !== null && (
+            <Button variant="ghost" size="sm" onClick={() => setVisibilityOpen(true)}>
+              공개 범위
+            </Button>
+          )}
           {hasRecord && (
             <Button variant="danger" size="sm" onClick={() => setConfirmOpen(true)}>
               삭제
@@ -262,6 +272,14 @@ function DiaryEditorForm({
         </div>
       </div>
 
+      {visibilityOpen && diaryId !== null && (
+        <VisibilityModal
+          open
+          onClose={() => setVisibilityOpen(false)}
+          itemType="DIARY"
+          itemId={diaryId}
+        />
+      )}
       <ConfirmModal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
@@ -311,6 +329,7 @@ export function DiaryEditor({ date }: { date: string }) {
       date={date}
       initial={initial}
       hasRecord={diary !== null}
+      diaryId={diary?.id ?? null}
       draftRestored={draft?.savedAt ?? null}
       photos={diary?.photos ?? []}
     />

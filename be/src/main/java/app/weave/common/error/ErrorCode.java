@@ -53,6 +53,12 @@ public enum ErrorCode {
     REPLY_PARENT_INVALID("REPLY-PARENT-INVALID", 400, "답글 대상이 올바르지 않습니다."),
     REPLY_INVALID("REPLY-INVALID", 400, "답글 내용이 올바르지 않습니다."),
     REPLY_NOT_AUTHOR("REPLY-NOT-AUTHOR", 404, "답글을 찾을 수 없습니다."),
+    AVAILABILITY_NOT_FOUND("AVAILABILITY-NOT-FOUND", 404, "가용성 범위를 찾을 수 없습니다."),
+    AVAILABILITY_INVALID("AVAILABILITY-INVALID", 400, "가용성 입력이 올바르지 않습니다."),
+    AVAILABILITY_REVISION_CONFLICT("AVAILABILITY-REVISION-CONFLICT", 409,
+            "다른 곳에서 수정되었습니다. 다시 불러온 후 시도해주세요."),
+    AVAILABILITY_SCOPE_CONFLICT("AVAILABILITY-SCOPE-CONFLICT", 409,
+            "같은 기간에 활성 가용성 범위가 이미 있습니다."),
     INTERNAL_ERROR("INTERNAL-ERROR", 500, "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
 
     private final String code;

@@ -14,7 +14,7 @@ public interface EventAccess {
     /** 본인 소유 일정인지 — diaries.event_id 연결 검증용. */
     boolean isOwnedBy(Long userId, Long eventId);
 
-    /** 지정 범위의 조율 불가 블록 — 친구 일정 미리보기(계약 §3.6). endExclusive는 배타 상한. */
+    /** 지정 범위의 시간 점유 블록 — 친구 일정 미리보기(계약 §3.6). endExclusive는 배타 상한. */
     List<BusyBlock> busyBlocksOf(Long userId, LocalDateTime start, LocalDateTime endExclusive);
 
     /** source=PROPOSAL인 미래 일정 — 친구 nextEvent 조합용 (startTime 오름차순). */

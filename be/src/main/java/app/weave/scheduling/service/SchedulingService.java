@@ -17,6 +17,7 @@ import app.weave.scheduling.service.ScheduleRecommender.UserScheduleInput;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,7 +46,7 @@ public class SchedulingService {
         this.availabilityAccess = availabilityAccess;
     }
 
-    /** 추천 응답 — participantIds는 주최자 제외 계산 시점 스냅샷, computedAt은 ISO instant (계약 §3.8). */
+    /** 추천 응답 — participantIds는 주최자 제외 계산 시점 스냅샷, computedAt은 서버 로컬 시각(naive, 계약 §3.8). */
     public record RecommendResult(List<Candidate> candidates,
             List<Long> participantIds, String computedAt) {
     }
@@ -147,7 +148,8 @@ public class SchedulingService {
         // 참여자 스냅샷은 주최자 제외 — 정렬해 결정적 순서로 반환한다.
         // computedAt은 서버 로컬 시각 — 다른 DTO의 datetime 필드와 같은 직렬화 규약 (계약 §3.8).
         return new RecommendResult(candidates,
-                participants.stream().sorted().toList(), LocalDateTime.now().toString());
+                participants.stream().sorted().toList(),
+                LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS).toString());
     }
 
     private Set<Long> resolveParticipants(Long me, List<Long> participantIds) {

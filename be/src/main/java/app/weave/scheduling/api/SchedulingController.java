@@ -56,7 +56,7 @@ public class SchedulingController {
             @JsonFormat(pattern = "HH:mm") LocalTime endTime) {
     }
 
-    /** participantIds = 계산 시점 참여자 스냅샷(주최자 제외) · computedAt = ISO instant (계약 §3.8). */
+    /** participantIds = 계산 시점 참여자 스냅샷(주최자 제외) · computedAt = 서버 로컬 시각(naive, 계약 §3.8). */
     public record CandidatesResponse(List<Candidate> candidates,
             List<Long> participantIds, String computedAt) {
     }

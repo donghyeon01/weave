@@ -123,7 +123,7 @@ public class FriendService {
     }
 
     /**
-     * 친구 일정 미리보기 — ACCEPTED 관계만, 조율 불가 블록(시작·종료)만 반환한다 (계약 §3.6).
+     * 친구 일정 미리보기 — ACCEPTED 관계만, 시간 점유 블록(시작·종료)만 반환한다 (계약 §3.6).
      * {id}는 friendship 행 id — 비친구·PENDING·타인 관계는 존재 비노출 404.
      */
     @Transactional(readOnly = true)

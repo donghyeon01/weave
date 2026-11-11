@@ -62,7 +62,7 @@ public class FriendController {
         return toResponse(service.accept(me, id));
     }
 
-    /** 친구 일정 미리보기 — 조율 불가 블록만, 메타는 어떤 필드도 노출하지 않는다 (계약 §3.6). */
+    /** 친구 일정 미리보기 — 시간 점유 블록만, 메타는 어떤 필드도 노출하지 않는다 (계약 §3.6). */
     @GetMapping("/{id}/schedule")
     public FriendScheduleResponse schedule(@AuthenticationPrincipal Long me,
             @PathVariable Long id,

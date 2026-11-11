@@ -220,7 +220,7 @@ function TimeGrid({
           <div key={slot.minute} role="row" className="flex">
             <div
               role="rowheader"
-              className="sticky left-0 z-[5] flex h-7 w-14 shrink-0 items-center justify-center border-b border-border bg-surface text-[10px] font-semibold text-text-muted"
+              className="sticky left-0 z-5 flex h-7 w-14 shrink-0 items-center justify-center border-b border-border bg-surface text-[10px] font-semibold text-text-muted"
             >
               {slot.label}
             </div>

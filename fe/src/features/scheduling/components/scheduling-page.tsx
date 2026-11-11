@@ -398,7 +398,15 @@ export function SchedulingPage() {
           </section>
 
           <section className="rounded-2xl border border-border bg-surface p-5 shadow-card-sm">
-            <h2 className="font-display text-xl">조율 조건</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-xl">조율 조건</h2>
+              <Link
+                to="/app/availability"
+                className="text-sm font-bold text-accent-text hover:underline"
+              >
+                내 가능 시간 관리 →
+              </Link>
+            </div>
             <div className="mt-4 flex flex-col gap-4">
               <div role="tablist" aria-label="조율 모드" className="flex gap-2">
                 {(['TIME', 'DATE'] as const).map((m) => (
@@ -608,8 +616,21 @@ export function SchedulingPage() {
                     c.rank === 1 ? 'text-text' : 'text-text-secondary',
                   )}
                 >
-                  참여율 {c.availableCount}/{c.totalCount}
-                  {c.availableCount === c.totalCount ? ' (전원 참석)' : ' — 조율 필요 인원 포함'}
+                  가능 {c.availableCount}/전체 {c.totalCount}
+                  {c.availableCount === c.totalCount ? ' (전원 가능)' : ' — 확인 필요·불가 인원 포함'}
+                </p>
+                {/* 5분류 판정 근거 — 직접 가능·캘린더 빈 2종만 강조, 나머지는 muted (계약 §3.8) */}
+                <p className="mt-1.5 text-xs font-medium text-text-muted">
+                  <span className="font-bold text-success-text">
+                    직접 가능 {c.breakdown.direct}
+                  </span>
+                  {' · '}
+                  <span className="font-bold text-success-text">
+                    캘린더 빈 {c.breakdown.calendarFree}
+                  </span>
+                  {' · '}조정 필요 {c.breakdown.conditional}
+                  {' · '}확인 필요 {c.breakdown.unknown}
+                  {' · '}불가 {c.breakdown.unavailable}
                 </p>
                 <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
                   <div className="flex -space-x-2">

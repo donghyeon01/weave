@@ -22,6 +22,15 @@ interface EventFormModalProps {
 const INPUT_CLASS =
   'w-full rounded-xl border-2 border-input bg-surface px-3 py-2 text-sm text-text outline-none transition duration-150 focus:border-accent'
 
+// 조율 계산상 점유 강도 (api-contract §3.4) — HARD 불가 · SOFT 조정 필요 · FREE 비점유.
+const BUSY_POLICIES = [
+  { value: 'HARD', label: '고정', hint: '조율 불가' },
+  { value: 'SOFT', label: '조정 가능', hint: '옮길 수 있음' },
+  { value: 'FREE', label: '비점유', hint: '빈 시간으로 계산' },
+] as const
+
+type BusyPolicy = (typeof BUSY_POLICIES)[number]['value']
+
 function toLocalInput(localDateTime: string): string {
   return localDateTime.slice(0, 16)
 }
@@ -50,6 +59,7 @@ export function EventFormModal({ mode, defaultDate, event, onClose, onSaved }: E
       : `${defaultDate}T10:00`,
   )
   const [location, setLocation] = useState(event?.location ?? '')
+  const [busyPolicy, setBusyPolicy] = useState<BusyPolicy>(event?.busyPolicy ?? 'HARD')
   const [description, setDescription] = useState(event?.description ?? '')
   const [error, setError] = useState<string | null>(null)
 
@@ -90,6 +100,7 @@ export function EventFormModal({ mode, defaultDate, event, onClose, onSaved }: E
       startTime: allDay ? `${start}T00:00:00` : toServerDateTime(start),
       endTime: allDay ? `${end}T23:59:59` : toServerDateTime(end),
       allDay,
+      busyPolicy,
     }
     if (location.trim() !== '') payload.location = location.trim()
     if (description.trim() !== '') payload.description = description.trim()
@@ -176,6 +187,31 @@ export function EventFormModal({ mode, defaultDate, event, onClose, onSaved }: E
             placeholder="장소 (선택)"
           />
         </label>
+        <fieldset className="flex flex-col gap-1 text-sm font-semibold text-text">
+          <legend className="text-sm font-semibold text-text">조정 정책</legend>
+          <div className="mt-1 flex gap-2">
+            {BUSY_POLICIES.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                aria-pressed={busyPolicy === p.value}
+                onClick={() => setBusyPolicy(p.value)}
+                className={
+                  busyPolicy === p.value
+                    ? 'flex-1 rounded-lg border border-accent bg-accent-soft px-2 py-2 text-sm font-bold text-on-tint'
+                    : 'flex-1 rounded-lg border border-border px-2 py-2 text-sm font-bold text-text-secondary hover:text-text'
+                }
+              >
+                {p.label} <span className="text-xs font-medium">({p.hint})</span>
+              </button>
+            ))}
+          </div>
+          {mode === 'edit' && event?.source === 'proposal' && (
+            <p className="text-xs font-medium text-text-secondary">
+              제안으로 만들어진 일정이에요. 조정 정책 변경은 내 조율 계산에만 반영돼요.
+            </p>
+          )}
+        </fieldset>
         <label className="flex flex-col gap-1 text-sm font-semibold text-text">
           설명
           <textarea

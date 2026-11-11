@@ -3,6 +3,7 @@ package app.weave.scheduling.api;
 import app.weave.scheduling.domain.Mode;
 import app.weave.scheduling.service.ScheduleRecommender.Candidate;
 import app.weave.scheduling.service.SchedulingService;
+import app.weave.scheduling.service.SchedulingService.RecommendResult;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -29,7 +30,7 @@ public class SchedulingController {
     @PostMapping
     public CandidatesResponse recommend(@AuthenticationPrincipal Long me,
             @Valid @RequestBody RecommendRequest req) {
-        List<Candidate> candidates = service.recommend(me, req.mode(), req.rangeStart(),
+        RecommendResult result = service.recommend(me, req.mode(), req.rangeStart(),
                 req.rangeEnd(), req.participantIds(), req.windowStart(), req.windowEnd(),
                 req.windows() == null ? null
                         : req.windows().stream()
@@ -38,7 +39,8 @@ public class SchedulingController {
                                         : new LocalTime[]{w.startTime(), w.endTime()})
                                 .toList(),
                 req.stepMinutes(), req.slotMinutes(), req.durationDays());
-        return new CandidatesResponse(candidates);
+        return new CandidatesResponse(result.candidates(), result.participantIds(),
+                result.computedAt());
     }
 
     public record RecommendRequest(@NotNull Mode mode, @NotNull LocalDate rangeStart,
@@ -54,6 +56,8 @@ public class SchedulingController {
             @JsonFormat(pattern = "HH:mm") LocalTime endTime) {
     }
 
-    public record CandidatesResponse(List<Candidate> candidates) {
+    /** participantIds = 계산 시점 참여자 스냅샷(주최자 제외) · computedAt = ISO instant (계약 §3.8). */
+    public record CandidatesResponse(List<Candidate> candidates,
+            List<Long> participantIds, String computedAt) {
     }
 }

@@ -7,7 +7,7 @@ import { Modal } from '../../../components/ui/modal'
 import { cx } from '../../../utils/cx'
 import { useDeleteEvent } from '../api/use-delete-event'
 import { CHIP_STYLES, SOURCE_LABEL } from '../legend'
-import { datePart, formatEventTime } from '../utils'
+import { datePart, eventEndDate, formatEventTime } from '../utils'
 
 interface EventDetailModalProps {
   event: EventItem
@@ -18,7 +18,7 @@ interface EventDetailModalProps {
 
 function formatDateRange(event: EventItem): string {
   const start = datePart(event.startTime)
-  const end = datePart(event.endTime)
+  const end = eventEndDate(event)
   return start === end ? start : `${start} ~ ${end}`
 }
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { Candidate, Slot } from '../types'
@@ -10,6 +10,8 @@ import { ApiError } from '../../../lib/api-client'
 import { cx } from '../../../utils/cx'
 import { useFriends } from '../../friends/api/use-friends'
 import { useMe } from '../../profile/api/use-profile'
+import { useEventsRange } from '../../events/api/use-events-range'
+import { datePart, toYmd } from '../../events/utils'
 import { useFriendBlocks } from '../api/use-friend-blocks'
 import { useRecommend } from '../api/use-recommend'
 import { useCreateProposal } from '../api/use-proposal-mutations'
@@ -19,7 +21,8 @@ import { InlineError } from '../../../components/ui/inline-error'
 function todayPlus(days: number): string {
   const d = new Date()
   d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  // toISOString은 UTC 기준이라 KST 자정~오전에 날짜가 어긋난다 — 로컬 ymd로 만든다.
+  return toYmd(d)
 }
 
 const TIME_WINDOWS = [
@@ -56,21 +59,28 @@ function TimetablePreview({
   members,
 }: {
   candidate: Candidate
-  members: { id: number; nickname: string }[]
+  members: { friendshipId: number; nickname: string }[]
 }) {
   const date = candidate.slot.type === 'TIME' ? candidate.slot.date : null
   const blocksQuery = useFriendBlocks(members, date)
+  const myEvents = useEventsRange(date, date)
   const me = useMe()
 
   if (candidate.slot.type !== 'TIME' || members.length === 0) return null
 
   const slot = candidate.slot
+  // 걸친 일정(allDay 배타 상한·전날 시작 등)은 표시 날짜 구간으로 클램프한다 —
+  // 클램프 없이 시각만 비교하면 종일 일정(end 00:00)이 비어있는 것으로 보인다.
+  const clamp = (b: { startTime: string; endTime: string }) => ({
+    startTime: datePart(b.startTime) < slot.date ? `${slot.date}T00:00:00` : b.startTime,
+    endTime: datePart(b.endTime) > slot.date ? `${slot.date}T23:59:59` : b.endTime,
+  })
   const rows = [
-    { friendId: 0, nickname: me.data?.nickname ?? '나', blocks: [] as { startTime: string; endTime: string }[] },
-    ...(blocksQuery.data ?? []),
+    { friendId: 0, nickname: me.data?.nickname ?? '나', blocks: (myEvents.data ?? []).map(clamp) },
+    ...(blocksQuery.data ?? []).map((r) => ({ ...r, blocks: r.blocks.map(clamp) })),
   ]
 
-  // 09~22시 한 칸 = 30분 — 칸당 16px, 친구별 일정 제목은 프라이버시 규칙상 렌더하지 않는다.
+  // 09~22시 타임라인 — 한 칸 = 1시간, 친구별 일정 제목은 프라이버시 규칙상 렌더하지 않는다.
   const HOURS = Array.from({ length: 14 }, (_, i) => 9 + i)
   const toMin = (hhmm: string) => {
     const [h, m] = hhmm.split(':').map(Number)
@@ -108,15 +118,16 @@ function TimetablePreview({
                 {HOURS.map((h) => {
                   const inRec = h * 60 >= recStart && h * 60 < recEnd
                   const isBusy = busy(r.blocks, h)
+                  // 충돌(busy) 표시가 추천 구간 강조보다 우선한다
                   return (
                     <td
                       key={h}
                       className={cx(
                         'h-8 rounded',
-                        inRec
-                          ? 'border-2 border-accent bg-accent-soft'
-                          : isBusy
-                            ? 'bg-surface-muted'
+                        isBusy
+                          ? 'bg-surface-muted'
+                          : inRec
+                            ? 'border-2 border-accent bg-accent-soft'
                             : 'bg-surface',
                       )}
                       title={isBusy ? '조율 불가 블록' : '비어있음'}
@@ -129,7 +140,11 @@ function TimetablePreview({
         </table>
       </div>
       <p className="mt-3 rounded-lg bg-accent-soft px-3 py-2 text-sm font-bold text-on-tint">
-        {slot.startTime.slice(0, 5)} ~ {slot.endTime.slice(0, 5)} 구간: 모두 비어있는 최적 골든 슬롯!
+        {slot.startTime.slice(0, 5)} ~ {slot.endTime.slice(0, 5)} 구간:{' '}
+        {candidate.availableCount}/{candidate.totalCount}명 참석 가능
+        {candidate.availableCount === candidate.totalCount
+          ? ' — 전원 가능한 골든 슬롯!'
+          : ` (참여율 ${candidate.percent}%)`}
       </p>
     </section>
   )
@@ -161,13 +176,32 @@ export function SchedulingPage() {
   )
   const best = candidates?.[0] ?? null
 
-  // 선호 시간대 다중 선택 → 백엔드 단일 시간창 계약상 최소~최대 합집합으로 보낸다.
-  const windowRange = useMemo(() => {
-    if (windows.length === 0) return { start: '09:00', end: '22:00' }
+  // 선호 시간대 다중 선택 — 프리셋을 창 배열로 만들어 붙은 창은 합친다.
+  // 결과가 연속 1창이면 windowStart/End, 떨어진 다중 창이면 windows로 보낸다 (be는 windows 우선).
+  const selectedWindows = useMemo(() => {
     const sel = TIME_WINDOWS.filter((w) => windows.includes(w.label))
-    const ends = sel.map((w) => w.end).sort()
-    return { start: sel.map((w) => w.start).sort()[0], end: ends[ends.length - 1] }
+    const merged: { startTime: string; endTime: string }[] = []
+    for (const w of sel) {
+      const last = merged[merged.length - 1]
+      if (last !== undefined && last.endTime >= w.start) {
+        if (w.end > last.endTime) last.endTime = w.end
+      } else {
+        merged.push({ startTime: w.start, endTime: w.end })
+      }
+    }
+    return merged
   }, [windows])
+
+  // 조건이 바뀌면 이전 추천 결과는 무효 — 다른 조건의 후보로 제안 생성을 막는다.
+  // 선택 순서만 다른 동일 집합이 불필요한 리셋을 만들지 않도록 정렬 후 직렬화한다.
+  const condKey = `${mode}|${rangeStart}|${rangeEnd}|${durationMin}|${durationDays}|${[...selectedIds].sort((a, b) => a - b).join(',')}|${[...windows].sort().join(',')}`
+  // in-flight 추천의 지연 성공이 변경된 조건의 stale 후보를 되살리지 못하게
+  // 최신 condKey를 ref로 들고 submit 시점 키와 비교한다.
+  const condKeyRef = useRef(condKey)
+  condKeyRef.current = condKey
+  useEffect(() => {
+    setCandidates(null)
+  }, [condKey])
 
   const toggleParticipant = (id: number) => {
     setSelectedIds((prev) =>
@@ -177,19 +211,32 @@ export function SchedulingPage() {
 
   const submitRecommend = () => {
     setFormError(null)
+    const keyAtSubmit = condKey
     recommend.mutate(
       {
         mode,
         rangeStart,
         rangeEnd,
         participantIds: selectedIds.length > 0 ? selectedIds : undefined,
-        windowStart: mode === 'TIME' ? windowRange.start : undefined,
-        windowEnd: mode === 'TIME' ? windowRange.end : undefined,
+        // 미선택(selectedWindows 빈 배열)이면 창 필드 자체를 생략해 be 기본 창을 쓴다
+        windows:
+          mode === 'TIME' && selectedWindows.length > 1 ? selectedWindows : undefined,
+        windowStart:
+          mode === 'TIME' && selectedWindows.length === 1
+            ? selectedWindows[0].startTime
+            : undefined,
+        windowEnd:
+          mode === 'TIME' && selectedWindows.length === 1
+            ? selectedWindows[0].endTime
+            : undefined,
         slotMinutes: mode === 'TIME' ? durationMin : undefined,
         durationDays: mode === 'DATE' ? durationDays : undefined,
       },
       {
-        onSuccess: (res) => setCandidates(res.candidates),
+        onSuccess: (res) => {
+          // 응답 도착 시점에 조건이 바뀌어 있으면 이 결과는 stale — 버린다
+          if (condKeyRef.current === keyAtSubmit) setCandidates(res.candidates)
+        },
         onError: (err) =>
           setFormError(
             err instanceof ApiError && err.code === 'SCHEDULING-NOT-FRIEND'
@@ -211,7 +258,13 @@ export function SchedulingPage() {
     e.preventDefault()
     if (proposalSlot === null || proposalTitle.trim() === '') return
     createProposal.mutate(
-      { title: proposalTitle.trim(), slot: proposalSlot, participantIds: selectedIds },
+      {
+        title: proposalTitle.trim(),
+        slot: proposalSlot,
+        // 추천의 "미선택=전원" 의미와 맞춘다 — 빈 배열은 be가 1명 미만으로 거절한다
+        participantIds:
+          selectedIds.length > 0 ? selectedIds : friends.map((f) => f.user.id),
+      },
       {
         onSuccess: () => {
           setProposalSlot(null)
@@ -588,10 +641,12 @@ export function SchedulingPage() {
           {best !== null && (
             <TimetablePreview
               candidate={best}
-              members={selectedFriends.map((f) => ({
-                id: f.user.id,
-                nickname: f.user.nickname,
-              }))}
+              members={(selectedFriends.length > 0 ? selectedFriends : friends).map(
+                (f) => ({
+                  friendshipId: f.friendshipId,
+                  nickname: f.user.nickname,
+                }),
+              )}
             />
           )}
         </div>

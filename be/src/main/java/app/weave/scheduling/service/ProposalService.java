@@ -177,9 +177,10 @@ public class ProposalService {
         attendeeIds.add(proposal.getOrganizerId());
         boolean allDay = proposal.getMode() == Mode.DATE;
         eventRepository.saveAll(attendeeIds.stream()
+                // 확정 일정은 조율 불가 — busyPolicy=HARD 명시 (개인 사본은 이후 본인만 SOFT 변경 가능)
                 .map(uid -> new Event(uid, proposal.getTitle(), null,
                         proposal.getStartTime(), proposal.getEndTime(), null, allDay,
-                        Source.PROPOSAL, proposal.getId(), null))
+                        Source.PROPOSAL, proposal.getId(), Event.BusyPolicy.HARD, null))
                 .toList());
         var confirmed = new NotificationPayload.ProposalConfirmed(proposal.getId(),
                 proposal.getTitle(), toPayloadSlot(proposal.toSlot()));

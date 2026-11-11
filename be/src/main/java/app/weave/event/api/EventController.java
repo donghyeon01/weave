@@ -1,6 +1,8 @@
 package app.weave.event.api;
 
 import app.weave.auth.domain.User;
+import app.weave.common.error.BusinessException;
+import app.weave.common.error.ErrorCode;
 import app.weave.event.domain.Event;
 import app.weave.event.service.EventService;
 import jakarta.validation.Valid;
@@ -41,7 +43,8 @@ public class EventController {
             @Valid @RequestBody CreateRequest req,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
         Event e = service.create(userId, req.title(), req.description(), req.startTime(),
-                req.endTime(), req.location(), Boolean.TRUE.equals(req.allDay()), idempotencyKey);
+                req.endTime(), req.location(), Boolean.TRUE.equals(req.allDay()),
+                parseBusyPolicy(req.busyPolicy()), idempotencyKey);
         return ResponseEntity.created(URI.create("/api/events/" + e.getId()))
                 .body(toResponse(userId, e));
     }
@@ -64,7 +67,8 @@ public class EventController {
     public EventResponse update(@AuthenticationPrincipal Long userId, @PathVariable Long id,
             @RequestBody UpdateRequest req) {
         return toResponse(userId, service.update(userId, id, req.title(), req.description(),
-                req.startTime(), req.endTime(), req.location(), req.allDay()));
+                req.startTime(), req.endTime(), req.location(), req.allDay(),
+                parseBusyPolicy(req.busyPolicy())));
     }
 
     @DeleteMapping("/{id}")
@@ -92,17 +96,31 @@ public class EventController {
                         .toList();
         return new EventResponse(e.getId(), e.getTitle(), e.getDescription(),
                 e.getStartTime().toString(), e.getEndTime().toString(), e.getLocation(),
-                e.isAllDay(), e.getSource().name().toLowerCase(), summaries);
+                e.isAllDay(), e.getSource().name().toLowerCase(),
+                e.getBusyPolicy().name(), summaries);
+    }
+
+    /** 계약 enum은 대문자 — 소문자 입력도 관대하게 받되, 미지정 값은 COMMON-VALIDATION(400). */
+    private Event.BusyPolicy parseBusyPolicy(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return Event.BusyPolicy.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(ErrorCode.COMMON_VALIDATION);
+        }
     }
 
     public record CreateRequest(@NotBlank @Size(max = 255) String title,
             @Size(max = 500) String description, @NotNull LocalDateTime startTime,
-            @NotNull LocalDateTime endTime, @Size(max = 255) String location, Boolean allDay) {
+            @NotNull LocalDateTime endTime, @Size(max = 255) String location, Boolean allDay,
+            String busyPolicy) {
     }
 
     public record UpdateRequest(@Size(max = 255) String title, @Size(max = 500) String description,
             LocalDateTime startTime, LocalDateTime endTime, @Size(max = 255) String location,
-            Boolean allDay) {
+            Boolean allDay, String busyPolicy) {
     }
 
     public record ParticipantSummary(Long id, String nickname, String profileImage) {
@@ -110,6 +128,6 @@ public class EventController {
 
     public record EventResponse(Long id, String title, String description, String startTime,
             String endTime, String location, boolean allDay, String source,
-            List<ParticipantSummary> participants) {
+            String busyPolicy, List<ParticipantSummary> participants) {
     }
 }

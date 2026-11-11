@@ -10,6 +10,7 @@ import app.weave.event.domain.Event;
 import app.weave.event.domain.EventRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,6 +46,11 @@ public class EventService {
                 return existing.get();
             }
         }
+        if (allDay && start != null && end != null) {
+            // allDay 저장 규약 [start일 00:00, end일+1 00:00) 배타 상한 — 시각은 무시하고 날짜만 취한다
+            start = start.toLocalDate().atStartOfDay();
+            end = end.toLocalDate().plusDays(1).atStartOfDay();
+        }
         validateRange(start, end);
         return repository.save(new Event(userId, title, description, start, end, location,
                 allDay, Event.Source.MANUAL, null, idempotencyKey));
@@ -68,8 +74,34 @@ public class EventService {
     public Event update(Long userId, Long id, String title, String description,
             LocalDateTime start, LocalDateTime end, String location, Boolean allDay) {
         Event event = findOwned(userId, id);
+        boolean wasAllDay = event.isAllDay();
         event.update(title, description, start, end, location, allDay);
-        if (start != null || end != null) {
+        // 정규화 대상: allDay로 전환되거나, allDay 상태에서 시각이 바뀔 때.
+        // 이미 allDay인 일정에 allDay:true만 재전송하면 재정규화로 하루 밀리므로 제외한다.
+        if (event.isAllDay() && (start != null || end != null
+                || (Boolean.TRUE.equals(allDay) && !wasAllDay))) {
+            LocalDateTime normStart = event.getStartTime().toLocalDate().atStartOfDay();
+            // 저장된 end가 자정이면 이미 배타 상한이라 그대로, 아니면 end 날짜+1일 00:00.
+            // 사용자가 보낸 end는 "포함 마지막 날짜"라 항상 +1일한다.
+            LocalDateTime effEnd = end != null ? end : event.getEndTime();
+            LocalDateTime normEnd = end == null
+                    && effEnd.toLocalTime().equals(LocalTime.MIDNIGHT)
+                    ? effEnd
+                    : effEnd.toLocalDate().plusDays(1).atStartOfDay();
+            validateRange(normStart, normEnd);
+            event.update(null, null, normStart, normEnd, null, null);
+        } else if (!event.isAllDay() && wasAllDay) {
+            // allDay 해제: 저장된 배타 상한을 마지막 점유일 23:59:59로 환원한다.
+            // 사용자가 end를 직접 보냈으면 그 값을 쓰고, 레거시 23:59:59 저장값은 그대로 통과.
+            if (end == null && event.getEndTime().toLocalTime()
+                    .equals(LocalTime.MIDNIGHT)) {
+                event.update(null, null, null,
+                        event.getEndTime().minusDays(1)
+                                .with(LocalTime.of(23, 59, 59)),
+                        null, null);
+            }
+            validateRange(event.getStartTime(), event.getEndTime());
+        } else if (start != null || end != null) {
             validateRange(event.getStartTime(), event.getEndTime());
         }
         return event;

@@ -21,6 +21,9 @@ const FriendsRoute = lazy(() =>
 const SchedulingRoute = lazy(() =>
   import('./routes/app/scheduling').then((m) => ({ default: m.SchedulingRoute })),
 )
+const AvailabilityRoute = lazy(() =>
+  import('./routes/app/availability').then((m) => ({ default: m.AvailabilityRoute })),
+)
 const ProfileRoute = lazy(() =>
   import('./routes/app/profile').then((m) => ({ default: m.ProfileRoute })),
 )
@@ -70,6 +73,7 @@ export const router = createBrowserRouter([
       { path: 'friends/:userId', element: lazyElement(<FriendProfileRoute />) },
       { path: 'shared/:shareId', element: lazyElement(<SharedRoute />) },
       { path: 'scheduling', element: lazyElement(<SchedulingRoute />) },
+      { path: 'availability', element: lazyElement(<AvailabilityRoute />) },
       { path: 'profile', element: lazyElement(<ProfileRoute />) },
       { path: 'proposals', element: lazyElement(<ProposalsRoute />) },
       { path: 'chat', element: lazyElement(<ChatRoute />) },

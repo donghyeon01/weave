@@ -50,9 +50,19 @@ export function timePart(localDateTime: string): string {
   return localDateTime.slice(11, 16)
 }
 
+// 표시상 마지막 점유일 — allDay는 [start일 00:00, 마지막날+1 00:00) 배타 상한으로 저장되므로
+// 자정 endTime은 하루 전 날짜가 마지막 점유일이다.
+export function eventEndDate(event: EventItem): string {
+  const end = datePart(event.endTime)
+  if (event.allDay && timePart(event.endTime) === '00:00') {
+    return toYmd(addDays(parseYmd(end), -1))
+  }
+  return end
+}
+
 // 이벤트가 특정 날짜를 덮는지 — 시작일~종료일(포함) 사이면 해당.
 export function eventCoversDate(event: EventItem, ymd: string): boolean {
-  return datePart(event.startTime) <= ymd && ymd <= datePart(event.endTime)
+  return datePart(event.startTime) <= ymd && ymd <= eventEndDate(event)
 }
 
 export function sortByStart(events: EventItem[]): EventItem[] {

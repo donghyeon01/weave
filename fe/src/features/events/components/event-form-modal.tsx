@@ -7,7 +7,7 @@ import { Modal } from '../../../components/ui/modal'
 import { useCreateEvent } from '../api/use-create-event'
 import { useUpdateEvent } from '../api/use-update-event'
 import type { EventPayload } from '../api/use-create-event'
-import { toServerDateTime } from '../utils'
+import { datePart, eventEndDate, toServerDateTime } from '../utils'
 
 interface EventFormModalProps {
   mode: 'create' | 'edit'
@@ -33,11 +33,21 @@ export function EventFormModal({ mode, defaultDate, event, onClose, onSaved }: E
 
   const [title, setTitle] = useState(event?.title ?? '')
   const [allDay, setAllDay] = useState(event?.allDay ?? false)
+  // allDay는 저장 규약이 날짜 단위 — 입력도 date 타입이라 날짜 부분만 넣는다.
   const [start, setStart] = useState(
-    event ? toLocalInput(event.startTime) : `${defaultDate}T09:00`,
+    event
+      ? event.allDay
+        ? datePart(event.startTime)
+        : toLocalInput(event.startTime)
+      : `${defaultDate}T09:00`,
   )
+  // allDay 저장값은 배타 상한(마지막날+1 00:00)이라 표시용 종료일은 마지막 점유일로 환산한다.
   const [end, setEnd] = useState(
-    event ? toLocalInput(event.endTime) : `${defaultDate}T10:00`,
+    event
+      ? event.allDay
+        ? eventEndDate(event)
+        : toLocalInput(event.endTime)
+      : `${defaultDate}T10:00`,
   )
   const [location, setLocation] = useState(event?.location ?? '')
   const [description, setDescription] = useState(event?.description ?? '')
@@ -65,8 +75,13 @@ export function EventFormModal({ mode, defaultDate, event, onClose, onSaved }: E
       setError('시작과 종료를 모두 입력해 주세요.')
       return
     }
-    if (start >= end) {
-      setError('시작 시각이 종료 시각보다 빨라야 합니다.')
+    // allDay는 종료일이 "포함 마지막 날짜"라 같은 날 허용 — 날짜 비교로 본다.
+    if (allDay ? start > end : start >= end) {
+      setError(
+        allDay
+          ? '시작일이 종료일보다 늦을 수 없어요.'
+          : '시작 시각이 종료 시각보다 빨라야 합니다.',
+      )
       return
     }
 

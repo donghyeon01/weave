@@ -10,6 +10,10 @@ export interface RecommendRequest {
   participantIds?: number[]
   windowStart?: string
   windowEnd?: string
+  /** 분리된 다중 탐색 창 — 비어있지 않으면 windowStart/End보다 우선한다 (계약 §3.8) */
+  windows?: { startTime: string; endTime: string }[]
+  /** 탐색 간격(분) — 미지정 시 be 기본 30 */
+  stepMinutes?: number
   slotMinutes?: number
   durationDays?: number
 }

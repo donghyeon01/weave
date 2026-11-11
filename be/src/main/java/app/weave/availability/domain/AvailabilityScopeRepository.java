@@ -29,6 +29,11 @@ public interface AvailabilityScopeRepository extends JpaRepository<AvailabilityS
             @Param("activeStatuses") Collection<ScopeStatus> activeStatuses,
             @Param("rangeStart") LocalDate rangeStart, @Param("rangeEnd") LocalDate rangeEnd);
 
+    /** AvailabilityAccess 포트용 일괄 조회 — 범위 겹침: scope.rangeStart<=to AND scope.rangeEnd>=from. */
+    List<AvailabilityScope> findByUserIdInAndModeAndStatusAndRangeStartLessThanEqualAndRangeEndGreaterThanEqualOrderByRangeStartAscIdAsc(
+            Collection<Long> userIds, ScopeMode mode, ScopeStatus status,
+            LocalDate to, LocalDate from);
+
     /** from/to는 각각 선택 — 한쪽만 주면 그 경계만 적용, 둘 다 생략 시 전체. */
     @Query("select s from AvailabilityScope s where s.userId = :userId"
             + " and (:to is null or s.rangeStart <= :to)"

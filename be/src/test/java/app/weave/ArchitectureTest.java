@@ -15,6 +15,7 @@ import java.util.Set;
  * capability-map의 모듈 경계를 강제한다.
  * 허용 의존: 전 모듈 auth·common 공통 + friend→user·notification
  * + scheduling→friend·event·notification·chat.
+ * availability는 auth·common만 의존하고, scheduling은 common.port를 통해서만 소비한다.
  * 이 표에 없는 feature 의존과 순환은 테스트가 깨진다.
  */
 @AnalyzeClasses(packages = "app.weave", importOptions = ImportOption.DoNotIncludeTests.class)
@@ -22,7 +23,7 @@ class ArchitectureTest {
 
     private static final Set<String> FEATURES = Set.of(
             "auth", "user", "notification", "task", "event", "diary", "friend", "scheduling",
-            "chat", "share");
+            "chat", "share", "availability");
 
     /** 전 모듈 공통 허용 — auth(JWT·User)·common(에러·BaseTime)은 어디서나 소비 가능. */
     private static final Set<String> BASE = Set.of("auth", "common");
@@ -69,6 +70,8 @@ class ArchitectureTest {
     static final ArchRule chat_경계 = boundaryOf("chat");
     @ArchTest
     static final ArchRule share_경계 = boundaryOf("share");
+    @ArchTest
+    static final ArchRule availability_경계 = boundaryOf("availability");
     @ArchTest
     static final ArchRule common_경계 =
             noClasses().that().resideInAPackage("app.weave.common..")

@@ -69,14 +69,6 @@ public class SchedulingController {
             RecurrenceRequest recurrence) {
     }
 
-    /**
-     * 정례 추천 요청 — freq는 WEEKLY만, TIME 모드 전용. 값 검증은
-     * {@link RecurrenceExpander.Spec#of}에 위임해 400으로 변환한다 (계약 §3.8).
-     */
-    public record RecurrenceRequest(String freq, Integer interval,
-            List<Integer> byDay, Integer count) {
-    }
-
     /** 다중 탐색 창 — windows가 있으면 windowStart/End보다 우선한다 (계약 §3.8). */
     public record TimeWindow(@JsonFormat(pattern = "HH:mm") LocalTime startTime,
             @JsonFormat(pattern = "HH:mm") LocalTime endTime) {

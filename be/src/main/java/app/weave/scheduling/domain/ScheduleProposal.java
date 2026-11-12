@@ -10,6 +10,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "schedule_proposals")
@@ -47,6 +52,22 @@ public class ScheduleProposal extends BaseTimeEntity {
     @Column(name = "idempotency_key", length = 64)
     private String idempotencyKey;
 
+    // 정례 4컬럼은 CHECK 제약상 all-or-nothing — applyRecurrence로만 채운다 (V11)
+    @Column(name = "recurrence_freq", length = 8)
+    private String recurrenceFreq;
+
+    @JdbcTypeCode(SqlTypes.TINYINT)
+    @Column(name = "recurrence_interval")
+    private Integer recurrenceInterval;
+
+    /** ISO 요일 CSV("2,4") — 파싱은 {@link #byDays()}. */
+    @Column(name = "recurrence_by_days", length = 13)
+    private String recurrenceByDays;
+
+    @JdbcTypeCode(SqlTypes.TINYINT)
+    @Column(name = "occurrence_count")
+    private Integer occurrenceCount;
+
     protected ScheduleProposal() {
     }
 
@@ -68,6 +89,28 @@ public class ScheduleProposal extends BaseTimeEntity {
     public LocalDateTime getStartTime() { return startTime; }
     public LocalDateTime getEndTime() { return endTime; }
     public Status getStatus() { return status; }
+    public String getRecurrenceFreq() { return recurrenceFreq; }
+    public Integer getRecurrenceInterval() { return recurrenceInterval; }
+    public String getRecurrenceByDays() { return recurrenceByDays; }
+    public Integer getOccurrenceCount() { return occurrenceCount; }
+
+    /** 정례 메타 기록 — 4컬럼을 한 번에 채워 CHECK의 all-or-nothing을 지킨다. */
+    public void applyRecurrence(String freq, int interval, Set<Integer> byDays, int count) {
+        this.recurrenceFreq = freq;
+        this.recurrenceInterval = interval;
+        this.recurrenceByDays = byDays.stream().sorted().map(String::valueOf)
+                .collect(Collectors.joining(","));
+        this.occurrenceCount = count;
+    }
+
+    /** recurrence_by_days CSV → ISO 요일(1=월~7=일) 집합 — 비정례는 빈 집합. */
+    public Set<Integer> byDays() {
+        if (recurrenceByDays == null || recurrenceByDays.isBlank()) {
+            return Set.of();
+        }
+        return Arrays.stream(recurrenceByDays.split(",")).map(String::trim)
+                .map(Integer::valueOf).collect(Collectors.toUnmodifiableSet());
+    }
 
     /** 행→API Slot 복원 — DATE는 저장된 배타 상한에서 1일을 빼 포함 끝으로 돌린다. */
     public app.weave.scheduling.service.Slot toSlot() {

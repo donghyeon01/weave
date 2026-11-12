@@ -18,7 +18,10 @@ import app.weave.scheduling.domain.ScheduleProposal.Status;
 import app.weave.scheduling.domain.ScheduleProposalParticipant;
 import app.weave.scheduling.domain.ScheduleProposalParticipant.Response;
 import app.weave.scheduling.domain.ScheduleProposalParticipantRepository;
+import app.weave.scheduling.domain.ScheduleProposalOccurrence;
+import app.weave.scheduling.domain.ScheduleProposalOccurrenceRepository;
 import app.weave.scheduling.domain.ScheduleProposalRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -38,11 +41,12 @@ public class ProposalService {
     /** 제안 + 응답 현황 + 표시용 사용자 정보 — 컨트롤러가 ProposalResponse로 변환한다. */
     public record ProposalDetail(ScheduleProposal proposal,
             List<ScheduleProposalParticipant> participants, User organizer,
-            Map<Long, User> users) {
+            Map<Long, User> users, List<ScheduleProposalOccurrence> occurrences) {
     }
 
     private final ScheduleProposalRepository proposalRepository;
     private final ScheduleProposalParticipantRepository participantRepository;
+    private final ScheduleProposalOccurrenceRepository occurrenceRepository;
     private final FriendshipRepository friendshipRepository;
     private final EventRepository eventRepository;
     private final NotificationPublisher publisher;
@@ -51,11 +55,13 @@ public class ProposalService {
 
     public ProposalService(ScheduleProposalRepository proposalRepository,
             ScheduleProposalParticipantRepository participantRepository,
+            ScheduleProposalOccurrenceRepository occurrenceRepository,
             FriendshipRepository friendshipRepository, EventRepository eventRepository,
             NotificationPublisher publisher, UserRepository userRepository,
             ChatService chatService) {
         this.proposalRepository = proposalRepository;
         this.participantRepository = participantRepository;
+        this.occurrenceRepository = occurrenceRepository;
         this.friendshipRepository = friendshipRepository;
         this.eventRepository = eventRepository;
         this.publisher = publisher;
@@ -64,7 +70,8 @@ public class ProposalService {
     }
 
     @Transactional
-    public ProposalDetail create(Long me, String title, Slot slot, List<Long> participantIds,
+    public ProposalDetail create(Long me, String title, Slot slot,
+            RecurrenceExpander.Spec recurrence, List<Long> participantIds,
             String idempotencyKey) {
         if (idempotencyKey != null) {
             var existing = proposalRepository.findByOrganizerIdAndIdempotencyKey(me,
@@ -85,8 +92,25 @@ public class ProposalService {
         if (!range[0].isBefore(range[1])) {
             throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
         }
+        // 정례는 TIME 전용이고 첫 회차 날짜의 ISO 요일이 byDay에 포함돼야 한다 (계약 §3.7)
+        List<LocalDate> occurrenceDates = null;
+        if (recurrence != null) {
+            if (!(slot instanceof Slot.Time t)
+                    || !recurrence.byDays().contains(t.date().getDayOfWeek().getValue())) {
+                throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+            }
+            occurrenceDates = RecurrenceExpander.expand(t.date(), recurrence);
+        }
         ScheduleProposal proposal = proposalRepository.save(new ScheduleProposal(me, title,
                 modeOf(slot), range[0], range[1], idempotencyKey));
+        if (recurrence != null) {
+            // start_time/end_time은 첫 회차 범위 그대로 — 방 스냅샷·알림 호환
+            proposal.applyRecurrence(recurrence.freq(), recurrence.interval(),
+                    recurrence.byDays(), recurrence.count());
+        }
+        // 전 제안 회차 물질화 — 비정례도 seq=0 한 행 (confirm이 이 행들로 이벤트를 만든다)
+        occurrenceRepository.saveAll(materialize(proposal.getId(), slot, range,
+                occurrenceDates));
         participantRepository.saveAll(participantIds.stream()
                 .map(uid -> new ScheduleProposalParticipant(proposal.getId(), uid)).toList());
 
@@ -238,7 +262,8 @@ public class ProposalService {
         userRepository.findAllById(participants.stream()
                         .map(ScheduleProposalParticipant::getUserId).toList())
                 .forEach(u -> users.put(u.getId(), u));
-        return new ProposalDetail(proposal, participants, organizer, users);
+        return new ProposalDetail(proposal, participants, organizer, users,
+                occurrenceRepository.findByProposalIdOrderBySeqAsc(proposal.getId()));
     }
 
     /** 목록 페이지용 배치 detail — 행별 N+1을 피하기 위해 참여자·사용자를 일괄 조회한다. */
@@ -256,10 +281,17 @@ public class ProposalService {
         }
         Map<Long, User> users = new HashMap<>();
         userRepository.findAllById(userIds).forEach(u -> users.put(u.getId(), u));
+        Map<Long, List<ScheduleProposalOccurrence>> occByProposal = new HashMap<>();
+        for (ScheduleProposalOccurrence o : occurrenceRepository.findByProposalIdIn(ids)) {
+            occByProposal.computeIfAbsent(o.getProposalId(), k -> new ArrayList<>()).add(o);
+        }
+        occByProposal.values().forEach(l -> l.sort(
+                java.util.Comparator.comparingInt(ScheduleProposalOccurrence::getSeq)));
         return proposals.stream()
                 .map(p -> new ProposalDetail(p,
                         byProposal.getOrDefault(p.getId(), List.of()),
-                        users.get(p.getOrganizerId()), users))
+                        users.get(p.getOrganizerId()), users,
+                        occByProposal.getOrDefault(p.getId(), List.of())))
                 .toList();
     }
 
@@ -271,6 +303,23 @@ public class ProposalService {
     private User loadUser(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_UNAUTHORIZED));
+    }
+
+    /** 회차 행 조립 — 정례는 전개 날짜×슬롯 시각, 비정례는 저장 범위 그대로 seq=0 한 행. */
+    private List<ScheduleProposalOccurrence> materialize(Long proposalId, Slot slot,
+            LocalDateTime[] range, List<LocalDate> occurrenceDates) {
+        List<ScheduleProposalOccurrence> occs = new ArrayList<>();
+        if (occurrenceDates == null) {
+            occs.add(new ScheduleProposalOccurrence(proposalId, 0, range[0], range[1]));
+            return occs;
+        }
+        Slot.Time t = (Slot.Time) slot;
+        for (int i = 0; i < occurrenceDates.size(); i++) {
+            LocalDate d = occurrenceDates.get(i);
+            occs.add(new ScheduleProposalOccurrence(proposalId, i,
+                    d.atTime(t.startTime()), d.atTime(t.endTime())));
+        }
+        return occs;
     }
 
     /** API Slot → 행 저장 규약: DATE는 endDate 포함 끝을 +1일 자정 배타 상한으로 저장한다. */

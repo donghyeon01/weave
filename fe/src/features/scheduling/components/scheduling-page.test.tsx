@@ -36,6 +36,7 @@ const CANDIDATE: Candidate = {
   percent: 100,
   availableCount: 2,
   totalCount: 2,
+  breakdown: { direct: 1, calendarFree: 1, conditional: 0, unknown: 0, unavailable: 0 },
   slot: { type: 'TIME', date: '2026-05-15', startTime: '14:00', endTime: '16:00' },
 }
 
@@ -46,7 +47,11 @@ function mockApis() {
     if (url === '/api/friends' && method === 'GET') return FRIENDS
     if (url === '/api/users/me') return { id: 1, nickname: '나' }
     if (url === '/api/scheduling' && method === 'POST') {
-      return { candidates: [CANDIDATE] }
+      return {
+        candidates: [CANDIDATE],
+        participantIds: [2, 3],
+        computedAt: '2026-05-12T09:00:00Z',
+      }
     }
     if (url.startsWith('/api/friends/') && url.includes('/schedule')) {
       // friendshipId 10(지우)에게 후보 날짜의 종일 일정 — 배타 상한 [당일 00:00, 익일 00:00)
@@ -83,7 +88,7 @@ async function renderPage() {
 
 async function runRecommend() {
   await userEvent.click(screen.getByRole('button', { name: /AI 추천 슬롯 찾기/ }))
-  await screen.findByText(/참여율 2\/2/)
+  await screen.findByText(/가능 2\/전체 2/)
 }
 
 beforeEach(() => {
@@ -124,6 +129,24 @@ describe('scheduling-page', () => {
       { startTime: '18:00', endTime: '22:00' },
     ])
     expect(body.windowStart).toBeUndefined()
+  })
+
+  it('추천 카드에 5분류 breakdown을 표시한다', async () => {
+    await renderPage()
+    await runRecommend()
+
+    await screen.findByText(/직접 가능 1/)
+    await screen.findByText(/캘린더 빈 1/)
+    expect(screen.getByText(/조정 필요 0/)).toBeInTheDocument()
+    expect(screen.getByText(/확인 필요 0/)).toBeInTheDocument()
+    expect(screen.getByText(/불가 0/)).toBeInTheDocument()
+  })
+
+  it('조율 조건 카드에 내 가능 시간 관리 링크가 있다', async () => {
+    await renderPage()
+
+    const link = screen.getByRole('link', { name: '내 가능 시간 관리 →' })
+    expect(link).toHaveAttribute('href', '/app/availability')
   })
 
   it('친구의 종일 블록(익일 00:00 끝)도 busy로 표시한다', async () => {

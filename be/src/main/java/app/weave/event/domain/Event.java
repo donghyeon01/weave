@@ -3,6 +3,8 @@ package app.weave.event.domain;
 import app.weave.common.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -16,6 +18,11 @@ public class Event extends BaseTimeEntity {
     /** 생성 출처 — 캘린더 범례 "스마트 조율 약속" 구분 (manual=직접 등록, proposal=조율 확정). */
     public enum Source {
         MANUAL, PROPOSAL
+    }
+
+    /** 시간 점유 정책 — HARD 조율 불가(기본) / SOFT 조정 가능(conditional) / FREE 비점유(표시용). */
+    public enum BusyPolicy {
+        HARD, SOFT, FREE
     }
 
     @Id
@@ -51,6 +58,11 @@ public class Event extends BaseTimeEntity {
     @Column(name = "proposal_id")
     private Long proposalId;
 
+    /** source와 독립 — 출처가 아니라 시간 점유 의미 (spec §Schema). 대문자 enum 저장. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "busy_policy", nullable = false, length = 4)
+    private BusyPolicy busyPolicy = BusyPolicy.HARD;
+
     @Column(name = "idempotency_key", length = 64)
     private String idempotencyKey;
 
@@ -59,7 +71,7 @@ public class Event extends BaseTimeEntity {
 
     public Event(Long userId, String title, String description, LocalDateTime startTime,
             LocalDateTime endTime, String location, boolean allDay, Source source,
-            Long proposalId, String idempotencyKey) {
+            Long proposalId, BusyPolicy busyPolicy, String idempotencyKey) {
         this.userId = userId;
         this.title = title;
         this.description = description;
@@ -69,6 +81,7 @@ public class Event extends BaseTimeEntity {
         this.allDay = allDay;
         this.source = source != null ? source : Source.MANUAL;
         this.proposalId = proposalId;
+        this.busyPolicy = busyPolicy != null ? busyPolicy : BusyPolicy.HARD;
         this.idempotencyKey = idempotencyKey;
     }
 
@@ -82,9 +95,11 @@ public class Event extends BaseTimeEntity {
     public boolean isAllDay() { return allDay; }
     public Source getSource() { return source; }
     public Long getProposalId() { return proposalId; }
+    public BusyPolicy getBusyPolicy() { return busyPolicy; }
 
     public void update(String title, String description, LocalDateTime startTime,
-            LocalDateTime endTime, String location, Boolean allDay) {
+            LocalDateTime endTime, String location, Boolean allDay,
+            BusyPolicy busyPolicy) {
         if (title != null) {
             this.title = title;
         }
@@ -102,6 +117,9 @@ public class Event extends BaseTimeEntity {
         }
         if (allDay != null) {
             this.allDay = allDay;
+        }
+        if (busyPolicy != null) {
+            this.busyPolicy = busyPolicy;
         }
     }
 }

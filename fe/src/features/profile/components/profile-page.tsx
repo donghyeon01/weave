@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/button'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
 import { Modal } from '../../../components/ui/modal'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
+import { Switch } from '../../../components/ui/switch'
 import { Toast } from '../../../components/ui/toast'
 import { ApiError } from '../../../lib/api-client'
 import { cx } from '../../../utils/cx'
@@ -48,25 +49,6 @@ const SHARE_ROWS: {
     desc: '친구에게 일정의 상세 설명과 메모까지 보여줍니다.',
   },
 ]
-
-function Switch({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      onClick={onToggle}
-      className={cx(
-        'flex h-6 w-12 shrink-0 items-center rounded-full p-1 transition duration-150',
-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-        on ? 'justify-end bg-accent' : 'justify-start bg-surface-muted',
-      )}
-    >
-      <span className="size-4 rounded-full bg-surface shadow" />
-    </button>
-  )
-}
 
 // Figma 4:4 — 벤토 2열(프로필 정보|일정 공개 / 앱 설정|계정 관리) + 하단 스티키 저장 바.
 export function ProfilePage() {

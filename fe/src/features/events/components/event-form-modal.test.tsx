@@ -32,6 +32,19 @@ const ALL_DAY_EVENT: EventItem = {
   location: null,
   allDay: true,
   source: 'manual',
+  busyPolicy: 'HARD',
+}
+
+const PROPOSAL_EVENT: EventItem = {
+  id: 7,
+  title: '제안 회의',
+  description: null,
+  startTime: '2026-05-12T14:00:00',
+  endTime: '2026-05-12T16:00:00',
+  location: null,
+  allDay: false,
+  source: 'proposal',
+  busyPolicy: 'HARD',
 }
 
 beforeEach(() => {
@@ -135,5 +148,84 @@ describe('event-form-modal allDay', () => {
       expect.anything(),
       expect.objectContaining({ method: 'POST' }),
     )
+  })
+})
+
+describe('event-form-modal busyPolicy', () => {
+  it('생성 시 조정 정책 기본값 HARD를 보낸다', async () => {
+    render(
+      <EventFormModal
+        mode="create"
+        defaultDate="2026-05-12"
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+      { wrapper: wrapper() },
+    )
+
+    await userEvent.type(screen.getByLabelText(/제목/), '기본 정책')
+    await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+    await waitFor(() => {
+      const call = apiFetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
+      const body = call?.[1]?.body as Record<string, unknown>
+      expect(body.busyPolicy).toBe('HARD')
+    })
+  })
+
+  it('SOFT를 선택해 저장하면 PATCH에 반영한다', async () => {
+    render(
+      <EventFormModal
+        mode="edit"
+        defaultDate="2026-05-12"
+        event={PROPOSAL_EVENT}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+      { wrapper: wrapper() },
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: /조정 가능/ }))
+    await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+    await waitFor(() => {
+      const call = apiFetchMock.mock.calls.find((c) => c[1]?.method === 'PATCH')
+      const body = call?.[1]?.body as Record<string, unknown>
+      expect(body.busyPolicy).toBe('SOFT')
+    })
+  })
+
+  it('proposal-sourced 일정 수정 시 개인 반영 안내를 보여준다', async () => {
+    render(
+      <EventFormModal
+        mode="edit"
+        defaultDate="2026-05-12"
+        event={PROPOSAL_EVENT}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+      { wrapper: wrapper() },
+    )
+
+    expect(
+      screen.getByText(/조정 정책 변경은 내 조율 계산에만 반영돼요/),
+    ).toBeInTheDocument()
+  })
+
+  it('manual 일정에는 개인 반영 안내가 없다', async () => {
+    render(
+      <EventFormModal
+        mode="edit"
+        defaultDate="2026-05-12"
+        event={ALL_DAY_EVENT}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+      { wrapper: wrapper() },
+    )
+
+    expect(
+      screen.queryByText(/조정 정책 변경은 내 조율 계산에만 반영돼요/),
+    ).not.toBeInTheDocument()
   })
 })

@@ -9,6 +9,8 @@ export interface EventPayload {
   endTime: string
   location?: string
   allDay?: boolean
+  /** 생략 시 be 기본 HARD · 수정 시 생략=기존 값 유지 (api-contract §3.4) */
+  busyPolicy?: 'HARD' | 'SOFT' | 'FREE'
 }
 
 // POST /api/events — 생성은 멱등키를 붙여 재시도 중복 생성을 막는다 (api-contract §1.6).

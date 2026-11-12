@@ -38,7 +38,8 @@ public class EventService {
 
     @Transactional
     public Event create(Long userId, String title, String description, LocalDateTime start,
-            LocalDateTime end, String location, boolean allDay, String idempotencyKey) {
+            LocalDateTime end, String location, boolean allDay, Event.BusyPolicy busyPolicy,
+            String idempotencyKey) {
         if (idempotencyKey != null) {
             Optional<Event> existing = repository
                     .findByUserIdAndIdempotencyKey(userId, idempotencyKey);
@@ -53,7 +54,7 @@ public class EventService {
         }
         validateRange(start, end);
         return repository.save(new Event(userId, title, description, start, end, location,
-                allDay, Event.Source.MANUAL, null, idempotencyKey));
+                allDay, Event.Source.MANUAL, null, busyPolicy, idempotencyKey));
     }
 
     @Transactional(readOnly = true)
@@ -72,10 +73,11 @@ public class EventService {
 
     @Transactional
     public Event update(Long userId, Long id, String title, String description,
-            LocalDateTime start, LocalDateTime end, String location, Boolean allDay) {
+            LocalDateTime start, LocalDateTime end, String location, Boolean allDay,
+            Event.BusyPolicy busyPolicy) {
         Event event = findOwned(userId, id);
         boolean wasAllDay = event.isAllDay();
-        event.update(title, description, start, end, location, allDay);
+        event.update(title, description, start, end, location, allDay, busyPolicy);
         // 정규화 대상: allDay로 전환되거나, allDay 상태에서 시각이 바뀔 때.
         // 이미 allDay인 일정에 allDay:true만 재전송하면 재정규화로 하루 밀리므로 제외한다.
         if (event.isAllDay() && (start != null || end != null
@@ -89,7 +91,7 @@ public class EventService {
                     ? effEnd
                     : effEnd.toLocalDate().plusDays(1).atStartOfDay();
             validateRange(normStart, normEnd);
-            event.update(null, null, normStart, normEnd, null, null);
+            event.update(null, null, normStart, normEnd, null, null, null);
         } else if (!event.isAllDay() && wasAllDay) {
             // allDay 해제: 저장된 배타 상한을 마지막 점유일 23:59:59로 환원한다.
             // 사용자가 end를 직접 보냈으면 그 값을 쓰고, 레거시 23:59:59 저장값은 그대로 통과.
@@ -98,7 +100,7 @@ public class EventService {
                 event.update(null, null, null,
                         event.getEndTime().minusDays(1)
                                 .with(LocalTime.of(23, 59, 59)),
-                        null, null);
+                        null, null, null);
             }
             validateRange(event.getStartTime(), event.getEndTime());
         } else if (start != null || end != null) {

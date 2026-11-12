@@ -26,6 +26,7 @@ const EVENT: EventItem = {
   location: '도서관',
   allDay: false,
   source: 'manual',
+  busyPolicy: 'HARD',
 }
 
 function renderPage() {

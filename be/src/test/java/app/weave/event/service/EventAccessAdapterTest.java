@@ -51,7 +51,7 @@ class EventAccessAdapterTest {
                 Long.class);
         event = eventService.create(meId, "점심 약속", "설명",
                 LocalDateTime.of(2027, 6, 1, 12, 0), LocalDateTime.of(2027, 6, 1, 13, 0),
-                "강남", false, null);
+                "강남", false, null, null);
     }
 
     @Test
@@ -91,7 +91,7 @@ class EventAccessAdapterTest {
                 Long.class, meId);
         Event proposalEvent = eventRepository.save(new Event(meId, "조율 약속", null,
                 LocalDateTime.of(2027, 6, 5, 19, 0), LocalDateTime.of(2027, 6, 5, 21, 0),
-                null, false, Event.Source.PROPOSAL, proposalId, null));
+                null, false, Event.Source.PROPOSAL, proposalId, Event.BusyPolicy.HARD, null));
 
         Optional<SharedEvent> result = adapter.eventDetailOf(meId, proposalEvent.getId());
 

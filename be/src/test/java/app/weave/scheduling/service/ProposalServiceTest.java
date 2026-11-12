@@ -186,6 +186,11 @@ class ProposalServiceTest {
         assertThat(com.jayway.jsonpath.JsonPath.<String>read(
                 r.getResponse().getContentAsString(), "$.occurrences[0].startTime"))
                 .isEqualTo("14:00");
+
+        // 방 스냅샷 — occurrence_count는 제안 회차 수 그대로 (Task 10)
+        assertThat(jdbc.queryForObject(
+                "SELECT occurrence_count FROM chat_rooms WHERE proposal_id=?",
+                Integer.class, id)).isEqualTo(4);
     }
 
     @Test
@@ -367,6 +372,9 @@ class ProposalServiceTest {
                 .isEqualTo("나");
         assertThat(com.jayway.jsonpath.JsonPath.<String>read(payload, "$.slot.type"))
                 .isEqualTo("TIME");
+        // 단일 제안 — 알림 payload의 occurrenceCount는 1
+        assertThat(com.jayway.jsonpath.JsonPath.<Integer>read(
+                payload, "$.occurrenceCount")).isEqualTo(1);
     }
 
     @Test
@@ -1088,7 +1096,8 @@ class ProposalServiceTest {
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.any(app.weave.chat.domain.Mode.class),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyList());
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.anyInt());
 
         mvc.perform(post("/api/scheduling/proposals")
                         .header("Authorization", "Bearer " + meToken)

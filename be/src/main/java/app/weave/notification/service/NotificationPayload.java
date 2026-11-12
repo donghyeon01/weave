@@ -71,8 +71,8 @@ public sealed interface NotificationPayload {
         }
     }
 
-    record ProposalReceived(Long proposalId, String title, UserRef organizer, Slot slot)
-            implements NotificationPayload {
+    record ProposalReceived(Long proposalId, String title, UserRef organizer, Slot slot,
+            Integer occurrenceCount) implements NotificationPayload {
         @Override
         public NotificationType type() {
             return NotificationType.PROPOSAL_RECEIVED;
@@ -81,12 +81,13 @@ public sealed interface NotificationPayload {
         @Override
         public Map<String, Object> toMap() {
             return Map.of("proposalId", proposalId, "title", title,
-                    "organizer", organizer.toMap(), "slot", slot.toMap());
+                    "organizer", organizer.toMap(), "slot", slot.toMap(),
+                    "occurrenceCount", occurrenceCount);
         }
     }
 
-    record ProposalAllAccepted(Long proposalId, String title, UserRef organizer, Slot slot)
-            implements NotificationPayload {
+    record ProposalAllAccepted(Long proposalId, String title, UserRef organizer, Slot slot,
+            Integer occurrenceCount) implements NotificationPayload {
         @Override
         public NotificationType type() {
             return NotificationType.PROPOSAL_ALL_ACCEPTED;
@@ -95,12 +96,13 @@ public sealed interface NotificationPayload {
         @Override
         public Map<String, Object> toMap() {
             return Map.of("proposalId", proposalId, "title", title,
-                    "organizer", organizer.toMap(), "slot", slot.toMap());
+                    "organizer", organizer.toMap(), "slot", slot.toMap(),
+                    "occurrenceCount", occurrenceCount);
         }
     }
 
-    record ProposalConfirmed(Long proposalId, String title, Slot slot)
-            implements NotificationPayload {
+    record ProposalConfirmed(Long proposalId, String title, Slot slot,
+            Integer occurrenceCount) implements NotificationPayload {
         @Override
         public NotificationType type() {
             return NotificationType.PROPOSAL_CONFIRMED;
@@ -108,7 +110,8 @@ public sealed interface NotificationPayload {
 
         @Override
         public Map<String, Object> toMap() {
-            return Map.of("proposalId", proposalId, "title", title, "slot", slot.toMap());
+            return Map.of("proposalId", proposalId, "title", title, "slot", slot.toMap(),
+                    "occurrenceCount", occurrenceCount);
         }
     }
 

@@ -123,12 +123,13 @@ public class ProposalService {
             roster.addAll(participantIds);
             chatService.createRoom(proposal.getId(), proposal.getTitle(),
                     mapMode(proposal.getMode()), proposal.getStartTime(), proposal.getEndTime(),
-                    roster);
+                    roster, occurrenceCountOf(proposal));
         }
 
         User organizer = loadUser(me);
         var payload = new NotificationPayload.ProposalReceived(proposal.getId(), title,
-                new UserRef(me, organizer.getNickname()), toPayloadSlot(slot));
+                new UserRef(me, organizer.getNickname()), toPayloadSlot(slot),
+                occurrenceCountOf(proposal));
         for (Long uid : participantIds) {
             publisher.publish(uid, payload);
         }
@@ -164,7 +165,8 @@ public class ProposalService {
                     new NotificationPayload.ProposalAllAccepted(proposal.getId(),
                             proposal.getTitle(),
                             new UserRef(organizer.getId(), organizer.getNickname()),
-                            toPayloadSlot(proposal.toSlot())));
+                            toPayloadSlot(proposal.toSlot()),
+                            occurrenceCountOf(proposal)));
         } else if (all.stream().anyMatch(r -> r.getResponse() == Response.DECLINED)) {
             proposal.decline();
             chatService.closeRoom(proposalId);
@@ -255,7 +257,8 @@ public class ProposalService {
         }
         eventRepository.saveAll(events);
         var confirmed = new NotificationPayload.ProposalConfirmed(proposal.getId(),
-                proposal.getTitle(), toPayloadSlot(proposal.toSlot()));
+                proposal.getTitle(), toPayloadSlot(proposal.toSlot()),
+                occurrenceCountOf(proposal));
         for (Long uid : attendeeIds) {
             publisher.publish(uid, confirmed);
         }
@@ -378,6 +381,11 @@ public class ProposalService {
             case Slot.Days d -> new LocalDateTime[]{
                     d.startDate().atStartOfDay(), d.endDate().plusDays(1).atStartOfDay()};
         };
+    }
+
+    /** 방 스냅샷·알림 payload 공용 — 비정례 제안은 occurrenceCount가 null이라 1로 대체한다. */
+    private int occurrenceCountOf(ScheduleProposal proposal) {
+        return proposal.getOccurrenceCount() != null ? proposal.getOccurrenceCount() : 1;
     }
 
     private Mode modeOf(Slot slot) {

@@ -33,6 +33,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -178,10 +179,14 @@ public class ProposalService {
 
     /**
      * 확정 — 방장 전용, ALL_ACCEPTED 게이트 통과 시에만 (ADR-0011).
+     * 제안 잠금 → 참석자 user 행을 id 오름차순 잠금(EventService 쓰기와 같은 잠금 규약,
+     * 교착 방지를 위해 반드시 제안 잠금 이후·오름차순) → HARD 재검증 → 확정.
      * status + 전원 EVENTS + 전원 알림 INSERT가 단일 트랜잭션으로 원자다 (ADR-0004).
      * WS push만 AFTER_COMMIT으로 빠진다 (Publisher 내부).
+     * READ_COMMITTED — user 잠금 대기 후 읽는 이벤트 조회가 최신 커밋을 봐야 한다
+     * (REPEATABLE READ 스냅샷 오판 방지 — PR #24 refresh 회전과 같은 교훈).
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ProposalDetail confirmProposal(Long me, Long proposalId) {
         ScheduleProposal proposal = proposalRepository.findByIdForUpdate(proposalId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PROPOSAL_NOT_FOUND));
@@ -191,21 +196,64 @@ public class ProposalService {
         if (proposal.getStatus() != Status.ALL_ACCEPTED) {
             throw new BusinessException(ErrorCode.PROPOSAL_NOT_AWAITING_CONFIRM);
         }
-        proposal.confirm();
-        chatService.closeRoom(proposalId);
 
         List<ScheduleProposalParticipant> all = participantRepository
                 .findByProposalId(proposalId);
         List<Long> attendeeIds = new ArrayList<>(
                 all.stream().map(ScheduleProposalParticipant::getUserId).toList());
         attendeeIds.add(proposal.getOrganizerId());
+        attendeeIds = attendeeIds.stream().distinct().sorted().toList();
+        // 참석자 user 행 잠금 — EventService create/update/delete가 같은 행을 잠그므로
+        // confirm과 개인 일정 쓰기가 직렬화된다. FK CASCADE로 행 존재가 보장되고,
+        // empty면 잠글 대상도 그 사용자의 이벤트도 없으므로 건너뛴다.
+        for (Long uid : attendeeIds) {
+            userRepository.findByIdForUpdate(uid);
+        }
+
+        // HARD 재검증 — 회차 전체 범위와 겹치는 이벤트를 일괄 조회해 HARD만 검사한다
+        // (SOFT·FREE·가용성 선언·선호는 수락한 약속을 막지 않는다 — spec D5).
+        List<ScheduleProposalOccurrence> occurrences = occurrenceRepository
+                .findByProposalIdOrderBySeqAsc(proposalId);
+        LocalDateTime minStart = occurrences.stream()
+                .map(ScheduleProposalOccurrence::getStartTime)
+                .min(LocalDateTime::compareTo).orElseThrow();
+        LocalDateTime maxEnd = occurrences.stream()
+                .map(ScheduleProposalOccurrence::getEndTime)
+                .max(LocalDateTime::compareTo).orElseThrow();
+        Map<Long, List<Event>> hardByUser = new HashMap<>();
+        for (Event e : eventRepository
+                .findByUserIdInAndStartTimeLessThanAndEndTimeGreaterThan(
+                        attendeeIds, maxEnd, minStart)) {
+            if (e.getBusyPolicy() == Event.BusyPolicy.HARD) {
+                hardByUser.computeIfAbsent(e.getUserId(), k -> new ArrayList<>()).add(e);
+            }
+        }
+        for (ScheduleProposalOccurrence occ : occurrences) {
+            for (Long uid : attendeeIds) {
+                for (Event e : hardByUser.getOrDefault(uid, List.of())) {
+                    // 반열린 구간 겹침 — 맞닿음(end==start)은 충돌 아님
+                    if (e.getStartTime().isBefore(occ.getEndTime())
+                            && e.getEndTime().isAfter(occ.getStartTime())) {
+                        throw new BusinessException(ErrorCode.PROPOSAL_CONFLICT);
+                    }
+                }
+            }
+        }
+
+        proposal.confirm();
+        chatService.closeRoom(proposalId);
+
         boolean allDay = proposal.getMode() == Mode.DATE;
-        eventRepository.saveAll(attendeeIds.stream()
+        List<Event> events = new ArrayList<>();
+        for (ScheduleProposalOccurrence occ : occurrences) {
+            for (Long uid : attendeeIds) {
                 // 확정 일정은 조율 불가 — busyPolicy=HARD 명시 (개인 사본은 이후 본인만 SOFT 변경 가능)
-                .map(uid -> new Event(uid, proposal.getTitle(), null,
-                        proposal.getStartTime(), proposal.getEndTime(), null, allDay,
-                        Source.PROPOSAL, proposal.getId(), Event.BusyPolicy.HARD, null))
-                .toList());
+                events.add(new Event(uid, proposal.getTitle(), null,
+                        occ.getStartTime(), occ.getEndTime(), null, allDay,
+                        Source.PROPOSAL, proposal.getId(), Event.BusyPolicy.HARD, null));
+            }
+        }
+        eventRepository.saveAll(events);
         var confirmed = new NotificationPayload.ProposalConfirmed(proposal.getId(),
                 proposal.getTitle(), toPayloadSlot(proposal.toSlot()));
         for (Long uid : attendeeIds) {

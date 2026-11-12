@@ -2,17 +2,20 @@ package app.weave.availability.api;
 
 import app.weave.availability.domain.AvailabilityBlock;
 import app.weave.availability.domain.BlockKind;
+import app.weave.availability.domain.PreferredWindow;
 import app.weave.availability.domain.ScopeMode;
 import app.weave.availability.service.AvailabilityService;
 import app.weave.availability.service.AvailabilityService.BlockDraft;
 import app.weave.availability.service.AvailabilityService.ScopeSummary;
 import app.weave.availability.service.AvailabilityService.ScopeWithBlocks;
+import app.weave.availability.service.AvailabilityService.WindowDraft;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.net.URI;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -93,6 +96,20 @@ public class AvailabilityController {
                 service.putUseCalendarInference(userId, req.useCalendarInference()));
     }
 
+    @GetMapping("/preferred-windows")
+    public PreferredWindowsResponse getPreferredWindows(@AuthenticationPrincipal Long userId) {
+        return toWindowsResponse(service.getPreferredWindows(userId));
+    }
+
+    @PutMapping("/preferred-windows")
+    public PreferredWindowsResponse putPreferredWindows(@AuthenticationPrincipal Long userId,
+            @Valid @RequestBody PutPreferredWindowsRequest req) {
+        List<WindowDraft> drafts = req.windows().stream()
+                .map(w -> new WindowDraft(w.dayOfWeek(), w.startTime(), w.endTime()))
+                .toList();
+        return toWindowsResponse(service.putPreferredWindows(userId, drafts));
+    }
+
     private ScopeDetail toDetail(ScopeWithBlocks r) {
         var s = r.scope();
         return new ScopeDetail(s.getId(), s.getMode().name(), s.getRangeStart().toString(),
@@ -115,6 +132,17 @@ public class AvailabilityController {
 
     private static String fmt(java.time.LocalDateTime t) {
         return t == null ? null : DATETIME.format(t);
+    }
+
+    /** 선호 윈도우 시각 표기 — 계약 §3.12는 "HH:mm" (TIME 컬럼이라 초 생략). */
+    private static final java.time.format.DateTimeFormatter TIME =
+            java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+
+    private PreferredWindowsResponse toWindowsResponse(List<PreferredWindow> windows) {
+        return new PreferredWindowsResponse(windows.stream()
+                .map(w -> new PreferredWindowResponse(w.getDayOfWeek(),
+                        w.getStartTime().format(TIME), w.getEndTime().format(TIME)))
+                .toList());
     }
 
     private BlockResponse toBlockResponse(AvailabilityBlock b) {
@@ -166,5 +194,26 @@ public class AvailabilityController {
     }
 
     public record PreferenceResponse(boolean useCalendarInference) {
+    }
+
+    /**
+     * 선호 윈도우 입력 — startTime/endTime은 Jackson 기본 ISO 파싱 ("HH:mm" 허용).
+     * dayOfWeek 범위·같은 요일 중첩 검증은 서비스가 AVAILABILITY-INVALID로 처리한다.
+     * windows 생략은 전량 삭제 의도와 구분 — 의도된 삭제는 명시적 []로만 (blocks와 같은 규약).
+     */
+    public record PreferredWindowRequest(
+            @NotNull Integer dayOfWeek,
+            @NotNull LocalTime startTime,
+            @NotNull LocalTime endTime) {
+    }
+
+    public record PutPreferredWindowsRequest(
+            @NotNull List<@NotNull @Valid PreferredWindowRequest> windows) {
+    }
+
+    public record PreferredWindowResponse(int dayOfWeek, String startTime, String endTime) {
+    }
+
+    public record PreferredWindowsResponse(List<PreferredWindowResponse> windows) {
     }
 }

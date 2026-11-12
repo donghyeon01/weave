@@ -19,10 +19,12 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
 
     /**
      * 회전은 조건부 UPDATE 1쿼리로 원자화 — 동일 해시 동시 요청은 1건만 갱신.
+     * evicted·만료 가드를 UPDATE 조건에 포함해 사전 조회와 UPDATE 사이의 상태 경쟁을 차단한다.
      */
     @Modifying(clearAutomatically = true)
     @Query("UPDATE RefreshToken t SET t.previousTokenHash = :oldHash, t.tokenHash = :newHash, "
-            + "t.expiryDate = :newExpiry, t.lastAccessedAt = :now WHERE t.tokenHash = :oldHash")
+            + "t.expiryDate = :newExpiry, t.lastAccessedAt = :now "
+            + "WHERE t.tokenHash = :oldHash AND t.evictedAt IS NULL AND t.expiryDate >= :now")
     int rotate(@Param("oldHash") String oldHash, @Param("newHash") String newHash,
             @Param("newExpiry") java.time.LocalDateTime newExpiry,
             @Param("now") java.time.LocalDateTime now);

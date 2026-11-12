@@ -55,7 +55,7 @@ Last reviewed: 2026-11-04 (spec 승인과 동시)
 | 동시 401 → refresh 요청 정확히 1회 + 대기 요청 새 토큰 재실행 | fe 인터셉터 단위 테스트 |
 | 제안 전원 수락 → `CONFIRMED` + 전원 EVENTS 생성 + 알림, 단일 트랜잭션 | `@SpringBootTest` 통합 테스트 (경합 케이스 포함) |
 | 친구·제안 상태 전이가 모든 경로에서 일관 — 불법 전이는 409 | 도메인 단위 + 통합 테스트 |
-| 세션 LRU — 5개 초과 시 `last_accessed_at` 최소 행 퇴출, UA 불일치 갱신 거부 | 통합 테스트 |
+| 세션 LRU — 4개 초과 시 `last_accessed_at` 최소 행 퇴출, UA 불일치 갱신 거부 | 통합 테스트 |
 
 ## Measured, not yet enforced
 

@@ -92,12 +92,13 @@ export function startStompClient() {
     // 배포는 apiBaseUrl의 API 도메인, 로컬은 vite dev 프록시가 /ws를 백엔드 8081로 넘긴다
     brokerURL: `${(env.apiBaseUrl || location.origin).replace(/^http/, 'ws')}/ws`,
     reconnectDelay: 5000,
-    // 매 연결 시도마다 실행되는 훅 — 토큰 갱신에 실패하면 throw로 그 시도를 중단하고
-    // reconnectDelay 재시도에 맡긴다 (네트워크 단절 시 자기 회복).
+    // 매 연결 시도마다 실행되는 훅 — 토큰 갱신에 실패해도 throw하지 않는다.
+    // stompjs 7.x는 beforeConnect 거절을 처리하지 않아 재연결이 예약되지 않고
+    // 클라이언트가 영구 정지한다. 무인증 CONNECT는 서버가 ERROR+종료로 거부하고
+    // WS 종료가 reconnectDelay 재시도를 스케줄하므로 그 경로에 맡긴다.
     beforeConnect: async () => {
       const token = await ensureFreshToken()
-      if (token === null) throw new Error('STOMP connect aborted: no access token')
-      c.connectHeaders = { Authorization: `Bearer ${token}` }
+      c.connectHeaders = token === null ? {} : { Authorization: `Bearer ${token}` }
     },
     onConnect: () => {
       applySubscriptions(c)

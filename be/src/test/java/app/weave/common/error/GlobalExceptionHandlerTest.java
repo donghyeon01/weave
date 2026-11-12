@@ -1,7 +1,10 @@
 package app.weave.common.error;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,13 +18,17 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -67,6 +74,21 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/unauthorized")
         void unauthorized() {
             throw new BadCredentialsException("bad token");
+        }
+
+        @PatchMapping("/test/item")
+        Map<String, String> patchItem() {
+            return Map.of("patched", "true");
+        }
+
+        @DeleteMapping("/test/item")
+        Map<String, String> deleteItem() {
+            return Map.of("deleted", "true");
+        }
+
+        @GetMapping("/test/params")
+        Map<String, String> params(@RequestParam String q) {
+            return Map.of("q", q);
         }
     }
 
@@ -118,6 +140,26 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.code").value("ACCESS-DENIED"));
+    }
+
+    @Test
+    void 지원하지_않는_메서드는_405와_Allow_헤더를_반환한다() throws Exception {
+        mockMvc.perform(put("/test/item"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.status").value(405))
+                .andExpect(jsonPath("$.code").value("COMMON-METHOD-NOT-ALLOWED"))
+                .andExpect(jsonPath("$.traceId").isString())
+                .andExpect(header().string(HttpHeaders.ALLOW, containsString("PATCH")))
+                .andExpect(header().string(HttpHeaders.ALLOW, containsString("DELETE")));
+    }
+
+    @Test
+    void 필수_쿼리_파라미터_누락은_400_VALIDATION_봉투로_응답한다() throws Exception {
+        mockMvc.perform(get("/test/params"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value("COMMON-VALIDATION"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("q"));
     }
 
     @Test

@@ -8,10 +8,13 @@ public enum ErrorCode {
 
     COMMON_VALIDATION("COMMON-VALIDATION", 400, "입력값이 올바르지 않습니다."),
     COMMON_MALFORMED("COMMON-MALFORMED", 400, "요청 본문을 해석할 수 없습니다."),
+    COMMON_METHOD_NOT_ALLOWED("COMMON-METHOD-NOT-ALLOWED", 405, "지원하지 않는 요청 메서드입니다."),
     AUTH_UNAUTHORIZED("AUTH-UNAUTHORIZED", 401, "인증이 필요합니다."),
     AUTH_KAKAO_EXCHANGE_FAILED("AUTH-KAKAO-EXCHANGE-FAILED", 401, "카카오 로그인에 실패했습니다."),
     AUTH_REFRESH_INVALID("AUTH-REFRESH-INVALID", 401, "세션이 유효하지 않습니다. 다시 로그인해주세요."),
     AUTH_REFRESH_REUSED("AUTH-REFRESH-REUSED", 401, "비정상적인 세션 사용이 감지되어 로그아웃되었습니다."),
+    AUTH_REFRESH_ROTATED("AUTH-REFRESH-ROTATED", 409,
+            "세션이 방금 갱신되었습니다. 다시 시도해주세요."),
     AUTH_UA_MISMATCH("AUTH-UA-MISMATCH", 401, "기기 정보가 일치하지 않습니다. 다시 로그인해주세요."),
     AUTH_SESSION_EVICTED("AUTH-SESSION-EVICTED", 401, "다른 기기에서 로그인하여 로그아웃되었습니다."),
     DEMO_RATE_LIMITED("DEMO-RATE-LIMITED", 429, "데모 로그인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),

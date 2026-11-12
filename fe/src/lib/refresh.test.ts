@@ -132,6 +132,97 @@ describe('refresh single-flight', () => {
   })
 })
 
+describe('refresh ROTATED 재시도·세대 가드', () => {
+  it('409 AUTH-REFRESH-ROTATED는 single-flight 내부에서 재시도해 새 토큰을 받는다', async () => {
+    useAuthStore.setState({ accessToken: 'old-token', status: 'authed' })
+    let refreshCalls = 0
+
+    fetchMock.mockImplementation(async (input) => {
+      if (urlOf(input) === REFRESH_URL) {
+        refreshCalls += 1
+        if (refreshCalls === 1) return envelope(409, 'AUTH-REFRESH-ROTATED')
+        return json({ accessToken: 'new-token', tokenType: 'Bearer', expiresIn: 1800 })
+      }
+      return envelope(401, 'AUTH-UNAUTHORIZED')
+    })
+
+    await expect(ensureFreshToken()).resolves.toBe('new-token')
+    expect(refreshCalls).toBe(2)
+    expect(useAuthStore.getState().accessToken).toBe('new-token')
+  }, 10000)
+
+  it('ROTATED 재시도에서 REUSED가 오면 logout한다', async () => {
+    useAuthStore.setState({ accessToken: 'old-token', status: 'authed' })
+    let refreshCalls = 0
+
+    fetchMock.mockImplementation(async (input) => {
+      if (urlOf(input) === REFRESH_URL) {
+        refreshCalls += 1
+        if (refreshCalls === 1) return envelope(409, 'AUTH-REFRESH-ROTATED')
+        return envelope(401, 'AUTH-REFRESH-REUSED')
+      }
+      return envelope(401, 'AUTH-UNAUTHORIZED')
+    })
+
+    await expect(ensureFreshToken()).resolves.toBeNull()
+    expect(refreshCalls).toBe(2)
+    expect(useAuthStore.getState().status).toBe('guest')
+    expect(useAuthStore.getState().accessToken).toBeNull()
+  }, 10000)
+
+  it('ROTATED가 재시도 예산을 넘기면 null을 반환하고 logout하지 않는다', async () => {
+    vi.useFakeTimers()
+    try {
+      useAuthStore.setState({ accessToken: 'old-token', status: 'authed' })
+      fetchMock.mockImplementation(async (input) => {
+        if (urlOf(input) === REFRESH_URL) return envelope(409, 'AUTH-REFRESH-ROTATED')
+        return envelope(401, 'AUTH-UNAUTHORIZED')
+      })
+
+      const pending = ensureFreshToken()
+      await vi.advanceTimersByTimeAsync(15000)
+      await expect(pending).resolves.toBeNull()
+      // 유예 예산 소진은 세션 무효 확정이 아니다 — 서버가 REUSED로 확정할 때까지 authed 유지
+      expect(useAuthStore.getState().status).toBe('authed')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('네트워크 오류는 logout 없이 null을 반환한다', async () => {
+    useAuthStore.setState({ accessToken: 'old-token', status: 'authed' })
+    fetchMock.mockImplementation(async () => {
+      throw new TypeError('fetch failed')
+    })
+
+    await expect(ensureFreshToken()).resolves.toBeNull()
+    expect(useAuthStore.getState().status).toBe('authed')
+  })
+
+  it('비행 중 logout이 끼어들면 늦은 refresh 성공을 폐기한다', async () => {
+    useAuthStore.setState({ accessToken: 'old-token', status: 'authed' })
+    let resolveFetch: ((res: Response) => void) | null = null
+
+    fetchMock.mockImplementation((input) => {
+      if (urlOf(input) === REFRESH_URL) {
+        return new Promise<Response>((resolve) => {
+          resolveFetch = resolve
+        })
+      }
+      return Promise.resolve(envelope(401, 'AUTH-UNAUTHORIZED'))
+    })
+
+    const pending = ensureFreshToken()
+    useAuthStore.getState().logout() // 요청 비행 중 세션 종료 → authEpoch 증가
+    resolveFetch!(json({ accessToken: 'new-token', tokenType: 'Bearer', expiresIn: 1800 }))
+
+    await expect(pending).resolves.toBeNull()
+    // 이전 세션의 토큰이 새 상태를 덮어쓰면 안 된다
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(useAuthStore.getState().status).toBe('guest')
+  })
+})
+
 describe('api-client', () => {
   it('에러 봉투를 ApiError로 파싱하고 Idempotency-Key 헤더를 전달한다', async () => {
     useAuthStore.setState({ accessToken: 'token', status: 'authed' })

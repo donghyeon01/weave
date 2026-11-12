@@ -47,6 +47,7 @@ class SchedulingControllerTest {
         jdbc.update("DELETE FROM availability_blocks");
         jdbc.update("DELETE FROM availability_scopes");
         jdbc.update("DELETE FROM availability_preferences");
+        jdbc.update("DELETE FROM availability_preferred_windows");
         jdbc.update("DELETE FROM users WHERE email IN ('me@weave.local','f@weave.local','s@weave.local')");
         jdbc.update("INSERT INTO users(email,name,nickname,provider) VALUES ('me@weave.local','나','나','demo'),('f@weave.local','친구','친구','demo'),('s@weave.local','남','남','demo')");
         meId = jdbc.queryForObject("SELECT id FROM users WHERE email='me@weave.local'", Long.class);
@@ -408,5 +409,108 @@ class SchedulingControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.candidates[0].breakdown.direct").value(1))
                 .andExpect(jsonPath("$.candidates[0].percent").value(100));
+    }
+
+    // ---------- Task 7: recurrence 추천 ----------
+
+    @Test
+    void recurrence_요청은_시리즈_후보를_반환한다() throws Exception {
+        befriend(meId, friendId);
+        inferenceOn(meId);
+        inferenceOn(friendId);
+        // 화요일(2) 매주 — [05-12, 06-02]에 화요일 정확히 4회
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-06-02\",\"slotMinutes\":60,\"windowStart\":\"10:00\",\"windowEnd\":\"11:00\",\"recurrence\":{\"freq\":\"WEEKLY\",\"interval\":1,\"byDay\":[2],\"count\":4}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidates[0].occurrenceCount").value(4))
+                .andExpect(jsonPath("$.candidates[0].occurrences.length()").value(4))
+                .andExpect(jsonPath("$.candidates[0].occurrences[0].date")
+                        .value("2026-05-12"))
+                .andExpect(jsonPath("$.candidates[0].occurrences[0].percent")
+                        .value(100))
+                .andExpect(jsonPath("$.candidates[0].minOccurrencePercent")
+                        .value(100))
+                .andExpect(jsonPath("$.candidates[0].percent").value(100));
+    }
+
+    @Test
+    void DATE_모드에서_recurrence는_INVALID_INPUT이다() throws Exception {
+        befriend(meId, friendId);
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"DATE\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-06-02\",\"durationDays\":1,\"recurrence\":{\"freq\":\"WEEKLY\",\"interval\":1,\"byDay\":[2],\"count\":4}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+    }
+
+    @Test
+    void 범위에_count만큼_회차가_없으면_INVALID_INPUT이다() throws Exception {
+        befriend(meId, friendId);
+        // 같은 범위에 화요일은 4회뿐 — count 8은 못 채운다
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-06-02\",\"recurrence\":{\"freq\":\"WEEKLY\",\"interval\":1,\"byDay\":[2],\"count\":8}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+    }
+
+    @Test
+    void 잘못된_recurrence_스펙은_INVALID_INPUT이다() throws Exception {
+        befriend(meId, friendId);
+        String[] bodies = {
+                "{\"freq\":\"WEEKLY\",\"interval\":1,\"byDay\":[2],\"count\":1}",
+                "{\"freq\":\"WEEKLY\",\"interval\":5,\"byDay\":[2],\"count\":4}",
+                "{\"freq\":\"WEEKLY\",\"interval\":1,\"byDay\":[],\"count\":4}",
+                "{\"freq\":\"DAILY\",\"interval\":1,\"byDay\":[2],\"count\":4}"};
+        for (String recurrence : bodies) {
+            mvc.perform(post("/api/scheduling")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-06-02\",\"recurrence\":"
+                                    + recurrence + "}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+        }
+    }
+
+    @Test
+    void 선호_윈도우_등록자가_있으면_preferenceScore가_계산된다() throws Exception {
+        befriend(meId, friendId);
+        inferenceOn(meId);
+        inferenceOn(friendId);
+        // 친구가 화요일 10~11시를 선호 등록 — 05-12(화) 10~11시 슬롯에 적합도 100%
+        jdbc.update("INSERT INTO availability_preferred_windows(user_id,day_of_week,start_time,end_time) VALUES (?,2,'10:00:00','11:00:00')",
+                friendId);
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-05-12\",\"slotMinutes\":60,\"windowStart\":\"10:00\",\"windowEnd\":\"11:00\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidates[0].preferenceScore").value(100))
+                .andExpect(jsonPath("$.candidates[0].preferenceRespondentCount")
+                        .value(1));
+    }
+
+    @Test
+    void 단일_추천의_시리즈_필드는_null이다() throws Exception {
+        // recurrence 없는 단일 추천 회귀 — 신규 필드는 존재하되 null이어야 한다
+        befriend(meId, friendId);
+        inferenceOn(meId);
+        inferenceOn(friendId);
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-05-12\",\"slotMinutes\":60,\"windowStart\":\"10:00\",\"windowEnd\":\"11:00\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidates[0].occurrenceCount")
+                        .value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.candidates[0].minOccurrencePercent")
+                        .value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.candidates[0].occurrences")
+                        .value(org.hamcrest.Matchers.nullValue()));
     }
 }

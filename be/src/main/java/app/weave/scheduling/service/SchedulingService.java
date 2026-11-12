@@ -4,6 +4,7 @@ import app.weave.common.error.BusinessException;
 import app.weave.common.error.ErrorCode;
 import app.weave.common.port.AvailabilityAccess;
 import app.weave.common.port.AvailabilityMode;
+import app.weave.common.port.PreferredWindowInfo;
 import app.weave.common.port.UserAvailability;
 import app.weave.event.domain.Event;
 import app.weave.event.domain.EventRepository;
@@ -55,13 +56,27 @@ public class SchedulingService {
     public RecommendResult recommend(Long me, Mode mode, LocalDate rangeStart,
             LocalDate rangeEnd, List<Long> participantIds, LocalTime windowStart,
             LocalTime windowEnd, List<LocalTime[]> windows, Integer stepMinutes,
-            Integer slotMinutes, Integer durationDays) {
+            Integer slotMinutes, Integer durationDays,
+            RecurrenceExpander.Spec recurrence) {
         if (mode == null || rangeStart == null || rangeEnd == null
                 || rangeStart.isAfter(rangeEnd)) {
             throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
         }
         if (mode == Mode.DATE && (durationDays == null || durationDays < 1)) {
             throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+        }
+        List<LocalDate> occurrenceDates = null;
+        if (recurrence != null) {
+            // recurrence는 TIME 전용 — 컨트롤러가 걸러도 service 계약으로 방어한다
+            if (mode == Mode.DATE) {
+                throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+            }
+            try {
+                occurrenceDates = RecurrenceExpander.expandWithin(rangeStart,
+                        rangeEnd, recurrence);
+            } catch (IllegalArgumentException e) {
+                throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+            }
         }
         int step = stepMinutes != null ? stepMinutes : DEFAULT_STEP_MINUTES;
         if (mode == Mode.TIME && slotMinutes != null) {
@@ -135,18 +150,24 @@ public class SchedulingService {
             resolvedWindows = List.<LocalTime[]>of(new LocalTime[]{ws, we});
         }
 
+        Map<Long, List<PreferredWindowInfo>> preferredByUser =
+                availabilityAccess.preferredWindowsOf(attendees);
+
         Map<Long, UserScheduleInput> inputByUser = new HashMap<>();
         for (Long uid : attendees) {
             UserAvailability av = availabilities.getOrDefault(uid,
                     new UserAvailability(List.of(), false));
-            // preferredWindows는 Task 7에서 preferredWindowsOf로 주입 — 현재는 빈 리스트
             inputByUser.put(uid, new UserScheduleInput(hardByUser.get(uid),
                     softByUser.get(uid), av.scopes(), av.useCalendarInference(),
-                    List.of()));
+                    preferredByUser.getOrDefault(uid, List.of())));
         }
 
-        List<Candidate> candidates = recommender.recommend(mode, rangeStart, rangeEnd,
-                resolvedWindows, step, slotMinutes, durationDays, inputByUser);
+        List<Candidate> candidates = recurrence == null
+                ? recommender.recommend(mode, rangeStart, rangeEnd,
+                        resolvedWindows, step, slotMinutes, durationDays,
+                        inputByUser)
+                : recommender.recommendRecurring(resolvedWindows, step,
+                        slotMinutes, occurrenceDates, inputByUser);
         // 참여자 스냅샷은 주최자 제외 — 정렬해 결정적 순서로 반환한다.
         // computedAt은 서버 로컬 시각 — 다른 DTO의 datetime 필드와 같은 직렬화 규약 (계약 §3.8).
         return new RecommendResult(candidates,

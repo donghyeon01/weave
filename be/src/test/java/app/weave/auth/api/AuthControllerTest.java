@@ -8,12 +8,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import jakarta.servlet.http.Cookie;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpHeaders;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -32,6 +35,8 @@ class AuthControllerTest {
 
     @Autowired
     MockMvc mvc;
+    @Autowired
+    JdbcTemplate jdbc;
 
     /** IP별 rate limit 격리 — 테스트마다 고유 IP를 쓴다. */
     private static RequestPostProcessor remoteIp(String ip) {
@@ -73,12 +78,32 @@ class AuthControllerTest {
     }
 
     @Test
-    void 구_refresh_재사용은_401_REUSED를_반환한다() throws Exception {
+    void 유예_내_구_refresh_재제시는_409_ROTATED를_반환한다() throws Exception {
         Cookie refresh = demoLogin("10.0.0.3");
 
         mvc.perform(post("/api/auth/refresh").cookie(refresh)
                         .header("User-Agent", "test-agent"))
                 .andExpect(status().isOk());
+
+        // 회전 직후의 구 해시 재제시 — 경합으로 보고 세션을 유지하고 재시도만 유도
+        mvc.perform(post("/api/auth/refresh").cookie(refresh)
+                        .header("User-Agent", "test-agent"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("AUTH-REFRESH-ROTATED"));
+    }
+
+    @Test
+    void 유예_경과_후_구_refresh_재사용은_401_REUSED를_반환한다() throws Exception {
+        Cookie refresh = demoLogin("10.0.0.6");
+
+        mvc.perform(post("/api/auth/refresh").cookie(refresh)
+                        .header("User-Agent", "test-agent"))
+                .andExpect(status().isOk());
+
+        // 회전 시각을 유예(10초) 이전으로 되돌려 탈취 재제시 상황을 재현한다
+        jdbc.update("UPDATE refresh_tokens SET last_accessed_at = ?",
+                java.sql.Timestamp.valueOf(LocalDateTime.now()
+                        .minus(11, ChronoUnit.SECONDS)));
 
         mvc.perform(post("/api/auth/refresh").cookie(refresh)
                         .header("User-Agent", "test-agent"))

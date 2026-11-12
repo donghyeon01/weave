@@ -139,8 +139,10 @@ public class SchedulingService {
         for (Long uid : attendees) {
             UserAvailability av = availabilities.getOrDefault(uid,
                     new UserAvailability(List.of(), false));
+            // preferredWindows는 Task 7에서 preferredWindowsOf로 주입 — 현재는 빈 리스트
             inputByUser.put(uid, new UserScheduleInput(hardByUser.get(uid),
-                    softByUser.get(uid), av.scopes(), av.useCalendarInference()));
+                    softByUser.get(uid), av.scopes(), av.useCalendarInference(),
+                    List.of()));
         }
 
         List<Candidate> candidates = recommender.recommend(mode, rangeStart, rangeEnd,

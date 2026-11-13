@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Badge } from '../../../components/ui/badge'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
@@ -29,7 +30,10 @@ function RoomCard({ room }: { room: ChatRoomSummary }) {
         className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-4 shadow-card transition duration-150 hover:bg-surface-muted/60"
       >
         <div className="flex items-center justify-between gap-3">
-          <p className="min-w-0 truncate text-base font-bold text-text">{room.title}</p>
+          <p className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-base font-bold text-text">{room.title}</span>
+            {room.occurrenceCount > 1 && <Badge className="shrink-0">총 {room.occurrenceCount}회</Badge>}
+          </p>
           <span className="flex shrink-0 items-center gap-1.5">
             {room.unreadCount > 0 && (
               <>

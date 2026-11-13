@@ -15,6 +15,7 @@ import type { AvailabilityScopeSummary } from '../types'
 import { cx } from '../../../utils/cx'
 import { PaintGrid } from './paint-grid'
 import { PreferencesCard } from './preferences-card'
+import { PreferredWindowsCard } from './preferred-windows-card'
 import { ScopeCreateCard } from './scope-create-card'
 import { ScopeList } from './scope-list'
 import {
@@ -292,6 +293,7 @@ export function AvailabilityPage() {
             onSelect={setSelectedId}
             onDeleteRequest={setDeleting}
           />
+          <PreferredWindowsCard />
           <PreferencesCard />
         </div>
 

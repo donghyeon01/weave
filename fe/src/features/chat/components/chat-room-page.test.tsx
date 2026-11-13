@@ -47,6 +47,7 @@ function room(roomId: number, status: RoomStatus): ChatRoomSummary {
     memberCount: 3,
     lastMessage: '최근 메시지',
     lastMessageAt: '2026-05-11T12:30:00',
+    occurrenceCount: 1,
   }
 }
 

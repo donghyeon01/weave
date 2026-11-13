@@ -32,6 +32,18 @@ export interface AvailabilityPreferences {
   useCalendarInference: boolean
 }
 
+// api-contract §3.12 — 선호 시간대 (V2 scheduling 확장). dayOfWeek는 ISO 요일(월=1~일=7),
+// 시각은 'HH:mm'. 추천 정렬(preferenceScore) 입력일 뿐 가용성 선언이 아니다.
+export interface PreferredWindow {
+  dayOfWeek: number
+  startTime: string
+  endTime: string
+}
+
+export interface PreferredWindowsResponse {
+  windows: PreferredWindow[]
+}
+
 export interface CreateScopeRequest {
   mode: AvailabilityMode
   rangeStart: string

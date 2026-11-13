@@ -513,4 +513,109 @@ class SchedulingControllerTest {
                 .andExpect(jsonPath("$.candidates[0].occurrences")
                         .value(org.hamcrest.Matchers.nullValue()));
     }
+
+    @Test
+    void 입력_상한_초과는_INVALID_INPUT이고_경계값은_통과한다() throws Exception {
+        befriend(meId, friendId);
+        // 기간 367일 — 상한 366일 초과
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-01-01\",\"rangeEnd\":\"2027-01-02\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+        // 기간 정확히 366일 — 통과
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-01-01\",\"rangeEnd\":\"2027-01-01\"}"))
+                .andExpect(status().isOk());
+        // DATE durationDays 31 — 상한 30 초과 / 30은 통과
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"DATE\",\"rangeStart\":\"2026-05-10\",\"rangeEnd\":\"2026-06-15\",\"durationDays\":31}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"DATE\",\"rangeStart\":\"2026-05-10\",\"rangeEnd\":\"2026-06-15\",\"durationDays\":30}"))
+                .andExpect(status().isOk());
+        // windows 9개 — 상한 8 초과
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-05-12\",\"windows\":["
+                                + "{\"startTime\":\"09:00\",\"endTime\":\"10:00\"},{\"startTime\":\"10:00\",\"endTime\":\"11:00\"},"
+                                + "{\"startTime\":\"11:00\",\"endTime\":\"12:00\"},{\"startTime\":\"12:00\",\"endTime\":\"13:00\"},"
+                                + "{\"startTime\":\"13:00\",\"endTime\":\"14:00\"},{\"startTime\":\"14:00\",\"endTime\":\"15:00\"},"
+                                + "{\"startTime\":\"15:00\",\"endTime\":\"16:00\"},{\"startTime\":\"16:00\",\"endTime\":\"17:00\"},"
+                                + "{\"startTime\":\"17:00\",\"endTime\":\"18:00\"}]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+        // stepMinutes 4 — 하한 5 미만 / slotMinutes 1441 — 상한 1440 초과
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-05-12\",\"stepMinutes\":4}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-05-12\",\"slotMinutes\":1441}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+    }
+
+    @Test
+    void 참여자_상한은_명시_생략_모두에_적용된다() throws Exception {
+        befriend(meId, friendId);
+        // 명시 51명 — 인원 상한은 NOT_FRIEND보다 먼저 적용되는 형식 검증
+        String ids51 = java.util.stream.IntStream.rangeClosed(1, 51)
+                .mapToObj(i -> "90" + i)
+                .collect(java.util.stream.Collectors.joining(","));
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-05-12\",\"participantIds\":["
+                                + ids51 + "]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+        // 친구 정확히 50명(friendId + p1~p49) — 생략(전체)·명시 50명 모두 상한 이내라 통과
+        List<Long> friendIds = new java.util.ArrayList<>();
+        friendIds.add(friendId);
+        for (int i = 1; i <= 49; i++) {
+            jdbc.update("INSERT INTO users(email,name,nickname,provider) VALUES (?,?,?,'demo')",
+                    "p" + i + "@weave.local", "p" + i, "p" + i);
+            Long pid = jdbc.queryForObject("SELECT id FROM users WHERE email=?",
+                    Long.class, "p" + i + "@weave.local");
+            befriend(meId, pid);
+            friendIds.add(pid);
+        }
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-05-12\"}"))
+                .andExpect(status().isOk());
+        // 51번째 친구 추가 — 생략은 상한 초과 400, 명시 50명 부분집합은 통과
+        jdbc.update("INSERT INTO users(email,name,nickname,provider) VALUES ('p50@weave.local','p50','p50','demo')");
+        befriend(meId, jdbc.queryForObject("SELECT id FROM users WHERE email='p50@weave.local'",
+                Long.class));
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-05-12\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+        String explicit50 = friendIds.stream().map(String::valueOf)
+                .collect(java.util.stream.Collectors.joining(","));
+        mvc.perform(post("/api/scheduling")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"TIME\",\"rangeStart\":\"2026-05-12\",\"rangeEnd\":\"2026-05-12\",\"participantIds\":["
+                                + explicit50 + "]}"))
+                .andExpect(status().isOk());
+    }
 }

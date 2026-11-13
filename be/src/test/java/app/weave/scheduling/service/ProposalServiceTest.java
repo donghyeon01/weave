@@ -231,6 +231,39 @@ class ProposalServiceTest {
     }
 
     @Test
+    void 참여자_51명과_DATE슬롯_31일은_400이다() throws Exception {
+        // 인원 상한 50 — 비친구 판정보다 먼저 적용되는 형식 검증
+        String ids51 = java.util.stream.IntStream.rangeClosed(1, 51)
+                .mapToObj(i -> "90" + i)
+                .collect(java.util.stream.Collectors.joining(","));
+        mvc.perform(post("/api/scheduling/proposals")
+                        .header("Authorization", "Bearer " + meToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"대규모\",\"slot\":{\"type\":\"TIME\","
+                                + "\"date\":\"2026-05-12\",\"startTime\":\"14:00\","
+                                + "\"endTime\":\"16:00\"},\"participantIds\":[" + ids51 + "]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+        // DATE 슬롯 31일 — 상한 30일 초과
+        mvc.perform(post("/api/scheduling/proposals")
+                        .header("Authorization", "Bearer " + meToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"장기\",\"slot\":{\"type\":\"DATE\","
+                                + "\"startDate\":\"2026-05-01\",\"endDate\":\"2026-05-31\"},"
+                                + "\"participantIds\":[" + p1Id + "]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+        // DATE 슬롯 정확히 30일 — 통과
+        mvc.perform(post("/api/scheduling/proposals")
+                        .header("Authorization", "Bearer " + meToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"한달\",\"slot\":{\"type\":\"DATE\","
+                                + "\"startDate\":\"2026-05-01\",\"endDate\":\"2026-05-30\"},"
+                                + "\"participantIds\":[" + p1Id + "]}"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     void 단일_제안도_occurrence_1행이_물질화되고_응답은_occurrenceCount1이다() throws Exception {
         Long id = createProposal();
 

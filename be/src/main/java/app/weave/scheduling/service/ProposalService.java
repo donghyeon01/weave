@@ -23,6 +23,7 @@ import app.weave.scheduling.domain.ScheduleProposalOccurrenceRepository;
 import app.weave.scheduling.domain.ScheduleProposalRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,6 +39,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProposalService {
+
+    // 계산량·알림·채팅방 규모 상한 — 계약 §3.7 (recommend §3.8과 동일 기준)
+    private static final int MAX_PARTICIPANTS = 50;
+    private static final int MAX_DATE_SLOT_DAYS = 30;
 
     /** 제안 + 응답 현황 + 표시용 사용자 정보 — 컨트롤러가 ProposalResponse로 변환한다. */
     public record ProposalDetail(ScheduleProposal proposal,
@@ -86,11 +91,20 @@ public class ProposalService {
         }
         // 중복 id는 participants UK·chat_room_members PK 충돌로 500이 나므로 미리 제거한다
         participantIds = participantIds.stream().distinct().toList();
+        if (participantIds.size() > MAX_PARTICIPANTS) {
+            throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+        }
         if (!acceptedFriendIds(me).containsAll(participantIds)) {
             throw new BusinessException(ErrorCode.SCHEDULING_NOT_FRIEND);
         }
         LocalDateTime[] range = toRange(slot);
         if (!range[0].isBefore(range[1])) {
+            throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+        }
+        // DATE 슬롯의 점유 일수 상한 — recommend durationDays 상한과 정합 (계약 §3.7)
+        if (slot instanceof Slot.Days d
+                && ChronoUnit.DAYS.between(d.startDate(), d.endDate()) + 1
+                        > MAX_DATE_SLOT_DAYS) {
             throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
         }
         // 정례는 TIME 전용이고 첫 회차 날짜의 ISO 요일이 byDay에 포함돼야 한다 (계약 §3.7)

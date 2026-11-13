@@ -34,6 +34,13 @@ public class SchedulingService {
     private static final LocalTime DEFAULT_WINDOW_START = LocalTime.of(9, 0);
     private static final LocalTime DEFAULT_WINDOW_END = LocalTime.of(22, 0);
     private static final int DEFAULT_STEP_MINUTES = 30;
+    // 계산량(후보×회차×참여자) 폭증 방지 상한 — 계약 §3.8 (Astra OQ1)
+    private static final int MAX_RANGE_DAYS = 366;
+    private static final int MAX_PARTICIPANTS = 50;
+    private static final int MAX_DURATION_DAYS = 30;
+    private static final int MAX_WINDOWS = 8;
+    private static final int MAX_SLOT_MINUTES = 24 * 60;
+    private static final int MIN_STEP_MINUTES = 5;
 
     private final FriendshipRepository friendshipRepository;
     private final EventRepository eventRepository;
@@ -59,10 +66,13 @@ public class SchedulingService {
             Integer slotMinutes, Integer durationDays,
             RecurrenceExpander.Spec recurrence) {
         if (mode == null || rangeStart == null || rangeEnd == null
-                || rangeStart.isAfter(rangeEnd)) {
+                || rangeStart.isAfter(rangeEnd)
+                || ChronoUnit.DAYS.between(rangeStart, rangeEnd) + 1 > MAX_RANGE_DAYS) {
             throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
         }
-        if (mode == Mode.DATE && (durationDays == null || durationDays < 1)) {
+        if (mode == Mode.DATE
+                && (durationDays == null || durationDays < 1
+                        || durationDays > MAX_DURATION_DAYS)) {
             throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
         }
         List<LocalDate> occurrenceDates = null;
@@ -78,10 +88,16 @@ public class SchedulingService {
                 throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
             }
         }
+        // stepMinutes는 제공 시 상시 형식 검증 — 하한 5는 1~4분 간격의 후보 수 폭증 방지
+        if (stepMinutes != null && (stepMinutes < MIN_STEP_MINUTES
+                || stepMinutes > MAX_SLOT_MINUTES)) {
+            throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+        }
         int step = stepMinutes != null ? stepMinutes : DEFAULT_STEP_MINUTES;
         if (mode == Mode.TIME && slotMinutes != null) {
             // stepMinutes는 탐색 간격 — 슬롯 길이(slotMinutes)를 넘을 수 없다
-            if (slotMinutes < 1 || step < 1 || step > slotMinutes) {
+            if (slotMinutes < 1 || slotMinutes > MAX_SLOT_MINUTES
+                    || step > slotMinutes) {
                 throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
             }
         }
@@ -133,7 +149,8 @@ public class SchedulingService {
         List<LocalTime[]> resolvedWindows;
         if (windows != null) {
             // 빈 windows는 명시적 오류 — "창 없음"과 "전체 기본 창"을 구분한다
-            if (windows.isEmpty() || windows.stream().anyMatch(
+            if (windows.isEmpty() || windows.size() > MAX_WINDOWS
+                    || windows.stream().anyMatch(
                     w -> w == null || w.length < 2
                             || w[0] == null || w[1] == null
                             || !w[1].isAfter(w[0]))) {
@@ -184,11 +201,20 @@ public class SchedulingService {
             if (acceptedFriendIds.isEmpty()) {
                 throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
             }
+            // 전체 친구가 상한을 넘으면 부분집합 지정을 요구한다 (계약 §3.8)
+            if (acceptedFriendIds.size() > MAX_PARTICIPANTS) {
+                throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+            }
             return acceptedFriendIds;
         }
-        if (!acceptedFriendIds.containsAll(participantIds)) {
+        Set<Long> requested = new HashSet<>(participantIds);
+        // 인원 상한은 형식 검증 — 비친구 판정보다 먼저 적용한다
+        if (requested.size() > MAX_PARTICIPANTS) {
+            throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+        }
+        if (!acceptedFriendIds.containsAll(requested)) {
             throw new BusinessException(ErrorCode.SCHEDULING_NOT_FRIEND);
         }
-        return new HashSet<>(participantIds);
+        return requested;
     }
 }

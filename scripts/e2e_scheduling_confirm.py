@@ -13,12 +13,18 @@ V2 scheduling extension의 마지막 미검증 경로다. 데모 로그인은 de
   6. A confirm → 409 PROPOSAL-CONFLICT, 제안은 ALL_ACCEPTED 유지
 
 사용:
-    python scripts/e2e_scheduling_confirm.py
+    python scripts/e2e_scheduling_confirm.py [--ui] [--base-url http://localhost:4173]
 
-사전 조건: be(8081, DEMO_ENABLED=true)·weave-mysql 컨테이너 기동. fe 불필요(API 레벨).
+--ui를 주면 P1 수락을 B의 실제 브라우저 세션으로 수행한다 — 알림 벨의 "총 N회"
+배지·인라인 수락 숨김, 보관함 상세 모달의 정례 요약·회차 목록, 수락 액션까지
+UI 경로로 검증한다. 미지정 시 P1 수락은 API로 수행한다.
+
+사전 조건: be(8081, DEMO_ENABLED=true)·weave-mysql 컨테이너 기동.
+--ui 사용 시 fe dev/preview 서버(base-url)도 필요. fe 불필요(API 레벨).
 결과 JSON은 snapshots/e2e-confirm-<timestamp>.json (git 제외).
 """
 
+import argparse
 import hashlib
 import json
 import secrets
@@ -63,7 +69,9 @@ class Reporter:
 
     def step(self, name, ok, detail=''):
         self.steps.append({'step': name, 'ok': ok, 'detail': str(detail)[:300]})
-        print(f"[{'PASS' if ok else 'FAIL'}] {name}{f' - {detail}' if detail else ''}")
+        # cp949 콘솔에서 em/en dash 등 비인코딩 문자가 detail에 섞여도 출력이 죽지 않게 한다
+        line = f"[{'PASS' if ok else 'FAIL'}] {name}{f' - {detail}' if detail else ''}"
+        print(line.encode('cp949', errors='replace').decode('cp949'))
 
 
 r = Reporter()
@@ -150,7 +158,90 @@ def proposal_events(token, title):
             if str(e.get('source')).lower() == 'proposal' and e.get('title') == title]
 
 
+def ui_accept_via_browser(base_url, jiwoo_id, title, count):
+    """B 브라우저 세션 — 알림 배지 확인 → 보관함 상세 → 수락.
+
+    세션은 refresh_tokens 행 + 쿠키 + 컨텍스트 UA 일치로 복원한다
+    (e2e_share_flow.py ui_pass와 같은 방식 — 세션 UA 검증 때문).
+    """
+    from playwright.sync_api import sync_playwright
+
+    ua = 'e2e-confirm-browser'
+    raw = secrets.token_hex(32)
+    h = hashlib.sha256(raw.encode()).hexdigest()
+    expiry = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+    mysql(f"INSERT INTO refresh_tokens (user_id, token_hash, user_agent, expiry_date, last_accessed_at) "
+          f"VALUES ({jiwoo_id}, '{h}', '{ua}', '{expiry}', NOW())")
+
+    out = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        ctx = browser.new_context(viewport={'width': 1440, 'height': 900}, user_agent=ua)
+        ctx.add_cookies([{'name': 'refresh_token', 'value': raw,
+                          'domain': 'localhost', 'path': '/'}])
+        page = ctx.new_page()
+        try:
+            page.goto(base_url + '/app', wait_until='load')
+            page.wait_for_timeout(6000)
+            logged = '/app' in page.url
+            out.append(('B 브라우저 세션 복원(쿠키 로그인)', logged, page.url))
+            if not logged:
+                return out
+
+            # 알림 벨 — 정례 제안은 총 N회 배지 + 인라인 수락 숨김 (상세 확인 경유)
+            page.get_by_role('button', name='알림', exact=False).click()
+            page.wait_for_timeout(800)
+            notif_row = page.locator('li', has_text=title).first
+            try:
+                notif_row.get_by_text(f'총 {count}회').first.wait_for(
+                    state='visible', timeout=8000)
+                out.append(('알림 총 N회 배지', True, ''))
+            except Exception:
+                out.append(('알림 총 N회 배지', False, ''))
+            out.append(('알림 정례 인라인 수락 숨김',
+                        notif_row.get_by_role('button', name='수락').count() == 0, ''))
+            page.keyboard.press('Escape')
+
+            # 보관함 받은 제안 — 행 배지 → 상세 모달 → 수락
+            page.goto(base_url + '/app/proposals', wait_until='load')
+            page.wait_for_timeout(2500)
+            row = page.locator('li', has_text=title).first
+            # count()/inner_text()는 스냅샷 — 비동기 로딩을 기다리는 wait_for로 판정한다
+            try:
+                row.get_by_text(f'총 {count}회').first.wait_for(
+                    state='visible', timeout=8000)
+                out.append(('받은 제안 행 정례 배지', True, ''))
+            except Exception:
+                out.append(('받은 제안 행 정례 배지', False, ''))
+            row.get_by_role('button', name='상세').click()
+            dialog = page.get_by_role('dialog')
+            dialog.wait_for(timeout=5000)
+            try:
+                dialog.get_by_text(f'총 {count}회').first.wait_for(
+                    state='visible', timeout=8000)
+                dtext = dialog.inner_text()
+                out.append(('상세 모달 정례 요약', True, ''))
+                out.append(('상세 모달 회차 목록', '11/23' in dtext, dtext[:120]))
+            except Exception:
+                out.append(('상세 모달 정례 요약', False, dialog.inner_text()[:120]))
+                out.append(('상세 모달 회차 목록', False, ''))
+            dialog.get_by_role('button', name='수락').click()
+            page.get_by_text('제안을 수락했어요').wait_for(timeout=10000)
+            out.append(('UI 수락 → 토스트', True, ''))
+        except Exception as e:
+            out.append(('B UI 패스 예외', False, f'{type(e).__name__}: {e}'))
+        finally:
+            browser.close()
+    return out
+
+
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--ui', action='store_true',
+                    help='P1 수락을 B 브라우저 세션으로 수행 (fe 서버 필요)')
+    ap.add_argument('--base-url', default='http://localhost:4173')
+    args = ap.parse_args()
+
     jiwoo_id = uid(JIWOO_EMAIL)
 
     login = requests.post(f'{API}/api/auth/demo',
@@ -186,10 +277,25 @@ def main():
     r.step('B에게 PROPOSAL_RECEIVED (occurrenceCount=3)',
            hit is not None and hit.get('payload', {}).get('occurrenceCount') == P1['count'])
 
-    res = call(token_b, 'POST', f'/api/scheduling/proposals/{p1_id}/respond',
-               json={'response': 'ACCEPTED'})
-    ok = res.status_code == 200 and res.json().get('status') == 'ALL_ACCEPTED'
-    r.step('B ACCEPTED → ALL_ACCEPTED', ok, f'{res.status_code} {res.text[:120]}')
+    if args.ui:
+        for name, ok, detail in ui_accept_via_browser(
+                args.base_url, jiwoo_id, p1_title, P1['count']):
+            r.step(name, ok, detail)
+        # UI 수락 실패 시 API로 폴백해 후속 시나리오를 진행한다 (UI 실패는 이미 기록됨)
+        detail_now = call(token_a, 'GET', f'/api/scheduling/proposals/{p1_id}').json()
+        if detail_now.get('status') != 'ALL_ACCEPTED':
+            res = call(token_b, 'POST', f'/api/scheduling/proposals/{p1_id}/respond',
+                       json={'response': 'ACCEPTED'})
+            r.step('P1 API 폴백 수락',
+                   res.status_code == 200 and res.json().get('status') == 'ALL_ACCEPTED',
+                   f'{res.status_code}')
+        else:
+            r.step('P1 UI 수락 → ALL_ACCEPTED', True, detail_now.get('status'))
+    else:
+        res = call(token_b, 'POST', f'/api/scheduling/proposals/{p1_id}/respond',
+                   json={'response': 'ACCEPTED'})
+        ok = res.status_code == 200 and res.json().get('status') == 'ALL_ACCEPTED'
+        r.step('B ACCEPTED → ALL_ACCEPTED', ok, f'{res.status_code} {res.text[:120]}')
 
     res = call(token_a, 'POST', f'/api/scheduling/proposals/{p1_id}/confirm')
     ok = res.status_code == 200 and res.json().get('status') == 'CONFIRMED'

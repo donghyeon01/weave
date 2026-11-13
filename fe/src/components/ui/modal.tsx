@@ -130,7 +130,7 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative w-full max-w-md rounded-xl border-2 border-border-strong bg-surface px-6 py-5 shadow-brutal-md outline-none"
+        className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-xl border-2 border-border-strong bg-surface px-6 py-5 shadow-brutal-md outline-none"
       >
         <button
           type="button"
@@ -150,7 +150,7 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
         <div id={titleId} className={titleClassName ?? 'pr-8'}>
           {title}
         </div>
-        <div className="mt-5">{children}</div>
+        <div className="mt-5 min-h-0 overflow-y-auto">{children}</div>
       </div>
     </div>,
     document.body,

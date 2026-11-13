@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../../../lib/react-query'
 import type { NotificationItem } from '../types'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
+import { Badge } from '../../../components/ui/badge'
 import { useMarkRead, useNotifications, useReadAll } from '../api/use-notifications'
 import { useRespondProposal } from '../../scheduling/api/use-proposal-mutations'
 
@@ -37,6 +38,12 @@ function readTitle(item: NotificationItem): string {
 function proposalIdOf(item: NotificationItem): number | null {
   const id = item.payload.proposalId
   return typeof id === 'number' ? id : null
+}
+
+// §3.7 — 정례 제안 알림은 occurrenceCount를 싣는다. 구 알림·단일 제안은 필드가 없거나 1이다.
+function occurrenceCountOf(item: NotificationItem): number {
+  const n = item.payload.occurrenceCount
+  return typeof n === 'number' ? n : 1
 }
 
 export function NotificationBell() {
@@ -149,12 +156,19 @@ export function NotificationBell() {
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text">
                       {readTitle(item)}
                     </span>
+                    {occurrenceCountOf(item) > 1 && (
+                      <Badge className="shrink-0">총 {occurrenceCountOf(item)}회</Badge>
+                    )}
                   </span>
                   <span className="text-xs text-text-secondary">
                     {new Date(item.createdAt).toLocaleString('ko-KR')}
                   </span>
                 </button>
-                {item.type === 'PROPOSAL_RECEIVED' && proposalIdOf(item) !== null && (
+                {/* 정례 제안은 인라인 수락을 숨기고 보관함 상세(회차 목록) 확인으로 보낸다 —
+                    시리즈 전체를 상세 확인 없이 한 번에 수락하는 것을 막기 위함 */}
+                {item.type === 'PROPOSAL_RECEIVED' &&
+                  proposalIdOf(item) !== null &&
+                  occurrenceCountOf(item) <= 1 && (
                   <div className="flex gap-2 px-4 pb-3">
                     <button
                       type="button"

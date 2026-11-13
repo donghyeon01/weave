@@ -1,6 +1,9 @@
 package app.weave.scheduling.api;
 
+import app.weave.common.error.BusinessException;
+import app.weave.common.error.ErrorCode;
 import app.weave.scheduling.domain.Mode;
+import app.weave.scheduling.service.RecurrenceExpander;
 import app.weave.scheduling.service.ScheduleRecommender.Candidate;
 import app.weave.scheduling.service.SchedulingService;
 import app.weave.scheduling.service.SchedulingService.RecommendResult;
@@ -30,6 +33,19 @@ public class SchedulingController {
     @PostMapping
     public CandidatesResponse recommend(@AuthenticationPrincipal Long me,
             @Valid @RequestBody RecommendRequest req) {
+        RecurrenceExpander.Spec recurrence = null;
+        if (req.recurrence() != null) {
+            if (req.mode() == Mode.DATE) {
+                throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+            }
+            try {
+                recurrence = RecurrenceExpander.Spec.of(req.recurrence().freq(),
+                        req.recurrence().interval(), req.recurrence().byDay(),
+                        req.recurrence().count());
+            } catch (IllegalArgumentException e) {
+                throw new BusinessException(ErrorCode.SCHEDULING_INVALID_INPUT);
+            }
+        }
         RecommendResult result = service.recommend(me, req.mode(), req.rangeStart(),
                 req.rangeEnd(), req.participantIds(), req.windowStart(), req.windowEnd(),
                 req.windows() == null ? null
@@ -38,7 +54,8 @@ public class SchedulingController {
                                 .map(w -> w == null ? new LocalTime[]{null, null}
                                         : new LocalTime[]{w.startTime(), w.endTime()})
                                 .toList(),
-                req.stepMinutes(), req.slotMinutes(), req.durationDays());
+                req.stepMinutes(), req.slotMinutes(), req.durationDays(),
+                recurrence);
         return new CandidatesResponse(result.candidates(), result.participantIds(),
                 result.computedAt());
     }
@@ -48,7 +65,8 @@ public class SchedulingController {
             @JsonFormat(pattern = "HH:mm") LocalTime windowStart,
             @JsonFormat(pattern = "HH:mm") LocalTime windowEnd,
             List<TimeWindow> windows, Integer stepMinutes,
-            Integer slotMinutes, Integer durationDays) {
+            Integer slotMinutes, Integer durationDays,
+            RecurrenceRequest recurrence) {
     }
 
     /** 다중 탐색 창 — windows가 있으면 windowStart/End보다 우선한다 (계약 §3.8). */

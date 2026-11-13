@@ -132,11 +132,11 @@ class NotificationPublisherTest {
                 new NotificationPayload.FriendAccepted(7L, new UserRef(3L, "철수")));
         publisher.publish(userId,
                 new NotificationPayload.ProposalReceived(9L, "캡스톤 회의",
-                        new UserRef(3L, "철수"), slot));
+                        new UserRef(3L, "철수"), slot, 4));
         publisher.publish(userId,
                 new NotificationPayload.ProposalAllAccepted(9L, "캡스톤 회의",
-                        new UserRef(3L, "철수"), slot));
-        publisher.publish(userId, new ProposalConfirmed(9L, "캡스톤 회의", slot));
+                        new UserRef(3L, "철수"), slot, 4));
+        publisher.publish(userId, new ProposalConfirmed(9L, "캡스톤 회의", slot, 4));
         publisher.publish(userId,
                 new NotificationPayload.ProposalDeclined(9L, "캡스톤 회의",
                         new UserRef(2L, "영희")));
@@ -162,7 +162,9 @@ class NotificationPublisherTest {
 
         Map<String, Object> received = byType.get(NotificationType.PROPOSAL_RECEIVED)
                 .getPayload();
-        assertThat(received).containsOnlyKeys("proposalId", "title", "organizer", "slot");
+        assertThat(received).containsOnlyKeys("proposalId", "title", "organizer", "slot",
+                "occurrenceCount");
+        assertThat(received).containsEntry("occurrenceCount", 4);
         assertThat(nested(received, "organizer")).containsOnlyKeys("id", "nickname");
         assertThat(nested(received, "slot"))
                 .containsOnlyKeys("type", "date", "startTime", "endTime")
@@ -171,12 +173,16 @@ class NotificationPublisherTest {
 
         Map<String, Object> allAccepted = byType.get(NotificationType.PROPOSAL_ALL_ACCEPTED)
                 .getPayload();
-        assertThat(allAccepted).containsOnlyKeys("proposalId", "title", "organizer", "slot");
+        assertThat(allAccepted).containsOnlyKeys("proposalId", "title", "organizer", "slot",
+                "occurrenceCount");
+        assertThat(allAccepted).containsEntry("occurrenceCount", 4);
         assertThat(nested(allAccepted, "organizer")).containsOnlyKeys("id", "nickname");
 
         Map<String, Object> confirmed = byType.get(NotificationType.PROPOSAL_CONFIRMED)
                 .getPayload();
-        assertThat(confirmed).containsOnlyKeys("proposalId", "title", "slot");
+        assertThat(confirmed).containsOnlyKeys("proposalId", "title", "slot",
+                "occurrenceCount");
+        assertThat(confirmed).containsEntry("occurrenceCount", 4);
 
         Map<String, Object> declined = byType.get(NotificationType.PROPOSAL_DECLINED)
                 .getPayload();
@@ -205,7 +211,7 @@ class NotificationPublisherTest {
     @Test
     void userId_payload_편의_오버로드도_동일하게_저장한다() {
         publisher.publish(userId, new ProposalConfirmed(5L, "저녁 약속",
-                new Slot.Days(LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 14))));
+                new Slot.Days(LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 14)), 1));
 
         List<Notification> all = repository.findAll();
         assertThat(all).hasSize(1);

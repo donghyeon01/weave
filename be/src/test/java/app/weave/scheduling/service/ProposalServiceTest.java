@@ -118,6 +118,205 @@ class ProposalServiceTest {
                 r.getResponse().getContentAsString(), "$.id").longValue();
     }
 
+    /** 정례 제안 생성 — 2026-05-12는 화요일(ISO 2). */
+    private MvcResult createRecurring(String recurrenceJson) throws Exception {
+        return mvc.perform(post("/api/scheduling/proposals")
+                        .header("Authorization", "Bearer " + meToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"정례 회의\",\"slot\":{\"type\":\"TIME\","
+                                + "\"date\":\"2026-05-12\",\"startTime\":\"14:00\","
+                                + "\"endTime\":\"16:00\"},\"participantIds\":["
+                                + p1Id + "," + p2Id + "],\"recurrence\":"
+                                + recurrenceJson + "}"))
+                .andReturn();
+    }
+
+    @Test
+    void 정례_제안_생성은_recurrence컬럼과_count개_회차행을_물질화한다() throws Exception {
+        MvcResult r = createRecurring(
+                "{\"freq\":\"WEEKLY\",\"interval\":1,\"byDay\":[2],\"count\":4}");
+        assertThat(r.getResponse().getStatus()).isEqualTo(201);
+        Long id = com.jayway.jsonpath.JsonPath.<Number>read(
+                r.getResponse().getContentAsString(), "$.id").longValue();
+
+        // proposal recurrence 컬럼 — 첫 회차 범위는 기존 start_time/end_time에 유지
+        assertThat(jdbc.queryForObject(
+                "SELECT recurrence_freq FROM schedule_proposals WHERE id=?",
+                String.class, id)).isEqualTo("WEEKLY");
+        assertThat(jdbc.queryForObject(
+                "SELECT recurrence_interval FROM schedule_proposals WHERE id=?",
+                Integer.class, id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT recurrence_by_days FROM schedule_proposals WHERE id=?",
+                String.class, id)).isEqualTo("2");
+        assertThat(jdbc.queryForObject(
+                "SELECT occurrence_count FROM schedule_proposals WHERE id=?",
+                Integer.class, id)).isEqualTo(4);
+        assertThat(jdbc.queryForObject(
+                "SELECT start_time FROM schedule_proposals WHERE id=?", String.class, id))
+                .startsWith("2026-05-12 14:00");
+
+        // 회차 물질화 — seq 0..3, 매주 화요일 같은 시각
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM schedule_proposal_occurrences WHERE proposal_id=?",
+                Integer.class, id)).isEqualTo(4);
+        List<String> starts = jdbc.queryForList(
+                "SELECT start_time FROM schedule_proposal_occurrences "
+                        + "WHERE proposal_id=? ORDER BY seq", String.class, id);
+        assertThat(starts).hasSize(4);
+        assertThat(starts.get(0)).startsWith("2026-05-12 14:00");
+        assertThat(starts.get(1)).startsWith("2026-05-19 14:00");
+        assertThat(starts.get(2)).startsWith("2026-05-26 14:00");
+        assertThat(starts.get(3)).startsWith("2026-06-02 14:00");
+
+        // 응답 — recurrence·occurrenceCount·occurrences (계약 §3.7)
+        assertThat(com.jayway.jsonpath.JsonPath.<Integer>read(
+                r.getResponse().getContentAsString(), "$.occurrenceCount")).isEqualTo(4);
+        assertThat(com.jayway.jsonpath.JsonPath.<String>read(
+                r.getResponse().getContentAsString(), "$.recurrence.freq"))
+                .isEqualTo("WEEKLY");
+        assertThat(com.jayway.jsonpath.JsonPath.<List<Integer>>read(
+                r.getResponse().getContentAsString(), "$.recurrence.byDay"))
+                .isEqualTo(List.of(2));
+        assertThat(com.jayway.jsonpath.JsonPath.<List<?>>read(
+                r.getResponse().getContentAsString(), "$.occurrences")).hasSize(4);
+        assertThat(com.jayway.jsonpath.JsonPath.<String>read(
+                r.getResponse().getContentAsString(), "$.occurrences[0].date"))
+                .isEqualTo("2026-05-12");
+        assertThat(com.jayway.jsonpath.JsonPath.<String>read(
+                r.getResponse().getContentAsString(), "$.occurrences[0].startTime"))
+                .isEqualTo("14:00");
+
+        // 방 스냅샷 — occurrence_count는 제안 회차 수 그대로 (Task 10)
+        assertThat(jdbc.queryForObject(
+                "SELECT occurrence_count FROM chat_rooms WHERE proposal_id=?",
+                Integer.class, id)).isEqualTo(4);
+    }
+
+    @Test
+    void slot날짜_요일이_byDay에_없으면_400이다() throws Exception {
+        // 2026-05-12(화)인데 byDay=[4](목)
+        MvcResult r = createRecurring(
+                "{\"freq\":\"WEEKLY\",\"interval\":1,\"byDay\":[4],\"count\":4}");
+        assertThat(r.getResponse().getStatus()).isEqualTo(400);
+        assertThat(com.jayway.jsonpath.JsonPath.<String>read(
+                r.getResponse().getContentAsString(), "$.code"))
+                .isEqualTo("SCHEDULING-INVALID-INPUT");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM schedule_proposals", Integer.class)).isEqualTo(0);
+    }
+
+    @Test
+    void DATE슬롯에_recurrence를_지정하면_400이다() throws Exception {
+        mvc.perform(post("/api/scheduling/proposals")
+                        .header("Authorization", "Bearer " + meToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"주말 여행\",\"slot\":{\"type\":\"DATE\","
+                                + "\"startDate\":\"2026-05-12\",\"endDate\":\"2026-05-14\"},"
+                                + "\"participantIds\":[" + p1Id + "],"
+                                + "\"recurrence\":{\"freq\":\"WEEKLY\",\"interval\":1,"
+                                + "\"byDay\":[2],\"count\":4}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SCHEDULING-INVALID-INPUT"));
+    }
+
+    @Test
+    void recurrence_형식위반은_400이다() throws Exception {
+        MvcResult r = createRecurring(
+                "{\"freq\":\"DAILY\",\"interval\":1,\"byDay\":[2],\"count\":4}");
+        assertThat(r.getResponse().getStatus()).isEqualTo(400);
+        assertThat(com.jayway.jsonpath.JsonPath.<String>read(
+                r.getResponse().getContentAsString(), "$.code"))
+                .isEqualTo("SCHEDULING-INVALID-INPUT");
+    }
+
+    @Test
+    void 단일_제안도_occurrence_1행이_물질화되고_응답은_occurrenceCount1이다() throws Exception {
+        Long id = createProposal();
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM schedule_proposal_occurrences WHERE proposal_id=?",
+                Integer.class, id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT seq FROM schedule_proposal_occurrences WHERE proposal_id=?",
+                Integer.class, id)).isEqualTo(0);
+        assertThat(jdbc.queryForObject(
+                "SELECT start_time FROM schedule_proposal_occurrences WHERE proposal_id=?",
+                String.class, id)).startsWith("2026-05-12 14:00");
+
+        MvcResult r = mvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.get("/api/scheduling/proposals/" + id)
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.occurrenceCount").value(1))
+                .andExpect(jsonPath("$.recurrence")
+                        .value(org.hamcrest.Matchers.nullValue()))
+                .andReturn();
+        assertThat(com.jayway.jsonpath.JsonPath.<Object>read(
+                r.getResponse().getContentAsString(), "$.occurrences")).isNull();
+    }
+
+    @Test
+    void 정례_제안의_멱등_재생성은_회차가_중복되지_않는다() throws Exception {
+        String body = "{\"title\":\"정례 회의\",\"slot\":{\"type\":\"TIME\","
+                + "\"date\":\"2026-05-12\",\"startTime\":\"14:00\",\"endTime\":\"16:00\"},"
+                + "\"participantIds\":[" + p1Id + "," + p2Id + "],"
+                + "\"recurrence\":{\"freq\":\"WEEKLY\",\"interval\":1,\"byDay\":[2],"
+                + "\"count\":4}}";
+
+        MvcResult r1 = mvc.perform(post("/api/scheduling/proposals")
+                        .header("Authorization", "Bearer " + meToken)
+                        .header("Idempotency-Key", "rec-key-1")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated()).andReturn();
+        Long id1 = com.jayway.jsonpath.JsonPath.<Number>read(
+                r1.getResponse().getContentAsString(), "$.id").longValue();
+
+        MvcResult r2 = mvc.perform(post("/api/scheduling/proposals")
+                        .header("Authorization", "Bearer " + meToken)
+                        .header("Idempotency-Key", "rec-key-1")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated()).andReturn();
+        Long id2 = com.jayway.jsonpath.JsonPath.<Number>read(
+                r2.getResponse().getContentAsString(), "$.id").longValue();
+
+        assertThat(id2).isEqualTo(id1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM schedule_proposal_occurrences WHERE proposal_id=?",
+                Integer.class, id1)).isEqualTo(4);
+    }
+
+    @Test
+    void 목록_summary와_상세에_정례_필드가_포함된다() throws Exception {
+        MvcResult r = createRecurring(
+                "{\"freq\":\"WEEKLY\",\"interval\":2,\"byDay\":[2,4],\"count\":4}");
+        assertThat(r.getResponse().getStatus()).isEqualTo(201);
+        Long id = com.jayway.jsonpath.JsonPath.<Number>read(
+                r.getResponse().getContentAsString(), "$.id").longValue();
+
+        // sent box summary — recurrence·occurrenceCount (계약 §3.7)
+        mvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.get("/api/scheduling/proposals?box=sent")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].occurrenceCount").value(4))
+                .andExpect(jsonPath("$.content[0].recurrence.freq").value("WEEKLY"))
+                .andExpect(jsonPath("$.content[0].recurrence.byDay")
+                        .value(org.hamcrest.Matchers.contains(2, 4)));
+
+        // 상세 — occurrences 전체 (interval 2: 5/12·5/14 같은 주 + 2주 뒤 5/26·5/28)
+        mvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.get("/api/scheduling/proposals/" + id)
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.occurrences.length()").value(4))
+                .andExpect(jsonPath("$.occurrences[0].date").value("2026-05-12"))
+                .andExpect(jsonPath("$.occurrences[1].date").value("2026-05-14"))
+                .andExpect(jsonPath("$.occurrences[2].date").value("2026-05-26"))
+                .andExpect(jsonPath("$.occurrences[3].date").value("2026-05-28"))
+                .andExpect(jsonPath("$.occurrences[1].startTime").value("14:00"));
+    }
+
     private MvcResult respond(String token, Long id, String response) throws Exception {
         return mvc.perform(post("/api/scheduling/proposals/" + id + "/respond")
                         .header("Authorization", "Bearer " + token)
@@ -173,6 +372,9 @@ class ProposalServiceTest {
                 .isEqualTo("나");
         assertThat(com.jayway.jsonpath.JsonPath.<String>read(payload, "$.slot.type"))
                 .isEqualTo("TIME");
+        // 단일 제안 — 알림 payload의 occurrenceCount는 1
+        assertThat(com.jayway.jsonpath.JsonPath.<Integer>read(
+                payload, "$.occurrenceCount")).isEqualTo(1);
     }
 
     @Test
@@ -594,6 +796,161 @@ class ProposalServiceTest {
                 Integer.class)).isEqualTo(0);
     }
 
+    // ── confirm 재검증 + 회차별 이벤트 (spec §Confirm 재검증) ──
+
+    /** 정례 제안(매주 화 14:00~16:00, count 4)을 만들어 ALL_ACCEPTED까지 진행해 id를 반환. */
+    private Long acceptedRecurring() throws Exception {
+        MvcResult r = createRecurring(
+                "{\"freq\":\"WEEKLY\",\"interval\":1,\"byDay\":[2],\"count\":4}");
+        assertThat(r.getResponse().getStatus()).isEqualTo(201);
+        Long id = com.jayway.jsonpath.JsonPath.<Number>read(
+                r.getResponse().getContentAsString(), "$.id").longValue();
+        respond(p1Token, id, "ACCEPTED");
+        respond(p2Token, id, "ACCEPTED");
+        return id;
+    }
+
+    @Test
+    void 참석자의_HARD_일정이_회차와_겹치면_409고_제안은_ALL_ACCEPTED를_유지한다()
+            throws Exception {
+        Long id = acceptedRecurring();
+        // 회차 2 (2026-05-19 14:00~16:00)과 겹치는 HARD 이벤트
+        jdbc.update("INSERT INTO events(user_id,title,start_time,end_time,busy_policy,source)"
+                + " VALUES (?,'겹침','2026-05-19 15:00:00','2026-05-19 17:00:00',"
+                + "'HARD','manual')", p1Id);
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROPOSAL-CONFLICT"));
+
+        // 원자성 — 상태·이벤트·알림 전부 확정 전 그대로
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
+                .isEqualTo("ALL_ACCEPTED");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                .isEqualTo(0);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_CONFIRMED'",
+                Integer.class)).isEqualTo(0);
+    }
+
+    @Test
+    void 마지막_회차의_HARD_충돌도_전체가_원자적으로_실패한다() throws Exception {
+        Long id = acceptedRecurring();
+        // 회차 4 (2026-06-02 14:00~16:00)과만 겹침 — 앞 회차는 깨끗하지만 전부 롤백
+        jdbc.update("INSERT INTO events(user_id,title,start_time,end_time,busy_policy,source)"
+                + " VALUES (?,'겹침','2026-06-02 14:30:00','2026-06-02 15:00:00',"
+                + "'HARD','manual')", p2Id);
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROPOSAL-CONFLICT"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM schedule_proposals WHERE id=?", String.class, id))
+                .isEqualTo("ALL_ACCEPTED");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                .isEqualTo(0);
+    }
+
+    @Test
+    void 단일_제안도_HARD_겹침이면_409다() throws Exception {
+        Long id = createProposal();
+        acceptAll(id);
+        jdbc.update("INSERT INTO events(user_id,title,start_time,end_time,busy_policy,source)"
+                + " VALUES (?,'겹침','2026-05-12 13:00:00','2026-05-12 14:00:01',"
+                + "'HARD','manual')", meId);
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROPOSAL-CONFLICT"));
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal'", Integer.class))
+                .isEqualTo(0);
+    }
+
+    @Test
+    void SOFT_일정_겹침은_confirm을_막지_않는다() throws Exception {
+        Long id = acceptedRecurring();
+        jdbc.update("INSERT INTO events(user_id,title,start_time,end_time,busy_policy,source)"
+                + " VALUES (?,'소프트','2026-05-12 14:00:00','2026-05-12 16:00:00',"
+                + "'SOFT','manual')", p1Id);
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal' AND proposal_id=?",
+                Integer.class, id)).isEqualTo(12);
+    }
+
+    @Test
+    void FREE_일정_겹침은_confirm을_막지_않는다() throws Exception {
+        Long id = acceptedRecurring();
+        jdbc.update("INSERT INTO events(user_id,title,start_time,end_time,busy_policy,source)"
+                + " VALUES (?,'자유','2026-05-19 14:00:00','2026-05-19 16:00:00',"
+                + "'FREE','manual')", p2Id);
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+    }
+
+    @Test
+    void 회차와_맞닿는_HARD_일정은_충돌이_아니다() throws Exception {
+        Long id = acceptedRecurring();
+        // 반열린 구간 — end==occ.start라 겹치지 않는다
+        jdbc.update("INSERT INTO events(user_id,title,start_time,end_time,busy_policy,source)"
+                + " VALUES (?,'맞닿음','2026-05-26 12:00:00','2026-05-26 14:00:00',"
+                + "'HARD','manual')", meId);
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+    }
+
+    @Test
+    void 정례_confirm은_참석자곱하기회차만큼_HARD_이벤트를_만든다() throws Exception {
+        Long id = acceptedRecurring();
+
+        mvc.perform(post("/api/scheduling/proposals/" + id + "/confirm")
+                        .header("Authorization", "Bearer " + meToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+        // 3명 × 4회차 — 모두 같은 proposal_id·HARD·TIME 모드(all_day=false)
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal' AND proposal_id=?",
+                Integer.class, id)).isEqualTo(12);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM events WHERE source='proposal' AND proposal_id=?"
+                        + " AND busy_policy='HARD' AND all_day=false",
+                Integer.class, id)).isEqualTo(12);
+        for (Long uid : List.of(meId, p1Id, p2Id)) {
+            List<String> starts = jdbc.queryForList(
+                    "SELECT start_time FROM events WHERE source='proposal'"
+                            + " AND proposal_id=? AND user_id=? ORDER BY start_time",
+                    String.class, id, uid);
+            assertThat(starts).hasSize(4);
+            assertThat(starts.get(0)).startsWith("2026-05-12 14:00");
+            assertThat(starts.get(1)).startsWith("2026-05-19 14:00");
+            assertThat(starts.get(2)).startsWith("2026-05-26 14:00");
+            assertThat(starts.get(3)).startsWith("2026-06-02 14:00");
+        }
+        // 알림은 시리즈당 참석자 1회씩만
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type='PROPOSAL_CONFIRMED'",
+                Integer.class)).isEqualTo(3);
+    }
+
     // ── 제안 라이프사이클 ↔ 채팅방 연동 (계약 §3.10) ──
 
     @Test
@@ -739,7 +1096,8 @@ class ProposalServiceTest {
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.any(app.weave.chat.domain.Mode.class),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyList());
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.anyInt());
 
         mvc.perform(post("/api/scheduling/proposals")
                         .header("Authorization", "Bearer " + meToken)

@@ -40,6 +40,9 @@ public class EventService {
     public Event create(Long userId, String title, String description, LocalDateTime start,
             LocalDateTime end, String location, boolean allDay, Event.BusyPolicy busyPolicy,
             String idempotencyKey) {
+        // 본인 user 행 잠금 — confirmProposal의 참석자 잠금(id 오름차순)과 같은 규약으로
+        // HARD 일정 쓰기를 직렬화한다 (spec §Confirm 재검증).
+        userRepository.findByIdForUpdate(userId);
         if (idempotencyKey != null) {
             Optional<Event> existing = repository
                     .findByUserIdAndIdempotencyKey(userId, idempotencyKey);
@@ -75,6 +78,8 @@ public class EventService {
     public Event update(Long userId, Long id, String title, String description,
             LocalDateTime start, LocalDateTime end, String location, Boolean allDay,
             Event.BusyPolicy busyPolicy) {
+        // findOwned보다 user 잠금이 먼저 — 잠금과 조회 사이에 confirm이 끼어들지 못하게 한다
+        userRepository.findByIdForUpdate(userId);
         Event event = findOwned(userId, id);
         boolean wasAllDay = event.isAllDay();
         event.update(title, description, start, end, location, allDay, busyPolicy);
@@ -111,6 +116,7 @@ public class EventService {
 
     @Transactional
     public void delete(Long userId, Long id) {
+        userRepository.findByIdForUpdate(userId);
         repository.delete(findOwned(userId, id));
     }
 

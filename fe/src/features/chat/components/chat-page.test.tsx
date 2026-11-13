@@ -15,7 +15,12 @@ vi.mock('../../../lib/api-client', async (importOriginal) => {
 
 const apiFetchMock = vi.mocked(apiFetch)
 
-function room(roomId: number, status: RoomStatus, unreadCount = 0): ChatRoomSummary {
+function room(
+  roomId: number,
+  status: RoomStatus,
+  unreadCount = 0,
+  occurrenceCount = 1,
+): ChatRoomSummary {
   return {
     roomId,
     proposalId: roomId * 10,
@@ -26,6 +31,7 @@ function room(roomId: number, status: RoomStatus, unreadCount = 0): ChatRoomSumm
     lastMessage: `마지막 메시지 ${roomId}`,
     lastMessageAt: '2026-05-11T12:30:00',
     memberCount: 3,
+    occurrenceCount,
   }
 }
 
@@ -62,6 +68,15 @@ describe('chat-page', () => {
     expect(await screen.findByText('약속 2')).toBeInTheDocument()
     expect(screen.getByText('대화가 종료됐어요')).toBeInTheDocument()
     expect(screen.queryByText('약속 1')).not.toBeInTheDocument()
+  })
+
+  it('occurrenceCount>1인 시리즈 방은 총 N회 배지를 보여준다', async () => {
+    apiFetchMock.mockResolvedValue([room(1, 'OPEN', 0, 8), room(2, 'OPEN')])
+    render(<ChatPage />, { wrapper: wrapper(createQueryClient()) })
+
+    expect(await screen.findByText('총 8회')).toBeInTheDocument()
+    // 단일 제안 방(occurrenceCount=1)에는 배지가 없다
+    expect(screen.getAllByText(/총 \d+회/)).toHaveLength(1)
   })
 
   it('채팅방이 없으면 빈 상태를 보여준다', async () => {

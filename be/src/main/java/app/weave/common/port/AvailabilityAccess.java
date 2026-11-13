@@ -2,6 +2,7 @@ package app.weave.common.port;
 
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -17,4 +18,7 @@ public interface AvailabilityAccess {
      */
     Map<Long, UserAvailability> availabilityOf(Collection<Long> userIds,
             AvailabilityMode mode, LocalDate from, LocalDate to);
+
+    /** userId별 선호 시간대 일괄 조회 — 행 없으면 빈 리스트. scheduling이 preferenceScore 계산에 소비. */
+    Map<Long, List<PreferredWindowInfo>> preferredWindowsOf(Collection<Long> userIds);
 }

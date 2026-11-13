@@ -40,7 +40,7 @@ public class ChatController {
         return service.myRooms(me).stream()
                 .map(s -> new RoomResponse(s.roomId(), s.proposalId(), s.title(),
                         toRoomSlot(s.slot()), s.unreadCount(), s.status(), s.lastMessage(),
-                        s.lastMessageAt(), s.memberCount()))
+                        s.lastMessageAt(), s.memberCount(), s.occurrenceCount()))
                 .toList();
     }
 
@@ -91,7 +91,7 @@ public class ChatController {
 
     public record RoomResponse(Long roomId, Long proposalId, String title, RoomSlot slot,
             long unreadCount, Status status, String lastMessage, LocalDateTime lastMessageAt,
-            long memberCount) {
+            long memberCount, int occurrenceCount) {
     }
 
     public record ReadRequest(@NotNull Long lastReadMessageId) {

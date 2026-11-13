@@ -49,6 +49,7 @@ class AvailabilityControllerTest {
         jdbc.update("DELETE FROM availability_blocks");
         jdbc.update("DELETE FROM availability_scopes");
         jdbc.update("DELETE FROM availability_preferences");
+        jdbc.update("DELETE FROM availability_preferred_windows");
         jdbc.update("DELETE FROM users WHERE email LIKE '%@weave.local'");
         jdbc.update("INSERT INTO users(email,name,nickname,provider) VALUES "
                 + "('me@weave.local','나','나','demo'),('other@weave.local','타인','타인','demo')");
@@ -506,5 +507,130 @@ class AvailabilityControllerTest {
                         .content("{\"blocks\":[null],\"expectedRevision\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON-VALIDATION"));
+    }
+
+    private void putWindows(String authToken, String windowsJson) throws Exception {
+        mvc.perform(put("/api/availability/preferred-windows")
+                        .header("Authorization", "Bearer " + authToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"windows\":" + windowsJson + "}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void 선호_윈도우가_없으면_빈_배열을_반환한다() throws Exception {
+        mvc.perform(get("/api/availability/preferred-windows")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.windows.length()").value(0));
+    }
+
+    @Test
+    void 선호_윈도우_PUT은_생성하고_GET은_요일_시작시각_순으로_반환한다() throws Exception {
+        putWindows(token, "[{\"dayOfWeek\":3,\"startTime\":\"15:00\",\"endTime\":\"16:00\"},"
+                + "{\"dayOfWeek\":1,\"startTime\":\"09:00\",\"endTime\":\"10:00\"}]");
+
+        mvc.perform(get("/api/availability/preferred-windows")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.windows.length()").value(2))
+                .andExpect(jsonPath("$.windows[0].dayOfWeek").value(1))
+                .andExpect(jsonPath("$.windows[0].startTime").value("09:00"))
+                .andExpect(jsonPath("$.windows[0].endTime").value("10:00"))
+                .andExpect(jsonPath("$.windows[1].dayOfWeek").value(3))
+                .andExpect(jsonPath("$.windows[1].startTime").value("15:00"));
+    }
+
+    @Test
+    void 선호_윈도우_PUT은_전량_교체한다() throws Exception {
+        putWindows(token, "[{\"dayOfWeek\":1,\"startTime\":\"09:00\",\"endTime\":\"10:00\"},"
+                + "{\"dayOfWeek\":2,\"startTime\":\"10:00\",\"endTime\":\"11:00\"}]");
+
+        putWindows(token, "[{\"dayOfWeek\":5,\"startTime\":\"18:00\",\"endTime\":\"19:00\"}]");
+
+        mvc.perform(get("/api/availability/preferred-windows")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.windows.length()").value(1))
+                .andExpect(jsonPath("$.windows[0].dayOfWeek").value(5))
+                .andExpect(jsonPath("$.windows[0].startTime").value("18:00"));
+
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM availability_preferred_windows WHERE user_id=?",
+                Integer.class, meId);
+        org.assertj.core.api.Assertions.assertThat(count).isEqualTo(1);
+    }
+
+    @Test
+    void 같은_요일에_겹치는_윈도우는_400이다() throws Exception {
+        mvc.perform(put("/api/availability/preferred-windows")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"windows\":[{\"dayOfWeek\":2,\"startTime\":\"10:00\","
+                                + "\"endTime\":\"12:00\"},{\"dayOfWeek\":2,"
+                                + "\"startTime\":\"11:00\",\"endTime\":\"13:00\"}]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AVAILABILITY-INVALID"));
+    }
+
+    @Test
+    void 같은_요일의_맞닿은_윈도우는_허용된다() throws Exception {
+        putWindows(token, "[{\"dayOfWeek\":1,\"startTime\":\"09:00\",\"endTime\":\"12:00\"},"
+                + "{\"dayOfWeek\":1,\"startTime\":\"12:00\",\"endTime\":\"14:00\"}]");
+
+        mvc.perform(get("/api/availability/preferred-windows")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.windows.length()").value(2));
+    }
+
+    @Test
+    void 요일_범위_밖이나_시각_역전은_400이다() throws Exception {
+        for (String body : new String[]{
+                "{\"windows\":[{\"dayOfWeek\":0,\"startTime\":\"09:00\",\"endTime\":\"10:00\"}]}",
+                "{\"windows\":[{\"dayOfWeek\":8,\"startTime\":\"09:00\",\"endTime\":\"10:00\"}]}",
+                "{\"windows\":[{\"dayOfWeek\":1,\"startTime\":\"10:00\",\"endTime\":\"10:00\"}]}",
+                "{\"windows\":[{\"dayOfWeek\":1,\"startTime\":\"12:00\",\"endTime\":\"10:00\"}]}"}) {
+            mvc.perform(put("/api/availability/preferred-windows")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("AVAILABILITY-INVALID"));
+        }
+    }
+
+    @Test
+    void 선호_윈도우는_30행을_넘으면_400이다() throws Exception {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < 31; i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            int hour = i / 7;
+            sb.append("{\"dayOfWeek\":").append(i % 7 + 1)
+                    .append(",\"startTime\":\"").append(String.format("%02d:00", hour))
+                    .append("\",\"endTime\":\"").append(String.format("%02d:30", hour))
+                    .append("\"}");
+        }
+        sb.append(']');
+
+        mvc.perform(put("/api/availability/preferred-windows")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"windows\":" + sb + "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AVAILABILITY-INVALID"));
+    }
+
+    @Test
+    void 선호_윈도우는_본인_것만_반환한다() throws Exception {
+        putWindows(otherToken,
+                "[{\"dayOfWeek\":4,\"startTime\":\"20:00\",\"endTime\":\"21:00\"}]");
+
+        mvc.perform(get("/api/availability/preferred-windows")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.windows.length()").value(0));
     }
 }

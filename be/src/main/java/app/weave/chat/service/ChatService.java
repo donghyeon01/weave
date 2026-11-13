@@ -47,7 +47,7 @@ public class ChatService {
      */
     public record RoomSummary(Long roomId, Long proposalId, String title, SlotView slot,
             long unreadCount, Status status, String lastMessage,
-            LocalDateTime lastMessageAt, long memberCount) {
+            LocalDateTime lastMessageAt, long memberCount, int occurrenceCount) {
     }
 
     /** 스냅샷 슬롯 — fe의 Slot 동형 직렬화는 Task 4 DTO에서 결정한다. */
@@ -77,9 +77,9 @@ public class ChatService {
     /** scheduling 호출 — proposal당 방 1개(uk_chat_rooms_proposal). 멤버 INSERT는 배치(saveAll). */
     @Transactional
     public ChatRoom createRoom(Long proposalId, String title, Mode mode, LocalDateTime startTime,
-            LocalDateTime endTime, List<Long> memberIds) {
+            LocalDateTime endTime, List<Long> memberIds, int occurrenceCount) {
         ChatRoom room = roomRepository.save(
-                new ChatRoom(proposalId, title, mode, startTime, endTime));
+                new ChatRoom(proposalId, title, mode, startTime, endTime, occurrenceCount));
         memberRepository.saveAll(memberIds.stream()
                 .map(uid -> new ChatRoomMember(room.getId(), uid)).toList());
         return room;
@@ -124,7 +124,8 @@ public class ChatService {
                             unread.getOrDefault(room.getId(), 0L), room.getStatus(),
                             last != null ? last.getContent() : null,
                             last != null ? last.getCreatedAt() : null,
-                            memberCount.getOrDefault(room.getId(), 0L));
+                            memberCount.getOrDefault(room.getId(), 0L),
+                            room.getOccurrenceCount());
                 })
                 .toList();
     }

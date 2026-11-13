@@ -7,6 +7,8 @@ import app.weave.availability.domain.AvailabilityPreferenceRepository;
 import app.weave.availability.domain.AvailabilityScope;
 import app.weave.availability.domain.AvailabilityScopeRepository;
 import app.weave.availability.domain.BlockKind;
+import app.weave.availability.domain.PreferredWindow;
+import app.weave.availability.domain.PreferredWindowRepository;
 import app.weave.availability.domain.ScopeMode;
 import app.weave.availability.domain.ScopeStatus;
 import app.weave.auth.domain.UserRepository;
@@ -14,6 +16,9 @@ import app.weave.common.error.BusinessException;
 import app.weave.common.error.ErrorCode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,18 +37,24 @@ public class AvailabilityService {
     private static final List<ScopeStatus> ACTIVE_STATUSES =
             List.of(ScopeStatus.INPUT, ScopeStatus.COMPLETED);
 
+    /** 선호 윈도우 사용자당 행 상한 — 계약 §3.12. */
+    private static final int MAX_PREFERRED_WINDOWS = 30;
+
     private final AvailabilityScopeRepository scopeRepository;
     private final AvailabilityBlockRepository blockRepository;
     private final AvailabilityPreferenceRepository preferenceRepository;
+    private final PreferredWindowRepository preferredWindowRepository;
     private final UserRepository userRepository;
 
     public AvailabilityService(AvailabilityScopeRepository scopeRepository,
             AvailabilityBlockRepository blockRepository,
             AvailabilityPreferenceRepository preferenceRepository,
+            PreferredWindowRepository preferredWindowRepository,
             UserRepository userRepository) {
         this.scopeRepository = scopeRepository;
         this.blockRepository = blockRepository;
         this.preferenceRepository = preferenceRepository;
+        this.preferredWindowRepository = preferredWindowRepository;
         this.userRepository = userRepository;
     }
 
@@ -156,6 +167,60 @@ public class AvailabilityService {
         return value;
     }
 
+    public List<PreferredWindow> getPreferredWindows(Long userId) {
+        return preferredWindowRepository.findByUserIdOrderByDayOfWeekAscStartTimeAsc(userId);
+    }
+
+    /**
+     * 선호 윈도우 전량 교체 — user 행을 잠가 동시 PUT을 직렬화한다.
+     * 순서: 잠금 → 검증(400) → 삭제+삽입.
+     */
+    @Transactional
+    public List<PreferredWindow> putPreferredWindows(Long userId,
+            List<WindowDraft> drafts) {
+        userRepository.findByIdForUpdate(userId);
+        validatePreferredWindows(drafts);
+        List<PreferredWindow> windows = drafts.stream()
+                .map(d -> new PreferredWindow(userId, d.dayOfWeek(), d.startTime(),
+                        d.endTime()))
+                .toList();
+        preferredWindowRepository.deleteByUserId(userId);
+        preferredWindowRepository.flush();
+        preferredWindowRepository.saveAll(windows);
+        return windows.stream()
+                .sorted(Comparator.comparingInt(PreferredWindow::getDayOfWeek)
+                        .thenComparing(PreferredWindow::getStartTime))
+                .toList();
+    }
+
+    /**
+     * [s,e) 반개방 기준 같은 요일 내 중첩 거부 — 맞닿음(a.end == b.start)은 허용.
+     * 요일별 startTime 정렬 후 인접 쌍만 비교하면 전체 중첩을 잡는다.
+     */
+    private void validatePreferredWindows(List<WindowDraft> drafts) {
+        if (drafts.size() > MAX_PREFERRED_WINDOWS) {
+            throw new BusinessException(ErrorCode.AVAILABILITY_INVALID);
+        }
+        Map<Integer, List<WindowDraft>> byDay = new HashMap<>();
+        for (WindowDraft d : drafts) {
+            if (d.dayOfWeek() < 1 || d.dayOfWeek() > 7 || d.startTime() == null
+                    || d.endTime() == null || !d.startTime().isBefore(d.endTime())) {
+                throw new BusinessException(ErrorCode.AVAILABILITY_INVALID);
+            }
+            byDay.computeIfAbsent(d.dayOfWeek(), k -> new ArrayList<>()).add(d);
+        }
+        for (List<WindowDraft> dayDrafts : byDay.values()) {
+            List<WindowDraft> sorted = dayDrafts.stream()
+                    .sorted(Comparator.comparing(WindowDraft::startTime))
+                    .toList();
+            for (int i = 1; i < sorted.size(); i++) {
+                if (sorted.get(i).startTime().isBefore(sorted.get(i - 1).endTime())) {
+                    throw new BusinessException(ErrorCode.AVAILABILITY_INVALID);
+                }
+            }
+        }
+    }
+
     public record ScopeWithBlocks(AvailabilityScope scope, List<AvailabilityBlock> blocks) {
     }
 
@@ -165,5 +230,9 @@ public class AvailabilityService {
     /** 블록 입력 — kind enum 검증은 컨트롤러 @Pattern이 끝낸 값만 들어온다. */
     public record BlockDraft(BlockKind kind, LocalDateTime startAt, LocalDateTime endAt,
             LocalDate blockDate) {
+    }
+
+    /** 선호 윈도우 입력 — dayOfWeek 범위·중첩 검증은 서비스가 한다. */
+    public record WindowDraft(int dayOfWeek, LocalTime startTime, LocalTime endTime) {
     }
 }

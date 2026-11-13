@@ -43,6 +43,10 @@ public class ChatRoom {
     @Column(name = "end_time", nullable = false)
     private LocalDateTime endTime;
 
+    /** 생성 시점 스냅샷 회차 수 — 단일 제안은 1. 이후 제안 회차가 바뀌어도 갱신하지 않는다. */
+    @Column(name = "occurrence_count", nullable = false)
+    private int occurrenceCount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private Status status;
@@ -57,12 +61,13 @@ public class ChatRoom {
     }
 
     public ChatRoom(Long proposalId, String title, Mode mode, LocalDateTime startTime,
-            LocalDateTime endTime) {
+            LocalDateTime endTime, int occurrenceCount) {
         this.proposalId = proposalId;
         this.title = title;
         this.mode = mode;
         this.startTime = startTime;
         this.endTime = endTime;
+        this.occurrenceCount = occurrenceCount;
         this.status = Status.OPEN;
     }
 
@@ -72,6 +77,7 @@ public class ChatRoom {
     public Mode getMode() { return mode; }
     public LocalDateTime getStartTime() { return startTime; }
     public LocalDateTime getEndTime() { return endTime; }
+    public int getOccurrenceCount() { return occurrenceCount; }
     public Status getStatus() { return status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getClosedAt() { return closedAt; }

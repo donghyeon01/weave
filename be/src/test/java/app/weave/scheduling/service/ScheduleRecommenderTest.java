@@ -6,10 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import app.weave.common.port.AvailabilityBlockInfo;
 import app.weave.common.port.AvailabilityScopeInfo;
+import app.weave.common.port.PreferredWindowInfo;
 import app.weave.scheduling.domain.Mode;
 import app.weave.scheduling.service.ScheduleRecommender.Breakdown;
 import app.weave.scheduling.service.ScheduleRecommender.BusyInterval;
 import app.weave.scheduling.service.ScheduleRecommender.Candidate;
+import app.weave.scheduling.service.ScheduleRecommender.OccurrenceInfo;
 import app.weave.scheduling.service.ScheduleRecommender.UserScheduleInput;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -31,17 +33,34 @@ class ScheduleRecommenderTest {
 
     /** busy만 있는 입력 — 선언 없음·추론 off. */
     private static UserScheduleInput in(BusyInterval... hard) {
-        return new UserScheduleInput(List.of(hard), List.of(), List.of(), false);
+        return new UserScheduleInput(List.of(hard), List.of(), List.of(), false,
+                List.of());
     }
 
     private static UserScheduleInput in(List<BusyInterval> hard, List<BusyInterval> soft,
             List<AvailabilityScopeInfo> scopes, boolean inference) {
-        return new UserScheduleInput(hard, soft, scopes, inference);
+        return new UserScheduleInput(hard, soft, scopes, inference, List.of());
+    }
+
+    private static UserScheduleInput in(List<BusyInterval> hard, List<BusyInterval> soft,
+            List<AvailabilityScopeInfo> scopes, boolean inference,
+            List<PreferredWindowInfo> prefs) {
+        return new UserScheduleInput(hard, soft, scopes, inference, prefs);
     }
 
     /** 추론 opt-in만 있는 입력 — 빈 캘린더면 calendarFree. */
     private static UserScheduleInput infer() {
-        return new UserScheduleInput(List.of(), List.of(), List.of(), true);
+        return new UserScheduleInput(List.of(), List.of(), List.of(), true,
+                List.of());
+    }
+
+    private static UserScheduleInput infer(List<PreferredWindowInfo> prefs) {
+        return new UserScheduleInput(List.of(), List.of(), List.of(), true, prefs);
+    }
+
+    private static PreferredWindowInfo pw(int dayOfWeek, int sh, int eh) {
+        return new PreferredWindowInfo(dayOfWeek, LocalTime.of(sh, 0),
+                LocalTime.of(eh, 0));
     }
 
     private static AvailabilityScopeInfo scope(LocalDate rs, LocalDate re,
@@ -535,5 +554,280 @@ class ScheduleRecommenderTest {
 
         assertThat(out).hasSize(1);
         assertThat(out.get(0).percent()).isEqualTo(33);
+    }
+
+    // ---------- 시리즈 집계 (recommendRecurring) ----------
+
+    private final LocalDate occ1 = LocalDate.of(2026, 5, 12); // 화
+    private final LocalDate occ2 = LocalDate.of(2026, 5, 19); // 다음 주 화
+
+    @Test
+    void 시리즈_availableCount는_모든_회차_가능자의_교집합이다() {
+        // user2는 occ2에만 HARD — 시리즈 분류는 최악값 unavailable
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(),
+                2L, in(List.of(busy(occ2.atTime(10, 0), occ2.atTime(12, 0))),
+                        List.of(), List.of(), true));
+        List<Candidate> out = recommender.recommendRecurring(
+                win(10, 0, 12, 0), 120, 120, List.of(occ1, occ2), in);
+
+        assertThat(out).hasSize(1);
+        Candidate c = out.get(0);
+        assertThat(c.availableCount()).isEqualTo(1); // |∩Aₖ| = user1만
+        assertThat(c.percent()).isEqualTo(50);
+        assertThat(c.breakdown().calendarFree()).isEqualTo(1);
+        assertThat(c.breakdown().unavailable()).isEqualTo(1);
+        // 회차별 집계 — occ1은 둘 다 가능, occ2는 user2만 불가
+        assertThat(c.occurrenceCount()).isEqualTo(2);
+        assertThat(c.minOccurrencePercent()).isEqualTo(50);
+        assertThat(c.occurrences()).hasSize(2);
+        OccurrenceInfo o1 = c.occurrences().get(0);
+        OccurrenceInfo o2 = c.occurrences().get(1);
+        assertThat(o1.date()).isEqualTo(occ1);
+        assertThat(o1.percent()).isEqualTo(100);
+        assertThat(o1.availableCount()).isEqualTo(2);
+        assertThat(o2.percent()).isEqualTo(50);
+        assertThat(o2.availableCount()).isEqualTo(1);
+        assertThat(o2.breakdown().unavailable()).isEqualTo(1);
+        // slot은 첫 회차 날짜 + 시각 쌍
+        Slot.Time slot = (Slot.Time) c.slot();
+        assertThat(slot.date()).isEqualTo(occ1);
+    }
+
+    @Test
+    void 시리즈_분류는_회차_최악값이다() {
+        // occ1에서 direct이던 user도 occ2에서 conditional이면 시리즈 conditional
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, in(List.of(),
+                        List.of(busy(occ2.atTime(10, 0), occ2.atTime(11, 0))),
+                        List.of(scope(occ1, occ2,
+                                tb(occ1.atTime(10, 0), occ1.atTime(12, 0)),
+                                tb(occ2.atTime(10, 0), occ2.atTime(12, 0)))),
+                        false));
+        List<Candidate> out = recommender.recommendRecurring(
+                win(10, 0, 12, 0), 120, 120, List.of(occ1, occ2), in);
+
+        assertThat(out).isEmpty(); // 전원 시리즈 불가 → availableCount=0 필터
+    }
+
+    @Test
+    void 시리즈_분류_conditional이면_가능_집계에서_제외된다() {
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, in(List.of(),
+                        List.of(busy(occ2.atTime(10, 0), occ2.atTime(11, 0))),
+                        List.of(scope(occ1, occ2,
+                                tb(occ1.atTime(10, 0), occ1.atTime(12, 0)),
+                                tb(occ2.atTime(10, 0), occ2.atTime(12, 0)))),
+                        false),
+                2L, infer());
+        List<Candidate> out = recommender.recommendRecurring(
+                win(10, 0, 12, 0), 120, 120, List.of(occ1, occ2), in);
+
+        assertThat(out).hasSize(1);
+        Candidate c = out.get(0);
+        assertThat(c.breakdown().conditional()).isEqualTo(1); // occ2 SOFT → 시리즈 최악
+        assertThat(c.breakdown().calendarFree()).isEqualTo(1);
+        assertThat(c.availableCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 회차가_1개면_단일_추천과_분류가_같다() {
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(),
+                2L, in(busy(d1.atTime(10, 0), d1.atTime(11, 0))));
+        List<Candidate> single = recommender.recommend(Mode.TIME, d1, d1,
+                win(10, 0, 12, 0), 120, 120, null, in);
+        List<Candidate> series = recommender.recommendRecurring(
+                win(10, 0, 12, 0), 120, 120, List.of(d1), in);
+
+        assertThat(series).hasSize(1);
+        assertThat(single).hasSize(1);
+        assertThat(series.get(0).breakdown()).isEqualTo(single.get(0).breakdown());
+        assertThat(series.get(0).percent()).isEqualTo(single.get(0).percent());
+        assertThat(series.get(0).occurrenceCount()).isEqualTo(1);
+        assertThat(series.get(0).occurrences()).hasSize(1);
+        // 단일 추천은 정례 필드가 전부 null
+        assertThat(single.get(0).occurrenceCount()).isNull();
+        assertThat(single.get(0).occurrences()).isNull();
+        assertThat(single.get(0).minOccurrencePercent()).isNull();
+    }
+
+    @Test
+    void 정례도_시리즈_availableCount가_0이면_후보에서_제외한다() {
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(),
+                2L, in(List.of(busy(occ1.atTime(10, 0), occ1.atTime(12, 0)),
+                                busy(occ2.atTime(10, 0), occ2.atTime(12, 0))),
+                        List.of(), List.of(), false));
+        List<Candidate> out = recommender.recommendRecurring(
+                win(10, 0, 12, 0), 120, 120, List.of(occ1, occ2), in);
+
+        assertThat(out).hasSize(1); // user1만 전 회차 가능
+        assertThat(out.get(0).availableCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 정례_정렬의_두번째_키는_최저_회차_availableCount다() {
+        // 시리즈 avail은 10시·14시 후보 모두 2 — 최저 회차 avail이 큰 14시가 앞에 온다.
+        // u3: 10시 occ2 + 14시 occ1 불가 / u4: 10시 양 회차 + 14시 occ2 불가
+        // 10시: 회차 avail [3,2] → min 2 · 14시: [3,3] → min 3
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(), 2L, infer(),
+                3L, in(List.of(busy(occ2.atTime(10, 0), occ2.atTime(12, 0)),
+                                busy(occ1.atTime(14, 0), occ1.atTime(16, 0))),
+                        List.of(), List.of(), true),
+                4L, in(List.of(busy(occ1.atTime(10, 0), occ1.atTime(12, 0)),
+                                busy(occ2.atTime(10, 0), occ2.atTime(12, 0)),
+                                busy(occ2.atTime(14, 0), occ2.atTime(16, 0))),
+                        List.of(), List.of(), true));
+        List<Candidate> out = recommender.recommendRecurring(
+                List.of(
+                        new LocalTime[]{LocalTime.of(10, 0), LocalTime.of(12, 0)},
+                        new LocalTime[]{LocalTime.of(14, 0), LocalTime.of(16, 0)}),
+                120, 120, List.of(occ1, occ2), in);
+
+        assertThat(out).hasSize(2);
+        assertThat(out.get(0).availableCount()).isEqualTo(2);
+        assertThat(((Slot.Time) out.get(0).slot()).startTime())
+                .isEqualTo(LocalTime.of(14, 0));
+    }
+
+    // ---------- preferenceScore ----------
+
+    @Test
+    void 선호_윈도우가_슬롯과_부분_겹치면_비율만큼_점수다() {
+        // user1: 10~12 전체 선호 → 1.0 / user2: 10~11 선호 → 0.5 → 평균 0.75 → 75
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(List.of(pw(2, 10, 12))),
+                2L, infer(List.of(pw(2, 10, 11))));
+        List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
+                win(10, 0, 12, 0), 120, 120, null, in);
+
+        assertThat(out).hasSize(1);
+        assertThat(out.get(0).preferenceScore()).isEqualTo(75);
+        assertThat(out.get(0).preferenceRespondentCount()).isEqualTo(2);
+    }
+
+    @Test
+    void 같은_요일_복수_윈도우는_합집합으로_계산한다() {
+        // 맞닿은 윈도우 10~11 + 11~12 → 슬롯 10~12 완전 커버 → 100
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(List.of(pw(2, 10, 11), pw(2, 11, 12))));
+        List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
+                win(10, 0, 12, 0), 120, 120, null, in);
+
+        assertThat(out.get(0).preferenceScore()).isEqualTo(100);
+        assertThat(out.get(0).preferenceRespondentCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 윈도우_등록했지만_슬롯과_불일치하면_0점으로_분모에_포함된다() {
+        // user1: 10~12 일치 1.0 / user2: 14~16 등록했지만 불일치 0.0 → 평균 50
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(List.of(pw(2, 10, 12))),
+                2L, infer(List.of(pw(2, 14, 16))));
+        List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
+                win(10, 0, 12, 0), 120, 120, null, in);
+
+        assertThat(out.get(0).preferenceScore()).isEqualTo(50);
+        assertThat(out.get(0).preferenceRespondentCount()).isEqualTo(2);
+    }
+
+    @Test
+    void 해당_요일_미등록_사용자는_점수_분모에서_제외된다() {
+        // user2는 수요일(3) 윈도우만 — 화요일 슬롯 분모 제외
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(List.of(pw(2, 10, 12))),
+                2L, infer(List.of(pw(3, 10, 12))));
+        List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
+                win(10, 0, 12, 0), 120, 120, null, in);
+
+        assertThat(out.get(0).preferenceScore()).isEqualTo(100);
+        assertThat(out.get(0).preferenceRespondentCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 전원_미등록이면_preferenceScore는_null이다() {
+        Map<Long, UserScheduleInput> in = Map.of(1L, infer(), 2L, infer());
+        List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
+                win(10, 0, 12, 0), 120, 120, null, in);
+
+        assertThat(out.get(0).preferenceScore()).isNull();
+        assertThat(out.get(0).preferenceRespondentCount()).isNull();
+    }
+
+    @Test
+    void DATE_모드는_preferenceScore가_항상_null이다() {
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(List.of(pw(2, 10, 12))), 2L, infer());
+        List<Candidate> out = recommender.recommend(Mode.DATE, d1, d2,
+                null, 30, null, 1, in);
+
+        assertThat(out).isNotEmpty();
+        assertThat(out.get(0).preferenceScore()).isNull();
+        assertThat(out.get(0).preferenceRespondentCount()).isNull();
+    }
+
+    @Test
+    void 정례는_사용자별_등록_회차만_평균낸다() {
+        // occ1=화, occ2=수 — user1은 화만 등록(1.0), user2는 화0.5·수1.0 → 평균(1.0, 0.75)=0.875 → 88
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(List.of(pw(2, 10, 12))),
+                2L, infer(List.of(pw(2, 10, 11), pw(3, 10, 12))));
+        List<Candidate> out = recommender.recommendRecurring(
+                win(10, 0, 12, 0), 120, 120,
+                List.of(occ1, LocalDate.of(2026, 5, 13)), in);
+
+        assertThat(out).hasSize(1);
+        assertThat(out.get(0).preferenceScore()).isEqualTo(88);
+        assertThat(out.get(0).preferenceRespondentCount()).isEqualTo(2);
+    }
+
+    @Test
+    void 정례에서_어느_회차에도_미등록인_사용자는_제외된다() {
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(List.of(pw(2, 10, 12))),
+                2L, infer()); // 윈도우 자체 없음
+        List<Candidate> out = recommender.recommendRecurring(
+                win(10, 0, 12, 0), 120, 120, List.of(occ1, occ2), in);
+
+        assertThat(out.get(0).preferenceScore()).isEqualTo(100);
+        assertThat(out.get(0).preferenceRespondentCount()).isEqualTo(1);
+    }
+
+    // ---------- 정렬 (신 계약) ----------
+
+    @Test
+    void 정렬은_availableCount가_preferenceScore보다_우선이다() {
+        // 10~11 슬롯(avail2, 점수50) > 11~12(avail2, 점수0) > 9~10(avail1, 점수50)
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, in(List.of(busy(d1.atTime(9, 0), d1.atTime(10, 0))),
+                        List.of(), List.of(), true, List.of(pw(2, 9, 10))),
+                2L, infer(List.of(pw(2, 10, 11))));
+        List<Candidate> out = recommender.recommend(Mode.TIME, d1, d1,
+                win(9, 0, 12, 0), 60, 60, null, in);
+
+        assertThat(out).hasSize(3);
+        assertThat(((Slot.Time) out.get(0).slot()).startTime())
+                .isEqualTo(LocalTime.of(10, 0));
+        assertThat(((Slot.Time) out.get(1).slot()).startTime())
+                .isEqualTo(LocalTime.of(11, 0));
+        assertThat(((Slot.Time) out.get(2).slot()).startTime())
+                .isEqualTo(LocalTime.of(9, 0));
+    }
+
+    @Test
+    void preferenceScore가_null인_후보는_점수_있는_후보보다_뒤다() {
+        // d1(화)은 윈도우 없음 → null, d2(수)는 등록 — 날짜가 늦어도 점수 있는 d2가 먼저
+        Map<Long, UserScheduleInput> in = Map.of(
+                1L, infer(List.of(pw(3, 10, 12))));
+        List<Candidate> out = recommender.recommend(Mode.TIME, d1, d2,
+                win(10, 0, 12, 0), 120, 120, null, in);
+
+        assertThat(out).hasSize(2);
+        assertThat(((Slot.Time) out.get(0).slot()).date()).isEqualTo(d2);
+        assertThat(out.get(0).preferenceScore()).isEqualTo(100);
+        assertThat(((Slot.Time) out.get(1).slot()).date()).isEqualTo(d1);
+        assertThat(out.get(1).preferenceScore()).isNull();
     }
 }

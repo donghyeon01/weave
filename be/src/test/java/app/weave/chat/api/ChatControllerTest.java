@@ -74,7 +74,7 @@ class ChatControllerTest {
     private ChatRoom timeRoom(long proposalId, List<Long> members) {
         return chatService.createRoom(proposalId, "방" + proposalId, Mode.TIME,
                 LocalDateTime.of(2026, 12, 1, 10, 30), LocalDateTime.of(2026, 12, 1, 12, 0),
-                members);
+                members, 1);
     }
 
     @Test
@@ -82,7 +82,7 @@ class ChatControllerTest {
         ChatRoom time = timeRoom(1L, List.of(meId, p1Id));
         // DATE 방 — 저장 end는 배타 상한(+1일 자정)이라 응답은 -1일
         chatService.createRoom(2L, "날짜방", Mode.DATE, LocalDateTime.of(2026, 12, 5, 0, 0),
-                LocalDateTime.of(2026, 12, 8, 0, 0), List.of(meId, p1Id));
+                LocalDateTime.of(2026, 12, 8, 0, 0), List.of(meId, p1Id), 3);
         // CLOSED 방도 status=CLOSED로 노출 (읽기 전용)
         chatService.closeRoom(timeRoom(3L, List.of(meId)).getProposalId());
         chatService.send(p1Id, time.getId(), "unread", null);
@@ -99,6 +99,8 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$[?(@.proposalId==1)].lastMessage").value("unread"))
                 .andExpect(jsonPath("$[?(@.proposalId==1)].lastMessageAt").isNotEmpty())
                 .andExpect(jsonPath("$[?(@.proposalId==1)].memberCount").value(2))
+                .andExpect(jsonPath("$[?(@.proposalId==1)].occurrenceCount").value(1))
+                .andExpect(jsonPath("$[?(@.proposalId==2)].occurrenceCount").value(3))
                 .andExpect(jsonPath("$[?(@.proposalId==2)].lastMessage")
                         .value(hasItem(nullValue())))
                 .andExpect(jsonPath("$[?(@.proposalId==2)].memberCount").value(2))

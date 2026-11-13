@@ -100,7 +100,7 @@ class ChatStompIntegrationTest {
     private ChatRoom room(long proposalId, List<Long> members) {
         return chatService.createRoom(proposalId, "방" + proposalId, Mode.TIME,
                 LocalDateTime.of(2026, 12, 1, 10, 0), LocalDateTime.of(2026, 12, 1, 12, 0),
-                members);
+                members, 1);
     }
 
     /** ERROR 프레임의 message 헤더({"code":"..."})를 큐로 수집하는 세션 핸들러. */

@@ -41,6 +41,8 @@ public enum ErrorCode {
     PROPOSAL_NOT_AWAITING_CONFIRM("PROPOSAL-NOT-AWAITING-CONFIRM", 409,
             "확정 대기 중인 제안이 아닙니다."),
     PROPOSAL_NOT_PARTICIPANT("PROPOSAL-NOT-PARTICIPANT", 403, "제안의 참여자가 아닙니다."),
+    PROPOSAL_CONFLICT("PROPOSAL-CONFLICT", 409,
+            "일정 충돌로 확정할 수 없습니다. 취소 후 다시 조율해주세요."),
     CHAT_ROOM_NOT_FOUND("CHAT-ROOM-NOT-FOUND", 404, "채팅방을 찾을 수 없습니다."),
     CHAT_NOT_MEMBER("CHAT-NOT-MEMBER", 404, "채팅방 멤버가 아닙니다."),
     CHAT_ROOM_CLOSED("CHAT-ROOM-CLOSED", 409, "종료된 채팅방입니다."),

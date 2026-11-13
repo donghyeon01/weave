@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import type { Candidate, Slot } from '../types'
+import {
+  formatRecurrence,
+  formatShortDate,
+  type Candidate,
+  type CandidateOccurrence,
+  type RecurrenceSpec,
+  type Slot,
+} from '../types'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { Modal } from '../../../components/ui/modal'
@@ -43,11 +50,58 @@ const DATE_DURATIONS = [1, 2, 3, 4] as const
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const
 
+// 반복 요일 칩 — 표시 순서 월~일, 값은 ISO 요일(월=1~일=7, 계약 §3.8)
+const REC_WEEKDAYS = [
+  { iso: 1, label: '월' },
+  { iso: 2, label: '화' },
+  { iso: 3, label: '수' },
+  { iso: 4, label: '목' },
+  { iso: 5, label: '금' },
+  { iso: 6, label: '토' },
+  { iso: 7, label: '일' },
+] as const
+
+const REC_INTERVALS = [1, 2, 3, 4] as const
+
 // "5월 22일 목요일 18:00 ~ 20:00" 형태 — 시안 결과 카드 표기
 function formatSlotHuman(slot: Slot): string {
   if (slot.type === 'DATE') return `${slot.startDate} ~ ${slot.endDate}`
   const d = new Date(`${slot.date}T00:00:00`)
   return `${d.getMonth() + 1}월 ${d.getDate()}일 ${WEEKDAYS[d.getDay()]}요일 ${slot.startTime.slice(0, 5)} ~ ${slot.endTime.slice(0, 5)}`
+}
+
+// 시리즈 후보 판정 — recurrence 요청 시에만 occurrenceCount/occurrences가 채워진다 (계약 §3.8)
+function isSeriesCandidate(c: Candidate): boolean {
+  return (c.occurrenceCount ?? 1) > 1 && c.occurrences != null
+}
+
+// 시리즈 카드의 회차 펼침 목록 — 회차별 시각은 슬롯과 동일 규칙이라 slot 시각을 재사용한다
+function OccurrenceList({
+  occurrences,
+  slot,
+  totalCount,
+}: {
+  occurrences: CandidateOccurrence[]
+  slot: Extract<Slot, { type: 'TIME' }>
+  totalCount: number
+}) {
+  return (
+    <ul className="mt-3 flex flex-col gap-1.5 rounded-xl border border-border bg-surface-muted/50 p-3">
+      {occurrences.map((o) => (
+        <li
+          key={o.date}
+          className="flex items-center justify-between gap-2 text-xs font-medium text-text-secondary"
+        >
+          <span>
+            {formatShortDate(o.date)} {slot.startTime.slice(0, 5)} ~ {slot.endTime.slice(0, 5)}
+          </span>
+          <span>
+            {o.percent}% · {o.availableCount}/{totalCount}명 가능
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 const inputCls =
@@ -96,7 +150,8 @@ function TimetablePreview({
       <div className="flex items-center justify-between">
         <h3 className="font-display text-lg">친구별 일정 겹침 타임테이블 미리보기</h3>
         <span className="text-xs font-medium text-text-secondary">
-          {formatSlotHuman(slot).split(' ')[0]} {formatSlotHuman(slot).split(' ')[1]} (09:00 ~ 22:00 타임라인 뷰어)
+          {formatSlotHuman(slot).split(' ')[0]} {formatSlotHuman(slot).split(' ')[1]} (09:00 ~ 22:00
+          타임라인 뷰어{isSeriesCandidate(candidate) ? ' · 첫 회차 기준' : ''})
         </span>
       </div>
       <div className="mt-4 overflow-x-auto">
@@ -141,12 +196,195 @@ function TimetablePreview({
       </div>
       <p className="mt-3 rounded-lg bg-accent-soft px-3 py-2 text-sm font-bold text-on-tint">
         {slot.startTime.slice(0, 5)} ~ {slot.endTime.slice(0, 5)} 구간:{' '}
+        {isSeriesCandidate(candidate) ? '전 회차 공통 ' : ''}
         {candidate.availableCount}/{candidate.totalCount}명 참석 가능
         {candidate.availableCount === candidate.totalCount
           ? ' — 전원 가능한 골든 슬롯!'
           : ` (참여율 ${candidate.percent}%)`}
       </p>
     </section>
+  )
+}
+
+// 추천 후보 카드 — 회차 펼침 상태를 카드 단위로 들고 있어야 해서 별도 컴포넌트로 분리한다.
+// 시리즈 후보(occurrenceCount>1)는 총 회차·최저 회차·회차별 내역·선호 적합도를 추가로 보여준다.
+function CandidateCard({
+  candidate: c,
+  seriesSpec,
+  friends,
+  onPropose,
+}: {
+  candidate: Candidate
+  seriesSpec: RecurrenceSpec | null
+  friends: { friendshipId: number; user: { nickname: string } }[]
+  onPropose: (c: Candidate) => void
+}) {
+  const [occOpen, setOccOpen] = useState(false)
+  const series = isSeriesCandidate(c)
+  const occs = c.occurrences ?? []
+  const firstDate = occs[0]?.date
+  const lastDate = occs[occs.length - 1]?.date
+  return (
+    <li
+      className={cx(
+        'rounded-2xl border p-5',
+        c.rank === 1
+          ? 'border-accent bg-accent-soft/40 shadow-brutal-accent'
+          : 'border-border bg-surface shadow-card-sm',
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        {c.rank === 1 ? (
+          <Badge variant="accent">BEST 추천 슬롯 🌟</Badge>
+        ) : (
+          <Badge>대안 슬롯 #{c.rank}</Badge>
+        )}
+        {series && (
+          <>
+            <Badge>총 {c.occurrenceCount}회</Badge>
+            {c.minOccurrencePercent != null && (
+              <Badge variant={c.minOccurrencePercent === 100 ? 'success' : 'warning'}>
+                최저 회차 {c.minOccurrencePercent}%
+              </Badge>
+            )}
+          </>
+        )}
+        {c.percent === 100 && (
+          <span
+            className={cx(
+              'text-xs font-bold',
+              // rank 1 카드는 accent-soft/40 워시 위 — text만 대비 통과
+              c.rank === 1 ? 'text-text' : 'text-success-text',
+            )}
+          >
+            100% 매칭
+          </span>
+        )}
+      </div>
+      <p className="mt-2 font-display text-2xl leading-8">{formatSlotHuman(c.slot)}</p>
+      {series && seriesSpec !== null && firstDate !== undefined && lastDate !== undefined && (
+        <p
+          className={cx(
+            'mt-1 text-sm font-medium',
+            c.rank === 1 ? 'text-text' : 'text-text-secondary',
+          )}
+        >
+          {formatRecurrence(seriesSpec)} · 총 {c.occurrenceCount}회 (
+          {formatShortDate(firstDate)} ~ {formatShortDate(lastDate)})
+        </p>
+      )}
+      <p
+        className={cx(
+          'mt-1 text-sm font-medium',
+          c.rank === 1 ? 'text-text' : 'text-text-secondary',
+        )}
+      >
+        {series ? '전 회차 공통 ' : ''}가능 {c.availableCount}/전체 {c.totalCount}
+        {c.availableCount === c.totalCount ? ' (전원 가능)' : ' — 확인 필요·불가 인원 포함'}
+      </p>
+      {/* 5분류 판정 근거 — 직접 가능·캘린더 빈 2종만 강조, 나머지는 muted (계약 §3.8).
+          시리즈는 사용자별 회차 판정의 최악 분류 합계다 */}
+      <p className="mt-1.5 text-xs font-medium text-text-muted">
+        <span className="font-bold text-success-text">직접 가능 {c.breakdown.direct}</span>
+        {' · '}
+        <span className="font-bold text-success-text">캘린더 빈 {c.breakdown.calendarFree}</span>
+        {' · '}조정 필요 {c.breakdown.conditional}
+        {' · '}확인 필요 {c.breakdown.unknown}
+        {' · '}불가 {c.breakdown.unavailable}
+      </p>
+      {series && c.slot.type === 'TIME' && (
+        <>
+          <button
+            type="button"
+            aria-expanded={occOpen}
+            onClick={() => setOccOpen((v) => !v)}
+            className="mt-2 text-xs font-bold text-accent-text hover:underline"
+          >
+            회차별 보기 {occOpen ? '▴' : '▾'}
+          </button>
+          {occOpen && (
+            <OccurrenceList occurrences={occs} slot={c.slot} totalCount={c.totalCount} />
+          )}
+        </>
+      )}
+      {c.preferenceScore != null && (
+        <p className="mt-1.5 text-xs font-bold text-text-secondary">
+          선호 적합도 {c.preferenceScore}점
+          {c.preferenceRespondentCount != null &&
+            ` (선호 등록 ${c.preferenceRespondentCount}명 기준)`}
+        </p>
+      )}
+      <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+        <div className="flex -space-x-2">
+          {friends.slice(0, 5).map((f) => (
+            <span
+              key={f.friendshipId}
+              className="flex size-7 items-center justify-center rounded-full border-2 border-surface bg-primary text-[11px] font-bold text-on-tint"
+              title={f.user.nickname}
+            >
+              {f.user.nickname.slice(0, 1)}
+            </span>
+          ))}
+          {friends.length === 0 && (
+            <span className="text-xs text-text-muted">친구 전원 대상</span>
+          )}
+        </div>
+        <Button variant={c.rank === 1 ? 'brutal' : 'ghost'} size="sm" onClick={() => onPropose(c)}>
+          제안 보내기
+        </Button>
+      </div>
+    </li>
+  )
+}
+
+// 제안 모달의 시리즈 요약 — 반복 주기·첫 회차·기간·최저 회차 경고·전체 회차 펼침
+function SeriesProposalSummary({
+  candidate: c,
+  spec,
+}: {
+  candidate: Candidate
+  spec: RecurrenceSpec | null
+}) {
+  const [open, setOpen] = useState(false)
+  const occs = c.occurrences ?? []
+  const first = occs[0]?.date
+  const last = occs[occs.length - 1]?.date
+  const minOcc = occs.length > 0 ? occs.reduce((a, b) => (b.percent < a.percent ? b : a)) : null
+  return (
+    <div className="rounded-xl border border-border bg-surface-muted/50 p-3 text-sm">
+      {spec !== null && (
+        <p className="font-bold text-text">
+          {formatRecurrence(spec)} · 총 {c.occurrenceCount}회
+        </p>
+      )}
+      <p className="mt-1 text-text-secondary">첫 회차 {formatSlotHuman(c.slot)}</p>
+      {first !== undefined && last !== undefined && (
+        <p className="text-text-secondary">
+          기간 {formatShortDate(first)} ~ {formatShortDate(last)}
+        </p>
+      )}
+      {minOcc !== null && minOcc.percent < 100 && (
+        <p className="mt-1 text-xs font-bold text-warning-text">
+          가장 가용 인원이 적은 회차: {minOcc.availableCount}/{c.totalCount}명 (
+          {minOcc.percent}%)
+        </p>
+      )}
+      {c.slot.type === 'TIME' && occs.length > 0 && (
+        <>
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            className="mt-1 text-xs font-bold text-accent-text hover:underline"
+          >
+            전체 {occs.length}회 보기 {open ? '▴' : '▾'}
+          </button>
+          {open && (
+            <OccurrenceList occurrences={occs} slot={c.slot} totalCount={c.totalCount} />
+          )}
+        </>
+      )}
+    </div>
   )
 }
 
@@ -163,9 +401,15 @@ export function SchedulingPage() {
   const [durationDays, setDurationDays] = useState(2)
   const [windows, setWindows] = useState<string[]>(['오후', '저녁'])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
+  // 반복 일정 — 요일 칩이 하나도 선택되지 않으면 recurrence를 보내지 않는다(단일 일정)
+  const [recByDay, setRecByDay] = useState<number[]>([])
+  const [recInterval, setRecInterval] = useState<number>(1)
+  const [recCount, setRecCount] = useState<number>(4)
   const [candidates, setCandidates] = useState<Candidate[] | null>(null)
+  // 마지막 추천에 실제로 쓰인 반복 스펙 — 시리즈 후보의 카드·제안 생성에 재사용한다
+  const [seriesSpec, setSeriesSpec] = useState<RecurrenceSpec | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
-  const [proposalSlot, setProposalSlot] = useState<Slot | null>(null)
+  const [proposalCandidate, setProposalCandidate] = useState<Candidate | null>(null)
   const [proposalTitle, setProposalTitle] = useState('')
   const [toast, setToast] = useState<{ variant: 'success' | 'danger'; message: string } | null>(null)
 
@@ -194,13 +438,14 @@ export function SchedulingPage() {
 
   // 조건이 바뀌면 이전 추천 결과는 무효 — 다른 조건의 후보로 제안 생성을 막는다.
   // 선택 순서만 다른 동일 집합이 불필요한 리셋을 만들지 않도록 정렬 후 직렬화한다.
-  const condKey = `${mode}|${rangeStart}|${rangeEnd}|${durationMin}|${durationDays}|${[...selectedIds].sort((a, b) => a - b).join(',')}|${[...windows].sort().join(',')}`
+  const condKey = `${mode}|${rangeStart}|${rangeEnd}|${durationMin}|${durationDays}|${[...selectedIds].sort((a, b) => a - b).join(',')}|${[...windows].sort().join(',')}|${[...recByDay].sort((a, b) => a - b).join(',')}|${recInterval}|${recCount}`
   // in-flight 추천의 지연 성공이 변경된 조건의 stale 후보를 되살리지 못하게
   // 최신 condKey를 ref로 들고 submit 시점 키와 비교한다.
   const condKeyRef = useRef(condKey)
   condKeyRef.current = condKey
   useEffect(() => {
     setCandidates(null)
+    setSeriesSpec(null)
   }, [condKey])
 
   const toggleParticipant = (id: number) => {
@@ -212,6 +457,16 @@ export function SchedulingPage() {
   const submitRecommend = () => {
     setFormError(null)
     const keyAtSubmit = condKey
+    // TIME 모드에서 요일이 하나라도 선택돼야 recurrence를 보낸다 — DATE 모드는 계약상 금지
+    const recurrence: RecurrenceSpec | undefined =
+      mode === 'TIME' && recByDay.length > 0
+        ? {
+            freq: 'WEEKLY',
+            interval: recInterval,
+            byDay: [...recByDay].sort((a, b) => a - b),
+            count: Math.min(12, Math.max(2, recCount)),
+          }
+        : undefined
     recommend.mutate(
       {
         mode,
@@ -231,17 +486,25 @@ export function SchedulingPage() {
             : undefined,
         slotMinutes: mode === 'TIME' ? durationMin : undefined,
         durationDays: mode === 'DATE' ? durationDays : undefined,
+        recurrence,
       },
       {
         onSuccess: (res) => {
           // 응답 도착 시점에 조건이 바뀌어 있으면 이 결과는 stale — 버린다
-          if (condKeyRef.current === keyAtSubmit) setCandidates(res.candidates)
+          if (condKeyRef.current === keyAtSubmit) {
+            setCandidates(res.candidates)
+            setSeriesSpec(recurrence ?? null)
+          }
         },
         onError: (err) =>
           setFormError(
             err instanceof ApiError && err.code === 'SCHEDULING-NOT-FRIEND'
               ? '선택한 참여자 중 친구가 아닌 사람이 있어요.'
-              : '추천 계산에 실패했어요. 조건을 확인해 주세요.',
+              : err instanceof ApiError && err.code === 'SCHEDULING-INVALID-INPUT'
+                ? mode === 'TIME' && recByDay.length > 0
+                  ? '조건이 올바르지 않아요. 반복 횟수를 채울 수 없으면 조율 기간을 넓히거나 횟수를 줄여 주세요.'
+                  : '조건이 올바르지 않아요. 입력 값을 확인해 주세요.'
+                : '추천 계산에 실패했어요. 조건을 확인해 주세요.',
           ),
       },
     )
@@ -256,22 +519,34 @@ export function SchedulingPage() {
 
   const submitProposal = (e: FormEvent) => {
     e.preventDefault()
-    if (proposalSlot === null || proposalTitle.trim() === '') return
+    if (proposalCandidate === null || proposalTitle.trim() === '') return
+    const series = isSeriesCandidate(proposalCandidate)
     createProposal.mutate(
       {
         title: proposalTitle.trim(),
-        slot: proposalSlot,
+        // slot은 첫 회차 스냅샷 — 시리즈면 recurrence를 함께 보내 서버가 회차를 전개한다 (계약 §3.7)
+        slot: proposalCandidate.slot,
+        recurrence: series ? (seriesSpec ?? undefined) : undefined,
         // 추천의 "미선택=전원" 의미와 맞춘다 — 빈 배열은 be가 1명 미만으로 거절한다
         participantIds:
           selectedIds.length > 0 ? selectedIds : friends.map((f) => f.user.id),
       },
       {
         onSuccess: () => {
-          setProposalSlot(null)
+          setProposalCandidate(null)
           setProposalTitle('')
           setToast({ variant: 'success', message: '제안을 보냈어요.' })
         },
-        onError: () => setToast({ variant: 'danger', message: '제안 전송에 실패했어요.' }),
+        onError: (err) =>
+          setToast({
+            variant: 'danger',
+            message:
+              err instanceof ApiError && err.code === 'SCHEDULING-INVALID-INPUT'
+                ? series
+                  ? '반복 조건이 올바르지 않아요. 요일·횟수를 확인해 주세요.'
+                  : '제안 조건이 올바르지 않아요. 입력 값을 확인해 주세요.'
+                : '제안 전송에 실패했어요.',
+          }),
       },
     )
   }
@@ -500,6 +775,86 @@ export function SchedulingPage() {
                       })}
                     </div>
                   </div>
+                  <div>
+                    <span className="text-sm font-bold text-text">반복 일정 (선택)</span>
+                    <p className="mt-1 text-xs font-medium text-text-muted">
+                      요일을 고르면 그 요일들로 반복되는 시리즈를 추천해요. 선택하지 않으면 1회
+                      일정이에요. 조율 기간은 첫 회차 탐색 범위예요.
+                    </p>
+                    <div
+                      role="group"
+                      aria-label="반복 요일"
+                      className="mt-1.5 flex gap-1.5"
+                    >
+                      {REC_WEEKDAYS.map((w) => {
+                        const on = recByDay.includes(w.iso)
+                        return (
+                          <button
+                            key={w.iso}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() =>
+                              setRecByDay((prev) =>
+                                on
+                                  ? prev.filter((d) => d !== w.iso)
+                                  : [...prev, w.iso].sort((a, b) => a - b),
+                              )
+                            }
+                            className={cx(
+                              'flex-1 rounded-lg border px-1 py-2 text-sm font-bold',
+                              on
+                                ? 'border-accent bg-accent-soft text-on-tint'
+                                : 'border-border text-text-secondary hover:text-text',
+                            )}
+                          >
+                            {w.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div
+                        role="group"
+                        aria-label="반복 간격"
+                        className="flex gap-1 rounded-lg bg-surface-muted p-1"
+                      >
+                        {REC_INTERVALS.map((i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            aria-pressed={recInterval === i}
+                            onClick={() => setRecInterval(i)}
+                            className={cx(
+                              'rounded-md px-2.5 py-1 text-xs font-bold transition',
+                              'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
+                              recInterval === i
+                                ? 'bg-surface text-text shadow-sm'
+                                : 'text-text-secondary',
+                            )}
+                          >
+                            {i === 1 ? '매주' : `${i}주마다`}
+                          </button>
+                        ))}
+                      </div>
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-text-secondary">
+                        총
+                        <input
+                          type="number"
+                          min={2}
+                          max={12}
+                          value={recCount}
+                          // 타이핑 중간값(1→10→12)을 허용하고 blur 시 계약 범위로 클램프한다
+                          onChange={(e) =>
+                            setRecCount(Math.min(99, Math.max(0, Number(e.target.value) || 0)))
+                          }
+                          onBlur={() => setRecCount(Math.min(12, Math.max(2, recCount)))}
+                          aria-label="반복 총 횟수"
+                          className="w-14 rounded-lg border-2 border-input bg-surface px-2 py-1 text-center text-sm outline-none focus:border-accent"
+                        />
+                        회
+                      </label>
+                    </div>
+                  </div>
                 </>
               ) : (
                 <div>
@@ -582,80 +937,13 @@ export function SchedulingPage() {
 
           <ol className="mt-4 flex flex-col gap-4">
             {candidates?.map((c) => (
-              <li
+              <CandidateCard
                 key={`${c.rank}-${formatSlotHuman(c.slot)}`}
-                className={cx(
-                  'rounded-2xl border p-5',
-                  c.rank === 1
-                    ? 'border-accent bg-accent-soft/40 shadow-brutal-accent'
-                    : 'border-border bg-surface shadow-card-sm',
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  {c.rank === 1 ? (
-                    <Badge variant="accent">BEST 추천 슬롯 🌟</Badge>
-                  ) : (
-                    <Badge>대안 슬롯 #{c.rank}</Badge>
-                  )}
-                  {c.percent === 100 && (
-                    <span
-                      className={cx(
-                        'text-xs font-bold',
-                        // rank 1 카드는 accent-soft/40 워시 위 — text만 대비 통과
-                        c.rank === 1 ? 'text-text' : 'text-success-text',
-                      )}
-                    >
-                      100% 매칭
-                    </span>
-                  )}
-                </div>
-                <p className="mt-2 font-display text-2xl leading-8">{formatSlotHuman(c.slot)}</p>
-                <p
-                  className={cx(
-                    'mt-1 text-sm font-medium',
-                    c.rank === 1 ? 'text-text' : 'text-text-secondary',
-                  )}
-                >
-                  가능 {c.availableCount}/전체 {c.totalCount}
-                  {c.availableCount === c.totalCount ? ' (전원 가능)' : ' — 확인 필요·불가 인원 포함'}
-                </p>
-                {/* 5분류 판정 근거 — 직접 가능·캘린더 빈 2종만 강조, 나머지는 muted (계약 §3.8) */}
-                <p className="mt-1.5 text-xs font-medium text-text-muted">
-                  <span className="font-bold text-success-text">
-                    직접 가능 {c.breakdown.direct}
-                  </span>
-                  {' · '}
-                  <span className="font-bold text-success-text">
-                    캘린더 빈 {c.breakdown.calendarFree}
-                  </span>
-                  {' · '}조정 필요 {c.breakdown.conditional}
-                  {' · '}확인 필요 {c.breakdown.unknown}
-                  {' · '}불가 {c.breakdown.unavailable}
-                </p>
-                <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                  <div className="flex -space-x-2">
-                    {selectedFriends.slice(0, 5).map((f) => (
-                      <span
-                        key={f.friendshipId}
-                        className="flex size-7 items-center justify-center rounded-full border-2 border-surface bg-primary text-[11px] font-bold text-on-tint"
-                        title={f.user.nickname}
-                      >
-                        {f.user.nickname.slice(0, 1)}
-                      </span>
-                    ))}
-                    {selectedFriends.length === 0 && (
-                      <span className="text-xs text-text-muted">친구 전원 대상</span>
-                    )}
-                  </div>
-                  <Button
-                    variant={c.rank === 1 ? 'brutal' : 'ghost'}
-                    size="sm"
-                    onClick={() => setProposalSlot(c.slot)}
-                  >
-                    제안 보내기
-                  </Button>
-                </div>
-              </li>
+                candidate={c}
+                seriesSpec={seriesSpec}
+                friends={selectedFriends}
+                onPropose={setProposalCandidate}
+              />
             ))}
           </ol>
 
@@ -673,17 +961,23 @@ export function SchedulingPage() {
         </div>
       </div>
 
-      {/* 제안 생성 모달 */}
+      {/* 제안 생성 모달 — 시리즈 후보면 반복 요약·첫 회차·기간·최저 회차를 보여준다 */}
       <Modal
-        open={proposalSlot !== null}
-        onClose={() => setProposalSlot(null)}
+        open={proposalCandidate !== null}
+        onClose={() => setProposalCandidate(null)}
         title={
           <h2 className="font-display text-lg">
-            제안 보내기 — {proposalSlot !== null && formatSlotHuman(proposalSlot)}
+            제안 보내기 —{' '}
+            {proposalCandidate !== null && isSeriesCandidate(proposalCandidate)
+              ? '정기 일정'
+              : proposalCandidate !== null && formatSlotHuman(proposalCandidate.slot)}
           </h2>
         }
       >
-        <form onSubmit={submitProposal}>
+        {proposalCandidate !== null && isSeriesCandidate(proposalCandidate) && (
+          <SeriesProposalSummary candidate={proposalCandidate} spec={seriesSpec} />
+        )}
+        <form onSubmit={submitProposal} className={proposalCandidate !== null && isSeriesCandidate(proposalCandidate) ? 'mt-4' : ''}>
           <label className="block text-sm font-bold text-text">
             제목
             <input
@@ -698,7 +992,7 @@ export function SchedulingPage() {
             참여자: {selectedIds.length > 0 ? `${selectedIds.length}명` : '친구 전원'}
           </p>
           <div className="mt-4 flex justify-end gap-2">
-            <Button variant="ghost" type="button" onClick={() => setProposalSlot(null)}>
+            <Button variant="ghost" type="button" onClick={() => setProposalCandidate(null)}>
               취소
             </Button>
             <Button

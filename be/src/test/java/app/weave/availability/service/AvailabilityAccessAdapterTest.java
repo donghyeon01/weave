@@ -8,13 +8,17 @@ import app.weave.availability.domain.AvailabilityPreference;
 import app.weave.availability.domain.AvailabilityPreferenceRepository;
 import app.weave.availability.domain.AvailabilityScope;
 import app.weave.availability.domain.AvailabilityScopeRepository;
+import app.weave.availability.domain.PreferredWindow;
+import app.weave.availability.domain.PreferredWindowRepository;
 import app.weave.availability.domain.ScopeMode;
 import app.weave.common.port.AvailabilityBlockInfo;
 import app.weave.common.port.AvailabilityMode;
 import app.weave.common.port.AvailabilityScopeInfo;
+import app.weave.common.port.PreferredWindowInfo;
 import app.weave.common.port.UserAvailability;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +48,8 @@ class AvailabilityAccessAdapterTest {
     @Autowired
     AvailabilityPreferenceRepository preferenceRepository;
     @Autowired
+    PreferredWindowRepository preferredWindowRepository;
+    @Autowired
     JdbcTemplate jdbc;
 
     private Long meId;
@@ -54,6 +60,7 @@ class AvailabilityAccessAdapterTest {
         jdbc.update("DELETE FROM availability_blocks");
         jdbc.update("DELETE FROM availability_scopes");
         jdbc.update("DELETE FROM availability_preferences");
+        jdbc.update("DELETE FROM availability_preferred_windows");
         jdbc.update("DELETE FROM users WHERE email LIKE '%@weave.local'");
         jdbc.update("INSERT INTO users(email,name,nickname,provider) VALUES "
                 + "('me@weave.local','나','나','demo'),('other@weave.local','타인','타인','demo')");
@@ -157,6 +164,55 @@ class AvailabilityAccessAdapterTest {
     void 빈_userIds는_빈_맵을_반환한다() {
         Map<Long, UserAvailability> result = adapter.availabilityOf(List.of(),
                 AvailabilityMode.TIME, LocalDate.of(2027, 6, 1), LocalDate.of(2027, 6, 30));
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void preferredWindowsOf는_userId별로_윈도우를_그룹핑한다() {
+        preferredWindowRepository.save(new PreferredWindow(meId, 2,
+                LocalTime.of(19, 0), LocalTime.of(22, 0)));
+        preferredWindowRepository.save(new PreferredWindow(meId, 4,
+                LocalTime.of(20, 0), LocalTime.of(23, 0)));
+        preferredWindowRepository.save(new PreferredWindow(otherId, 2,
+                LocalTime.of(9, 0), LocalTime.of(12, 0)));
+
+        Map<Long, List<PreferredWindowInfo>> result = adapter
+                .preferredWindowsOf(List.of(meId, otherId));
+
+        assertThat(result.get(meId)).hasSize(2);
+        assertThat(result.get(otherId)).hasSize(1);
+    }
+
+    @Test
+    void preferredWindowsOf는_필드를_그대로_매핑한다() {
+        preferredWindowRepository.save(new PreferredWindow(meId, 5,
+                LocalTime.of(18, 30), LocalTime.of(21, 0)));
+
+        Map<Long, List<PreferredWindowInfo>> result = adapter
+                .preferredWindowsOf(List.of(meId));
+
+        assertThat(result.get(meId)).containsExactly(
+                new PreferredWindowInfo(5, LocalTime.of(18, 30), LocalTime.of(21, 0)));
+    }
+
+    @Test
+    void preferredWindowsOf는_행_없는_user도_빈_리스트로_포함한다() {
+        preferredWindowRepository.save(new PreferredWindow(otherId, 1,
+                LocalTime.of(10, 0), LocalTime.of(12, 0)));
+
+        Map<Long, List<PreferredWindowInfo>> result = adapter
+                .preferredWindowsOf(List.of(meId, otherId));
+
+        assertThat(result).containsKey(meId);
+        assertThat(result.get(meId)).isEmpty();
+        assertThat(result.get(otherId)).hasSize(1);
+    }
+
+    @Test
+    void preferredWindowsOf는_빈_userIds에_빈_맵을_반환한다() {
+        Map<Long, List<PreferredWindowInfo>> result = adapter
+                .preferredWindowsOf(List.of());
 
         assertThat(result).isEmpty();
     }

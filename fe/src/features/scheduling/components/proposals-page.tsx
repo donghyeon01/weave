@@ -2,7 +2,13 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '../../../lib/api-client'
-import type { ProposalStatus, ProposalSummary, Slot } from '../types'
+import {
+  formatRecurrence,
+  formatShortDate,
+  type ProposalStatus,
+  type ProposalSummary,
+  type Slot,
+} from '../types'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
@@ -113,6 +119,17 @@ export function ProposalsPage() {
           })
           return
         }
+        // 409 PROPOSAL-CONFLICT = 확정 시점 HARD 재검증 실패 (V2 scheduling 확장) —
+        // 회차 중 하나라도 참여자 일정과 겹쳐 서버가 확정을 거절했다
+        if (error instanceof ApiError && error.code === 'PROPOSAL-CONFLICT') {
+          void queryClient.invalidateQueries({ queryKey: ['scheduling', 'proposals'] })
+          setDetailId(null)
+          setToast({
+            variant: 'danger',
+            message: '일정 충돌 — 취소 후 다시 조율해 주세요.',
+          })
+          return
+        }
         // 409 PROPOSAL-NOT-AWAITING-CONFIRM = 이미 확정·취소 등 상태가 바뀐 제안 —
         // 목록을 재조회해 화면 상태를 서버와 맞춘다
         if (
@@ -204,12 +221,16 @@ export function ProposalsPage() {
                   </div>
                   <p className="text-sm font-medium text-text-secondary">
                     {formatSlotHuman(p.slot)}
+                    {p.occurrenceCount > 1 && ` 외 ${p.occurrenceCount - 1}회`}
                     {box === 'received' && ` · ${p.organizer.nickname} 님의 제안`}
                   </p>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <Badge>
                       수락 {p.acceptCount}/{p.totalCount}
                     </Badge>
+                    {p.recurrence != null && p.occurrenceCount > 1 && (
+                      <Badge>{formatRecurrence(p.recurrence)} · 총 {p.occurrenceCount}회</Badge>
+                    )}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -248,14 +269,14 @@ export function ProposalsPage() {
                       일정 확정
                     </Button>
                   )}
-                  {/* 취소는 계약상 ALL_ACCEPTED에서도 허용 */}
+                  {/* 취소는 계약상 ALL_ACCEPTED에서도 허용 — 시리즈는 전체가 취소된다 */}
                   {box === 'sent' && (p.status === 'PENDING' || p.status === 'ALL_ACCEPTED') && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setConfirmAction({ kind: 'cancel', id: p.id })}
                     >
-                      제안 취소
+                      {p.occurrenceCount > 1 ? '전체 취소' : '제안 취소'}
                     </Button>
                   )}
                   {p.status === 'ALL_ACCEPTED' && box === 'received' && (
@@ -331,6 +352,28 @@ export function ProposalsPage() {
               {formatSlotHuman(detailQuery.data.slot)} · 주최 {detailQuery.data.organizer.nickname} ·{' '}
               {STATUS_META[detailQuery.data.status].label}
             </p>
+            {detailQuery.data.recurrence != null && detailQuery.data.occurrenceCount > 1 && (
+              <div className="mt-2 rounded-xl border border-border bg-surface-muted/50 p-3 text-sm">
+                <p className="font-bold text-text">
+                  {formatRecurrence(detailQuery.data.recurrence)} · 총{' '}
+                  {detailQuery.data.occurrenceCount}회
+                </p>
+                {detailQuery.data.occurrences != null &&
+                  detailQuery.data.occurrences.length > 0 && (
+                    <ul className="mt-2 flex flex-col gap-1">
+                      {detailQuery.data.occurrences.map((o) => (
+                        <li
+                          key={o.date}
+                          className="text-xs font-medium text-text-secondary"
+                        >
+                          {formatShortDate(o.date)} {o.startTime.slice(0, 5)} ~{' '}
+                          {o.endTime.slice(0, 5)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+              </div>
+            )}
             <ul className="mt-3 space-y-1">
               {detailQuery.data.participants.map((p) => (
                 <li
@@ -416,7 +459,7 @@ export function ProposalsPage() {
                         setConfirmAction({ kind: 'cancel', id: detailQuery.data.id })
                       }}
                     >
-                      제안 취소
+                      {detailQuery.data.occurrenceCount > 1 ? '전체 취소' : '제안 취소'}
                     </Button>
                   </>
                 )}

@@ -17,6 +17,8 @@ export interface ChatRoomSummary {
   lastMessage: string | null
   lastMessageAt: string | null
   memberCount: number
+  /** 시리즈 조율의 총 회차 수 — 단일 제안 방은 1 (계약 §3.10, V2 scheduling 확장) */
+  occurrenceCount: number
 }
 
 export interface ChatMessage {

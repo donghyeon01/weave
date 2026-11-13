@@ -76,7 +76,7 @@ class ChatServiceTest {
     private ChatRoom newRoom(long proposalId, List<Long> members) {
         return chatService.createRoom(proposalId, "방" + proposalId, Mode.TIME,
                 LocalDateTime.of(2026, 12, 1, 10, 0), LocalDateTime.of(2026, 12, 1, 12, 0),
-                members);
+                members, 1);
     }
 
     private void assertError(ErrorCode code, Runnable r) {
@@ -93,6 +93,17 @@ class ChatServiceTest {
         assertThat(room.getMode()).isEqualTo(Mode.TIME);
         assertThat(room.getStartTime()).isEqualTo(LocalDateTime.of(2026, 12, 1, 10, 0));
         assertThat(room.getStatus()).isEqualTo(ChatRoom.Status.OPEN);
+        assertThat(room.getOccurrenceCount()).isEqualTo(1);
+    }
+
+    @Test
+    void createRoom_occurrenceCount가_스냅샷으로_저장된다() {
+        ChatRoom room = chatService.createRoom(9L, "정례방", Mode.TIME,
+                LocalDateTime.of(2026, 12, 1, 10, 0), LocalDateTime.of(2026, 12, 1, 12, 0),
+                List.of(meId), 4);
+
+        assertThat(roomRepository.findByProposalId(9L)).isPresent();
+        assertThat(room.getOccurrenceCount()).isEqualTo(4);
     }
 
     @Test

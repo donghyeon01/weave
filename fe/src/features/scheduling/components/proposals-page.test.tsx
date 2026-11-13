@@ -16,16 +16,23 @@ vi.mock('../../../lib/api-client', async (importOriginal) => {
 
 const apiFetchMock = vi.mocked(apiFetch)
 
-function item(id: number, status: ProposalStatus): ProposalSummary {
+function item(
+  id: number,
+  status: ProposalStatus,
+  extra: Partial<ProposalSummary> = {},
+): ProposalSummary {
   return {
     id,
     title: `제안 ${id}`,
     status,
     slot: { type: 'TIME', date: '2026-05-12', startTime: '14:00', endTime: '16:00' },
     organizer: { id: 2, nickname: '지우' },
+    recurrence: null,
+    occurrenceCount: 1,
     acceptCount: 2,
     totalCount: 3,
     createdAt: '2026-05-10T09:00:00',
+    ...extra,
   }
 }
 
@@ -139,6 +146,46 @@ describe('proposals-page', () => {
     await userEvent.click(btn)
 
     await screen.findByText('이미 상태가 바뀐 제안이에요. 목록을 새로고침했어요.')
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map(
+        (c) => (c[0] as { queryKey: string[] }).queryKey,
+      )
+      expect(keys).toContainEqual(['scheduling', 'proposals'])
+    })
+  })
+
+  it('시리즈 제안 행은 총 회차 배지·외 N-1회·전체 취소를 보여준다', async () => {
+    mockLists(
+      [],
+      [
+        item(9, 'PENDING', {
+          recurrence: { freq: 'WEEKLY', interval: 1, byDay: [2, 4], count: 8 },
+          occurrenceCount: 8,
+        }),
+      ],
+    )
+    render(<ProposalsPage />, { wrapper: wrapper(createQueryClient()) })
+    await userEvent.click(await screen.findByRole('tab', { name: /보낸 제안/ }))
+
+    expect(await screen.findByText(/외 7회/)).toBeInTheDocument()
+    expect(screen.getByText('매주 화·목 · 총 8회')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '전체 취소' })).toBeInTheDocument()
+  })
+
+  it('confirm 409(PROPOSAL-CONFLICT) — 일정 충돌 안내 + proposals 재조회', async () => {
+    const queryClient = createQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    mockLists([], [item(7, 'ALL_ACCEPTED')])
+    render(<ProposalsPage />, { wrapper: wrapper(queryClient) })
+    await userEvent.click(await screen.findByRole('tab', { name: /보낸 제안/ }))
+
+    const btn = await screen.findByRole('button', { name: '일정 확정' })
+    apiFetchMock.mockRejectedValueOnce(
+      new ApiError('PROPOSAL-CONFLICT', 409, '확정 시점에 일정이 겹쳐요'),
+    )
+    await userEvent.click(btn)
+
+    await screen.findByText('일정 충돌 — 취소 후 다시 조율해 주세요.')
     await waitFor(() => {
       const keys = invalidateSpy.mock.calls.map(
         (c) => (c[0] as { queryKey: string[] }).queryKey,

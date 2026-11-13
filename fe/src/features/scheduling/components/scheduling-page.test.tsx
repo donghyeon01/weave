@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -40,7 +40,32 @@ const CANDIDATE: Candidate = {
   slot: { type: 'TIME', date: '2026-05-15', startTime: '14:00', endTime: '16:00' },
 }
 
-function mockApis() {
+// 화·목 8회 시리즈 후보 — 회차별 percent는 첫 회차 100 → 이후 67로 최저 67
+const SERIES_OCCURRENCES = [
+  '2026-05-12', '2026-05-14', '2026-05-19', '2026-05-21',
+  '2026-05-26', '2026-05-28', '2026-06-02', '2026-06-04',
+].map((date, i) => ({
+  date,
+  percent: i === 0 ? 100 : 67,
+  availableCount: i === 0 ? 3 : 2,
+  breakdown: { direct: 1, calendarFree: 1, conditional: 0, unknown: 1, unavailable: 0 },
+}))
+
+const SERIES_CANDIDATE: Candidate = {
+  rank: 1,
+  percent: 67,
+  availableCount: 2,
+  totalCount: 3,
+  breakdown: { direct: 1, calendarFree: 1, conditional: 0, unknown: 1, unavailable: 0 },
+  preferenceScore: 0,
+  preferenceRespondentCount: 2,
+  occurrenceCount: 8,
+  minOccurrencePercent: 67,
+  occurrences: SERIES_OCCURRENCES,
+  slot: { type: 'TIME', date: '2026-05-12', startTime: '19:00', endTime: '21:00' },
+}
+
+function mockApis(candidates: Candidate[] = [CANDIDATE]) {
   apiFetchMock.mockImplementation(async (path, init) => {
     const url = typeof path === 'string' ? path : ''
     const method = init?.method ?? 'GET'
@@ -48,7 +73,7 @@ function mockApis() {
     if (url === '/api/users/me') return { id: 1, nickname: '나' }
     if (url === '/api/scheduling' && method === 'POST') {
       return {
-        candidates: [CANDIDATE],
+        candidates,
         participantIds: [2, 3],
         computedAt: '2026-05-12T09:00:00Z',
       }
@@ -184,6 +209,111 @@ describe('scheduling-page', () => {
       expect(call).toBeDefined()
       const body = call?.[1]?.body as Record<string, unknown>
       expect(body.participantIds).toEqual([2, 3])
+    })
+  })
+
+  it('반복 요일을 고르면 추천 요청에 recurrence를 보낸다', async () => {
+    await renderPage()
+    await userEvent.click(screen.getByRole('button', { name: '화' }))
+    await userEvent.click(screen.getByRole('button', { name: '목' }))
+    await runRecommend()
+
+    const call = apiFetchMock.mock.calls.find(
+      (c) => c[0] === '/api/scheduling' && c[1]?.method === 'POST',
+    )
+    const body = call?.[1]?.body as Record<string, unknown>
+    // count는 첫 회차 포함 총 발생 횟수 — 기본값 4, byDay는 ISO 요일(화=2·목=4)
+    expect(body.recurrence).toEqual({ freq: 'WEEKLY', interval: 1, byDay: [2, 4], count: 4 })
+  })
+
+  it('날짜 약속 모드에서는 recurrence를 보내지 않는다', async () => {
+    await renderPage()
+    // 요일을 골라도 DATE 모드 전환 시 계약상 recurrence 전송 금지
+    await userEvent.click(screen.getByRole('button', { name: '화' }))
+    await userEvent.click(screen.getByRole('tab', { name: '날짜 약속' }))
+    await runRecommend()
+
+    const call = apiFetchMock.mock.calls.find(
+      (c) => c[0] === '/api/scheduling' && c[1]?.method === 'POST',
+    )
+    const body = call?.[1]?.body as Record<string, unknown>
+    expect(body.mode).toBe('DATE')
+    expect(body.recurrence).toBeUndefined()
+  })
+
+  it('반복 조건을 바꾸면 이전 시리즈 후보가 지워진다', async () => {
+    mockApis([SERIES_CANDIDATE])
+    await renderPage()
+    await userEvent.click(screen.getByRole('button', { name: '화' }))
+    await userEvent.click(screen.getByRole('button', { name: /AI 추천 슬롯 찾기/ }))
+    await screen.findByText(/전 회차 공통 가능 2\/전체 3/)
+
+    // 요일 추가 → condKey 변경 → 후보 리셋
+    await userEvent.click(screen.getByRole('button', { name: '목' }))
+    await screen.findByText('아직 추천 결과가 없어요')
+  })
+
+  it('시리즈 후보는 총 회차·최저 회차·회차별 보기·선호 적합도를 보여준다', async () => {
+    mockApis([SERIES_CANDIDATE])
+    await renderPage()
+    await userEvent.click(screen.getByRole('button', { name: '화' }))
+    await userEvent.click(screen.getByRole('button', { name: '목' }))
+    await userEvent.click(screen.getByRole('button', { name: /AI 추천 슬롯 찾기/ }))
+    await screen.findByText(/전 회차 공통 가능 2\/전체 3/)
+
+    expect(screen.getAllByText('총 8회').length).toBeGreaterThan(0)
+    expect(screen.getByText('최저 회차 67%')).toBeInTheDocument()
+    expect(screen.getByText(/매주 화·목 · 총 8회/)).toBeInTheDocument()
+    // preferenceScore 0도 표시 — null만 숨긴다
+    expect(screen.getByText(/선호 적합도 0점/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /회차별 보기/ }))
+    expect(await screen.findByText(/5\/12 \(화\) 19:00 ~ 21:00/)).toBeInTheDocument()
+    // 나머지 7회차는 모두 67%·2/3명 — 동일 행 7개
+    expect(screen.getAllByText(/67% · 2\/3명 가능/)).toHaveLength(7)
+  })
+
+  it('시리즈 후보의 제안 생성은 slot(첫 회차)+recurrence를 함께 보낸다', async () => {
+    mockApis([SERIES_CANDIDATE])
+    await renderPage()
+    await userEvent.click(screen.getByRole('button', { name: '화' }))
+    await userEvent.click(screen.getByRole('button', { name: '목' }))
+    await userEvent.click(screen.getByRole('button', { name: /AI 추천 슬롯 찾기/ }))
+    await screen.findByText(/전 회차 공통 가능 2\/전체 3/)
+
+    await userEvent.click(screen.getAllByRole('button', { name: '제안 보내기' })[0])
+    // 모달에 시리즈 요약 — 첫 회차·기간·최저 회차 경고
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/매주 화·목 · 총 8회/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/첫 회차/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/가장 가용 인원이 적은 회차/)).toBeInTheDocument()
+
+    await userEvent.type(
+      within(dialog).getByPlaceholderText('예: 캡스톤 회의'),
+      '화목 스탠드업',
+    )
+    await userEvent.click(
+      within(dialog).getAllByRole('button', { name: '제안 보내기' }).slice(-1)[0],
+    )
+
+    await waitFor(() => {
+      const call = apiFetchMock.mock.calls.find(
+        (c) => c[0] === '/api/scheduling/proposals' && c[1]?.method === 'POST',
+      )
+      expect(call).toBeDefined()
+      const body = call?.[1]?.body as Record<string, unknown>
+      expect(body.slot).toEqual({
+        type: 'TIME',
+        date: '2026-05-12',
+        startTime: '19:00',
+        endTime: '21:00',
+      })
+      expect(body.recurrence).toEqual({
+        freq: 'WEEKLY',
+        interval: 1,
+        byDay: [2, 4],
+        count: 4,
+      })
     })
   })
 })

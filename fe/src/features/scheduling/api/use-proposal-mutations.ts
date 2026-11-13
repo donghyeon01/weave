@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../../lib/api-client'
-import type { ProposalResponse, Slot } from '../types'
+import type { ProposalResponse, RecurrenceSpec, Slot } from '../types'
 
 // respond는 확정 시 서버가 EVENTS를 만들므로 ['events']까지 무효화한다 (열린 캘린더 갱신).
 // 제안 생명주기는 채팅방과 연동된다(생성→OPEN, 확정·취소→CLOSED) — ['chat','rooms']도 무효화한다.
@@ -21,7 +21,13 @@ function useProposalInvalidator(extra: string[][] = []) {
 export function useCreateProposal() {
   const invalidate = useProposalInvalidator()
   return useMutation({
-    mutationFn: (body: { title: string; slot: Slot; participantIds: number[] }) =>
+    mutationFn: (body: {
+      title: string
+      slot: Slot
+      participantIds: number[]
+      /** 정례 제안이면 반복 패턴 (계약 §3.7) — slot은 첫 회차 */
+      recurrence?: RecurrenceSpec
+    }) =>
       apiFetch<ProposalResponse>('/api/scheduling/proposals', {
         method: 'POST',
         body,

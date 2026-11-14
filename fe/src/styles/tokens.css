@@ -96,6 +96,11 @@
 
   /* === 외부 브랜드 === */
   --color-brand-kakao: #fee500; /* 카카오 로그인 버튼 — Kakao 브랜드 가이드 색 */
+  /* Google "G" 로고 4색 — 브랜드 가이드 고정색, 다크에서도 반전하지 않는다 */
+  --color-brand-google-blue: #4285f4;
+  --color-brand-google-green: #34a853;
+  --color-brand-google-yellow: #fbbc05;
+  --color-brand-google-red: #ea4335;
 
   /* === 마이크 === */
   --color-milk-white: #fcfbf7; /* 따뜻한 화이트 포인트 */

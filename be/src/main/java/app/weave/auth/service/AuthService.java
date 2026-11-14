@@ -24,6 +24,7 @@ public class AuthService {
     private final SessionService sessionService;
     private final JwtProvider jwtProvider;
     private final KakaoOAuthClient kakaoClient;
+    private final GoogleOAuthClient googleClient;
     private final boolean demoEnabled;
 
     /** 데모 로그인 IP당 10회/시간 — 공개 토큰 발급 엔드포인트 남용 차단. */
@@ -34,12 +35,14 @@ public class AuthService {
 
     public AuthService(UserRepository userRepository, SessionService sessionService,
             JwtProvider jwtProvider, KakaoOAuthClient kakaoClient,
+            GoogleOAuthClient googleClient,
             @org.springframework.beans.factory.annotation.Value("${weave.demo-enabled:false}")
             boolean demoEnabled) {
         this.userRepository = userRepository;
         this.sessionService = sessionService;
         this.jwtProvider = jwtProvider;
         this.kakaoClient = kakaoClient;
+        this.googleClient = googleClient;
         this.demoEnabled = demoEnabled;
     }
 
@@ -50,6 +53,16 @@ public class AuthService {
                 .orElseGet(() -> userRepository.save(User.signup(
                         profile.email(), profile.nickname(), profile.profileImage(),
                         User.Provider.KAKAO)));
+        return issueSession(user, ua, ip);
+    }
+
+    @Transactional
+    public LoginResult loginWithGoogle(String code, String redirectUri, String ua, String ip) {
+        var profile = googleClient.fetchProfile(code, redirectUri);
+        User user = userRepository.findByEmail(profile.email())
+                .orElseGet(() -> userRepository.save(User.signup(
+                        profile.email(), profile.nickname(), profile.profileImage(),
+                        User.Provider.GOOGLE)));
         return issueSession(user, ua, ip);
     }
 

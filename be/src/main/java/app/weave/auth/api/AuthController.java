@@ -55,9 +55,17 @@ public class AuthController {
     }
 
     @PostMapping("/oauth/kakao")
-    public ResponseEntity<TokenResponse> kakao(@Valid @RequestBody KakaoRequest req,
+    public ResponseEntity<TokenResponse> kakao(@Valid @RequestBody OAuthCodeRequest req,
             HttpServletRequest http) {
         var result = authService.loginWithKakao(req.code(), req.redirectUri(),
+                http.getHeader("User-Agent"), http.getRemoteAddr());
+        return tokenResponse(result, HttpStatus.OK);
+    }
+
+    @PostMapping("/oauth/google")
+    public ResponseEntity<TokenResponse> google(@Valid @RequestBody OAuthCodeRequest req,
+            HttpServletRequest http) {
+        var result = authService.loginWithGoogle(req.code(), req.redirectUri(),
                 http.getHeader("User-Agent"), http.getRemoteAddr());
         return tokenResponse(result, HttpStatus.OK);
     }
@@ -120,7 +128,7 @@ public class AuthController {
                 .build();
     }
 
-    public record KakaoRequest(@NotBlank String code, @NotBlank String redirectUri) {
+    public record OAuthCodeRequest(@NotBlank String code, @NotBlank String redirectUri) {
     }
 
     public record TokenResponse(String accessToken, String tokenType, int expiresIn,

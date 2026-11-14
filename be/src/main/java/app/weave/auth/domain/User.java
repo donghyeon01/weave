@@ -13,11 +13,11 @@ import jakarta.persistence.Table;
 public class User extends BaseTimeEntity {
 
     /**
-     * 가입 경로. DB에는 소문자로 저장된다 — users.provider CHECK ('kakao','demo').
+     * 가입 경로. DB에는 소문자로 저장된다 — users.provider CHECK ('kakao','demo','google').
      * 변환은 ProviderConverter가 담당하므로 @Enumerated(STRING)을 쓰면 CHECK 위반.
      */
     public enum Provider {
-        KAKAO, DEMO
+        KAKAO, DEMO, GOOGLE
     }
 
     /** 화면 테마 — 소문자 저장은 UserThemeConverter 참조 (chk_users_theme). */

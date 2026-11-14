@@ -1,6 +1,6 @@
 import { cx } from '../../utils/cx'
 
-export type ButtonVariant = 'primary' | 'brutal' | 'ghost' | 'danger' | 'kakao'
+export type ButtonVariant = 'primary' | 'brutal' | 'ghost' | 'danger' | 'kakao' | 'google'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
 export interface ButtonStyleOptions {
@@ -9,15 +9,19 @@ export interface ButtonStyleOptions {
   fullWidth?: boolean
 }
 
+// 아웃라인 계열(ghost·google) 공용 — google은 Figma Variant=google이 ghost와 동형
+const OUTLINE =
+  'rounded-xl border-2 border-border-strong bg-surface text-text shadow-brutal-sm hover:bg-surface-muted'
+
 // design-system button.md 스펙 — 파스텔·브랜드 채움 위 텍스트는 고정 on-* 토큰 (danger→on-danger, kakao→on-tint)
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'rounded-full border-2 border-primary bg-surface-muted text-text hover:border-primary-dark',
   brutal:
     'rounded-xl border-2 border-border-strong bg-accent-deep text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal-md',
-  ghost:
-    'rounded-xl border-2 border-border-strong bg-surface text-text shadow-brutal-sm hover:bg-surface-muted',
+  ghost: OUTLINE,
   danger: 'rounded-xl border-2 border-border-strong bg-danger text-on-danger shadow-brutal-sm',
   kakao: 'rounded-xl border border-brand-kakao bg-brand-kakao text-on-tint',
+  google: OUTLINE,
 }
 
 const SIZES: Record<ButtonSize, string> = {

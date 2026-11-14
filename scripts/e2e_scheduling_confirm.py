@@ -15,9 +15,11 @@ V2 scheduling extension의 마지막 미검증 경로다. 데모 로그인은 de
 사용:
     python scripts/e2e_scheduling_confirm.py [--ui] [--base-url http://localhost:4173]
 
---ui를 주면 P1 수락을 B의 실제 브라우저 세션으로 수행한다 — 알림 벨의 "총 N회"
-배지·인라인 수락 숨김, 보관함 상세 모달의 정례 요약·회차 목록, 수락 액션까지
-UI 경로로 검증한다. 미지정 시 P1 수락은 API로 수행한다.
+--ui를 주면 P1 전 구간을 브라우저 세션으로 수행한다 — B의 알림 배지 "총 N회"·
+인라인 수락 숨김, 보관함 상세 모달의 정례 요약·회차 목록, 수락 액션, 그리고
+A(주최자)의 보낸 제안 탭 "일정 확정" 클릭까지 2계정 혼합 UI 경로로 검증한다.
+P2 confirm도 UI로 1회 시도해 충돌 토스트를 확인한 뒤 API 409 단언을 유지한다.
+미지정 시 수락·confirm 모두 API로 수행한다.
 
 사전 조건: be(8081, DEMO_ENABLED=true)·weave-mysql 컨테이너 기동.
 --ui 사용 시 fe dev/preview 서버(base-url)도 필요. fe 불필요(API 레벨).
@@ -158,20 +160,27 @@ def proposal_events(token, title):
             if str(e.get('source')).lower() == 'proposal' and e.get('title') == title]
 
 
-def ui_accept_via_browser(base_url, jiwoo_id, title, count):
-    """B 브라우저 세션 — 알림 배지 확인 → 보관함 상세 → 수락.
+def issue_browser_session(user_id, ua):
+    """브라우저 컨텍스트용 refresh 세션을 발급하고 쿠키 원문을 반환한다.
 
-    세션은 refresh_tokens 행 + 쿠키 + 컨텍스트 UA 일치로 복원한다
-    (e2e_share_flow.py ui_pass와 같은 방식 — 세션 UA 검증 때문).
+    세션 UA 검증 때문에 브라우저 컨텍스트의 user_agent와 행의 user_agent가
+    일치해야 한다 (e2e_share_flow.py ui_pass와 같은 방식).
     """
-    from playwright.sync_api import sync_playwright
-
-    ua = 'e2e-confirm-browser'
     raw = secrets.token_hex(32)
     h = hashlib.sha256(raw.encode()).hexdigest()
     expiry = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
     mysql(f"INSERT INTO refresh_tokens (user_id, token_hash, user_agent, expiry_date, last_accessed_at) "
-          f"VALUES ({jiwoo_id}, '{h}', '{ua}', '{expiry}', NOW())")
+          f"VALUES ({user_id}, '{h}', '{ua}', '{expiry}', NOW())")
+    return raw
+
+
+def ui_accept_via_browser(base_url, jiwoo_id, title, count):
+    """B 브라우저 세션 — 알림 배지 확인 → 보관함 상세 → 수락.
+    """
+    from playwright.sync_api import sync_playwright
+
+    ua = 'e2e-confirm-browser'
+    raw = issue_browser_session(jiwoo_id, ua)
 
     out = []
     with sync_playwright() as p:
@@ -235,14 +244,67 @@ def ui_accept_via_browser(base_url, jiwoo_id, title, count):
     return out
 
 
+def ui_confirm_via_browser(base_url, user_id, title, expect):
+    """주최자 브라우저 세션 — 보낸 제안 탭에서 '일정 확정' 클릭.
+
+    expect='confirmed': 성공 토스트 '약속을 확정했어요' 대기
+    expect='conflict': 409 PROPOSAL-CONFLICT → danger 토스트 '일정 충돌' 대기
+    """
+    from playwright.sync_api import sync_playwright
+
+    ua = 'e2e-confirm-browser-a'
+    raw = issue_browser_session(user_id, ua)
+
+    out = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        ctx = browser.new_context(viewport={'width': 1440, 'height': 900}, user_agent=ua)
+        ctx.add_cookies([{'name': 'refresh_token', 'value': raw,
+                          'domain': 'localhost', 'path': '/'}])
+        page = ctx.new_page()
+        try:
+            page.goto(base_url + '/app', wait_until='load')
+            page.wait_for_timeout(6000)
+            logged = '/app' in page.url
+            out.append(('A 브라우저 세션 복원(쿠키 로그인)', logged, page.url))
+            if not logged:
+                return out
+
+            page.goto(base_url + '/app/proposals', wait_until='load')
+            page.wait_for_timeout(2500)
+            page.get_by_role('tab', name='보낸 제안').click()
+            page.wait_for_timeout(1500)
+            row = page.locator('li', has_text=title).first
+            try:
+                row.get_by_role('button', name='일정 확정').wait_for(
+                    state='visible', timeout=8000)
+                out.append(('보낸 제안 일정 확정 버튼 노출', True, ''))
+            except Exception:
+                out.append(('보낸 제안 일정 확정 버튼 노출', False, ''))
+                return out
+            row.get_by_role('button', name='일정 확정').click()
+            if expect == 'confirmed':
+                page.get_by_text('약속을 확정했어요').wait_for(timeout=10000)
+                out.append(('UI 확정 → 성공 토스트', True, ''))
+            else:
+                page.get_by_text('일정 충돌').wait_for(timeout=10000)
+                out.append(('UI 확정 → 충돌 토스트', True, ''))
+        except Exception as e:
+            out.append((f'A UI 확정 패스 예외({expect})', False, f'{type(e).__name__}: {e}'))
+        finally:
+            browser.close()
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--ui', action='store_true',
-                    help='P1 수락을 B 브라우저 세션으로 수행 (fe 서버 필요)')
+                    help='P1 수락·confirm을 브라우저 세션으로 수행 (fe 서버 필요)')
     ap.add_argument('--base-url', default='http://localhost:4173')
     args = ap.parse_args()
 
     jiwoo_id = uid(JIWOO_EMAIL)
+    demo_id = uid(DEMO_EMAIL)
 
     login = requests.post(f'{API}/api/auth/demo',
                           headers={'User-Agent': 'e2e-confirm'}, timeout=15)
@@ -291,15 +353,28 @@ def main():
                    f'{res.status_code}')
         else:
             r.step('P1 UI 수락 → ALL_ACCEPTED', True, detail_now.get('status'))
+
+        # A(주최자) confirm도 브라우저 UI로 — B UI 수락과 합쳐 2계정 혼합 UI 경로
+        for name, ok, detail in ui_confirm_via_browser(
+                args.base_url, demo_id, p1_title, 'confirmed'):
+            r.step(name, ok, detail)
+        detail_now = call(token_a, 'GET', f'/api/scheduling/proposals/{p1_id}').json()
+        if detail_now.get('status') != 'CONFIRMED':
+            res = call(token_a, 'POST', f'/api/scheduling/proposals/{p1_id}/confirm')
+            r.step('P1 API 폴백 confirm',
+                   res.status_code == 200 and res.json().get('status') == 'CONFIRMED',
+                   f'{res.status_code}')
+        else:
+            r.step('P1 UI 확정 → CONFIRMED', True, detail_now.get('status'))
     else:
         res = call(token_b, 'POST', f'/api/scheduling/proposals/{p1_id}/respond',
                    json={'response': 'ACCEPTED'})
         ok = res.status_code == 200 and res.json().get('status') == 'ALL_ACCEPTED'
         r.step('B ACCEPTED → ALL_ACCEPTED', ok, f'{res.status_code} {res.text[:120]}')
 
-    res = call(token_a, 'POST', f'/api/scheduling/proposals/{p1_id}/confirm')
-    ok = res.status_code == 200 and res.json().get('status') == 'CONFIRMED'
-    r.step('A confirm → CONFIRMED', ok, f'{res.status_code} {res.text[:120]}')
+        res = call(token_a, 'POST', f'/api/scheduling/proposals/{p1_id}/confirm')
+        ok = res.status_code == 200 and res.json().get('status') == 'CONFIRMED'
+        r.step('A confirm → CONFIRMED', ok, f'{res.status_code} {res.text[:120]}')
 
     for name, tok in (('A(demo)', token_a), ('B(jiwoo)', token_b)):
         evs = proposal_events(tok, p1_title)
@@ -323,6 +398,12 @@ def main():
     res = call(token_b, 'POST', '/api/events', json=BLOCK)
     r.step('B HARD 차단 이벤트 생성 (11/24 19:30~20:30)',
            res.status_code in (200, 201), f'{res.status_code}')
+
+    # UI 패스에서는 충돌 토스트 표면도 1회 확인 — 이어서 API 409 단언은 그대로 유지
+    if args.ui:
+        for name, ok, detail in ui_confirm_via_browser(
+                args.base_url, demo_id, p2['title'], 'conflict'):
+            r.step(name, ok, detail)
 
     res = call(token_a, 'POST', f'/api/scheduling/proposals/{p2_id}/confirm')
     body = res.json() if res.headers.get('content-type', '').startswith('application/json') else {}

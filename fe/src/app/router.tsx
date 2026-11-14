@@ -9,6 +9,9 @@ const LoginRoute = lazy(() =>
 const KakaoCallbackRoute = lazy(() =>
   import('./routes/kakao-callback').then((m) => ({ default: m.KakaoCallbackRoute })),
 )
+const GoogleCallbackRoute = lazy(() =>
+  import('./routes/google-callback').then((m) => ({ default: m.GoogleCallbackRoute })),
+)
 const AppRoute = lazy(() => import('./routes/app').then((m) => ({ default: m.AppRoute })))
 const TodoRoute = lazy(() => import('./routes/app/todo').then((m) => ({ default: m.TodoRoute })))
 const CalendarRoute = lazy(() =>
@@ -62,6 +65,7 @@ export const router = createBrowserRouter([
     ],
   },
   { path: '/login/kakao/callback', element: lazyElement(<KakaoCallbackRoute />) },
+  { path: '/login/google/callback', element: lazyElement(<GoogleCallbackRoute />) },
   {
     path: '/app',
     element: lazyElement(<AppRoute />),

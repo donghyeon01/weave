@@ -88,6 +88,19 @@ describe('login-modal', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
+  it('Google 버튼이 표시되고 클라이언트 ID 미설정 시 설정 안내를 띄운다', async () => {
+    renderModal()
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Google로 시작하기' }),
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Google 로그인 설정이 아직 완료되지 않았어요.',
+    )
+    expect(useAuthStore.getState().status).toBe('guest')
+  })
+
   it('X 닫기가 랜딩(/)으로 돌아간다', async () => {
     renderModal()
     await userEvent.click(screen.getByRole('button', { name: '닫기' }))

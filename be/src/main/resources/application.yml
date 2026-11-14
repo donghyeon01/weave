@@ -44,6 +44,9 @@ weave:
   kakao:
     client-id: ${KAKAO_CLIENT_ID:}
     client-secret: ${KAKAO_CLIENT_SECRET:}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
   # cross-site 배포는 refresh 쿠키가 fe 도메인과 API 도메인을 가로질러야 해서 None 필수
   cookie-samesite: ${COOKIE_SAMESITE:Strict}
 

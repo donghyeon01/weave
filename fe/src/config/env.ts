@@ -2,6 +2,8 @@ declare global {
   interface ImportMetaEnv {
     readonly VITE_KAKAO_CLIENT_ID?: string
     readonly VITE_KAKAO_REDIRECT_URI?: string
+    readonly VITE_GOOGLE_CLIENT_ID?: string
+    readonly VITE_GOOGLE_REDIRECT_URI?: string
     readonly VITE_API_BASE_URL?: string
   }
 }
@@ -15,4 +17,7 @@ export const env = {
   kakaoClientId: import.meta.env.VITE_KAKAO_CLIENT_ID ?? '',
   kakaoRedirectUri:
     import.meta.env.VITE_KAKAO_REDIRECT_URI ?? 'http://localhost:5173/login/kakao/callback',
+  googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '',
+  googleRedirectUri:
+    import.meta.env.VITE_GOOGLE_REDIRECT_URI ?? 'http://localhost:5173/login/google/callback',
 } as const

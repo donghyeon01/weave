@@ -148,7 +148,6 @@
   --animate-toast-in: toast-in 200ms ease both;
   --animate-toast-out: toast-out 150ms ease both;
   --animate-page-in: page-in 200ms ease backwards;
-  --animate-stagger-item: stagger-item 200ms ease calc(var(--stagger-i, 0) * 40ms) backwards;
   --animate-fade-in: fade-in 200ms ease backwards;
   --animate-fade-out: fade-out 150ms ease both;
 }
@@ -234,4 +233,12 @@ body {
 @keyframes fade-out {
   from { opacity: 1; }
   to { opacity: 0; }
+}
+
+/* stagger-item은 @theme 토큰이 아니라 @utility — animation 단축 안의
+ * calc(var(--stagger-i)*40ms)가 브라우저 파서에 버려져 delay가 0이 된다.
+ * animation과 animation-delay를 분리 선언해야 longhand calc(var())가 해석된다. */
+@utility animate-stagger-item {
+  animation: stagger-item 200ms ease backwards;
+  animation-delay: calc(var(--stagger-i, 0) * 40ms);
 }

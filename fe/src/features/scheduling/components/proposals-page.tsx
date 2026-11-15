@@ -11,6 +11,7 @@ import {
 } from '../types'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
 import { Modal } from '../../../components/ui/modal'
 import { Toast } from '../../../components/ui/toast'
@@ -212,7 +213,10 @@ export function ProposalsPage() {
             return (
               <li
                 key={p.id}
-                className="flex animate-stagger-item items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-card"
+                className={cx(
+                  'flex animate-stagger-item items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-card',
+                  cardClasses({ variant: 'clean' }),
+                )}
                 // stagger 지연은 --stagger-i × 40ms — 상한 7이면 8번째 항목부터 같은 시각에 나타난다
                 style={{ '--stagger-i': Math.min(i, 7) } as CSSProperties}
               >

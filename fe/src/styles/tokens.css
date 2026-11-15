@@ -136,13 +136,21 @@
   --transition-normal: 200ms ease;
   --transition-slow: 300ms ease;
 
-  /* === 모션 (계획서 §7 — 진입 200ms / 퇴출 150ms) === */
-  --animate-modal-in: modal-in 200ms ease both;
+  /* === 모션 (계획서 §7 — 진입 200ms / 퇴출 150ms) ===
+   * fill-mode: 진입은 backwards — 종료 후 transform 잔존이
+   * fixed 자손의 containing block을 만들지 않도록 자연 상태로 해제.
+   * 퇴출은 both — 언마운트 타이머와 animation 종료의 드리프트 동안
+   * 최종(hidden) 상태를 유지해 재표시 플래시를 막는다.
+   * 예외: toast-in/out은 both — 키프레임의 translate(-50%)가 수평 중앙 정렬을
+   * 담당하므로 backwards로 끝나면 transform이 해제돼 토스트가 점프한다. */
+  --animate-modal-in: modal-in 200ms ease backwards;
   --animate-modal-out: modal-out 150ms ease both;
   --animate-toast-in: toast-in 200ms ease both;
   --animate-toast-out: toast-out 150ms ease both;
-  --animate-page-in: page-in 200ms ease both;
-  --animate-stagger-item: stagger-item 200ms ease both;
+  --animate-page-in: page-in 200ms ease backwards;
+  --animate-stagger-item: stagger-item 200ms ease calc(var(--stagger-i, 0) * 40ms) backwards;
+  --animate-fade-in: fade-in 200ms ease backwards;
+  --animate-fade-out: fade-out 150ms ease both;
 }
 
 /* Pretendard 전역 적용 */
@@ -217,4 +225,13 @@ body {
 @keyframes stagger-item {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+/* 전체화면 오버레이용 — scale 키프레임은 가장자리 미커버 아티팩트를 만들어 opacity만 적용 */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }

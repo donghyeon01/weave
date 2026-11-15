@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -21,6 +21,10 @@ if (typeof document !== 'undefined') {
 // 모듈 레벨 오픈 스택 — 중첩 모달에서 Escape·Tab 트랩은 최상위 인스턴스만 처리하고,
 // body overflow 잠금은 마지막 모달이 닫힐 때 해제한다. (이슈 #3 F7)
 const openModals: symbol[] = []
+
+// 퇴출 애니메이션(150ms) 동안 DOM을 유지하기 위한 삼단계 phase
+type Phase = 'closed' | 'open' | 'exiting'
+const EXIT_MS = 150 // animate-modal-out duration과 일치
 
 interface ModalProps {
   open: boolean
@@ -47,10 +51,43 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
     onCloseRef.current = onClose
   }, [onClose])
 
+  const [phase, setPhase] = useState<Phase>(open ? 'open' : 'closed')
+  // effect 안에서 최신 phase를 동기적으로 읽기 위한 미러 — 같은 커밋의 연속 전이 판정용
+  const phaseRef = useRef<Phase>(phase)
+  const exitTimer = useRef<ReturnType<typeof setTimeout>>(null)
+  const mounted = phase !== 'closed'
+
+  // open prop 전이를 phase로 변환 — 닫힘 요청 시 즉시 언마운트하지 않고
+  // exiting(150ms) 후 closed로 내린다. 퇴출 중 재오픈하면 타이머를 해제하고 open 복귀.
+  // useLayoutEffect — 페인트 전 동기 재렌더로 open→portal 표시가 1프레임 밀리지 않게 한다.
+  useLayoutEffect(() => {
+    if (open) {
+      if (exitTimer.current !== null) {
+        clearTimeout(exitTimer.current)
+        exitTimer.current = null
+      }
+      phaseRef.current = 'open'
+      setPhase('open')
+      return
+    }
+    if (phaseRef.current === 'closed') return
+    phaseRef.current = 'exiting'
+    setPhase('exiting')
+    exitTimer.current = setTimeout(() => {
+      exitTimer.current = null
+      phaseRef.current = 'closed'
+      setPhase('closed')
+    }, EXIT_MS)
+    return () => {
+      if (exitTimer.current !== null) clearTimeout(exitTimer.current)
+    }
+  }, [open])
+
   // 포커스 캡처·이동은 useLayoutEffect — paint 전에 실행돼 호출자 포커스를 잡는다.
   // activeElement가 이미 BODY로 해제된 경우(Enter 활성화)는 마지막 포커스 추적으로 복구한다.
+  // mounted 기준 — open→exiting 전이에서는 재실행되지 않아 퇴출 동안 잠금·트랩이 유지된다.
   useLayoutEffect(() => {
-    if (!open) return
+    if (!mounted) return
     if (previousRef.current === null) {
       const active = document.activeElement
       const candidate = active instanceof HTMLElement && active !== document.body
@@ -102,24 +139,26 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
       if (i !== -1) openModals.splice(i, 1)
       if (openModals.length === 0) document.body.style.overflow = ''
     }
-  }, [open])
+  }, [mounted])
 
   // 닫힐 때 호출자로 포커스 복귀 — cleanup이 아닌 별도 effect여야 StrictMode의
-  // 마운트 cleanup에서 조기 복원되지 않는다.
+  // 마운트 cleanup에서 조기 복원되지 않는다. 퇴출 애니메이션이 끝난 mounted→false 시점에 복원.
   useEffect(() => {
-    if (open) return
+    if (mounted) return
     const prev = previousRef.current
     previousRef.current = null
     if (prev !== null && prev.isConnected) {
       prev.focus()
     }
-  }, [open])
+  }, [mounted])
 
-  if (!open) return null
+  if (!mounted) return null
+
+  const exiting = phase === 'exiting'
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-text/40 p-4 backdrop-blur"
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-text/40 p-4 backdrop-blur ${exiting ? 'animate-fade-out' : 'animate-fade-in'}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCloseRef.current()
       }}
@@ -130,7 +169,7 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-xl border-2 border-border-strong bg-surface px-6 py-5 shadow-brutal-md outline-none"
+        className={`relative flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-xl border-2 border-border-strong bg-surface px-6 py-5 shadow-brutal-md outline-none ${exiting ? 'animate-modal-out' : 'animate-modal-in'}`}
       >
         <button
           type="button"

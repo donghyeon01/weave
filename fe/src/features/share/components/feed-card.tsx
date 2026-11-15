@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 import { ITEM_TYPE_LABEL, type FeedItem } from '../types'
 import { relativeTime } from '../time'
@@ -29,7 +30,10 @@ export function FeedCard({ item, showOwner = true }: { item: FeedItem; showOwner
     <li>
       <Link
         to={`/app/shared/${item.shareId}`}
-        className="block rounded-xl border border-border bg-surface p-5 shadow-card transition duration-150 hover:bg-surface-muted/60"
+        className={cx(
+          'block rounded-xl border border-border bg-surface p-5 shadow-card hover:bg-surface-muted/60',
+          cardClasses({ variant: 'clean' }),
+        )}
       >
         {showOwner ? (
           <div className="flex items-start justify-between gap-3">

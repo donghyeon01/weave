@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Badge } from '../../../components/ui/badge'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 
 // patterns.md §랜딩 구성 패턴 — 섹션 구분은 배경 교대 + 2px border-strong 경계선
@@ -64,6 +65,7 @@ export function BrutalCard({
     <div
       className={cx(
         'flex flex-col gap-2 rounded-2xl border-2 border-border-strong bg-surface px-5 pb-4 pt-5 shadow-brutal-md',
+        cardClasses({ variant: 'brutal' }),
         className,
       )}
     >

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
 import { Modal } from '../../../components/ui/modal'
 import { Toast } from '../../../components/ui/toast'
@@ -415,7 +416,10 @@ export function FriendsPage() {
           {received.map((r) => (
             <li
               key={r.friendshipId}
-              className="flex items-center gap-3 rounded-2xl border-2 border-border-strong bg-surface px-4 py-3 shadow-brutal-sm"
+              className={cx(
+                'flex items-center gap-3 rounded-2xl border-2 border-border-strong bg-surface px-4 py-3 shadow-brutal-sm',
+                cardClasses({ variant: 'brutal' }),
+              )}
             >
               <Avatar user={r.user} />
               <div className="min-w-0 flex-1">
@@ -452,7 +456,10 @@ export function FriendsPage() {
           {sent.map((r) => (
             <li
               key={r.friendshipId}
-              className="flex items-center gap-3 rounded-2xl border-2 border-border-strong bg-surface px-4 py-3 shadow-brutal-sm"
+              className={cx(
+                'flex items-center gap-3 rounded-2xl border-2 border-border-strong bg-surface px-4 py-3 shadow-brutal-sm',
+                cardClasses({ variant: 'brutal' }),
+              )}
             >
               <Avatar user={r.user} />
               <div className="min-w-0 flex-1">

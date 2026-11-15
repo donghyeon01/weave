@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Badge } from '../../../components/ui/badge'
 import { buttonClasses } from '../../../components/ui/button-styles'
+import { Reveal } from '../../../components/ui/reveal'
 import { BrutalCard, LandingSection, SectionHeading } from './section-shell'
 
 // Figma 151:1000·4:2379·151:1016·151:1043 — 문제 3카드 / 기능 3카드(아이콘+미니 위젯) / 과정 4스텝 / 추천 결과 카드.
@@ -73,7 +74,7 @@ function FeatureCard({
   widget: ReactNode
 }) {
   return (
-    <div className="flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface p-6 shadow-card-md">
+    <div className="flex h-full flex-1 flex-col gap-2 rounded-lg border border-border bg-surface p-6 shadow-card-md">
       <div
         className={`flex size-12 items-center justify-center rounded-lg border border-border-strong ${iconBg}`}
       >
@@ -99,8 +100,10 @@ export function ProblemSection() {
     <LandingSection tone="white">
       <SectionHeading badge="문제 상황" title="약속 잡기, 왜 이렇게 어려울까요?" />
       <div className="mx-auto grid max-w-5xl gap-6 sm:grid-cols-3">
-        {PROBLEMS.map((p) => (
-          <BrutalCard key={p.title} title={p.title} desc={p.desc} />
+        {PROBLEMS.map((p, i) => (
+          <Reveal key={p.title} index={i} className="h-full">
+            <BrutalCard title={p.title} desc={p.desc} className="h-full" />
+          </Reveal>
         ))}
       </div>
     </LandingSection>
@@ -116,81 +119,87 @@ export function FeaturesSection() {
         sub="약속 조율부터 기록까지, Weave 하나로 완성됩니다."
       />
       <div className="flex flex-col gap-6 md:flex-row">
-        <FeatureCard
-          icon={<ChecklistIcon />}
-          iconBg="bg-primary"
-          title="할 일 관리"
-          desc="오늘 꼭 해야 할 투두와 데드라인을 체계적으로 정리하고 친구와 함께 공유합니다."
-          widget={
-            <>
-              <MiniRow>
-                <span className="flex items-center gap-1.5">
-                  <span className="flex size-4 items-center justify-center rounded bg-accent-deep text-[10px] font-medium text-white">
-                    ✓
+        <Reveal index={0} className="md:flex-1">
+          <FeatureCard
+            icon={<ChecklistIcon />}
+            iconBg="bg-primary"
+            title="할 일 관리"
+            desc="오늘 꼭 해야 할 투두와 데드라인을 체계적으로 정리하고 친구와 함께 공유합니다."
+            widget={
+              <>
+                <MiniRow>
+                  <span className="flex items-center gap-1.5">
+                    <span className="flex size-4 items-center justify-center rounded bg-accent-deep text-[10px] font-medium text-white">
+                      ✓
+                    </span>
+                    <span className="text-xs font-medium text-text">모임 장소 예약하기</span>
                   </span>
-                  <span className="text-xs font-medium text-text">모임 장소 예약하기</span>
-                </span>
-                <Badge variant="warning">D-1</Badge>
-              </MiniRow>
-              <MiniRow>
-                <span className="flex items-center gap-1.5">
-                  <span className="flex size-4 items-center justify-center rounded bg-border text-[10px] font-medium text-text-secondary line-through">
-                    ✓
+                  <Badge variant="warning">D-1</Badge>
+                </MiniRow>
+                <MiniRow>
+                  <span className="flex items-center gap-1.5">
+                    <span className="flex size-4 items-center justify-center rounded bg-border text-[10px] font-medium text-text-secondary line-through">
+                      ✓
+                    </span>
+                    <span className="text-xs font-medium text-text-secondary line-through">
+                      카페 후보 리스트업
+                    </span>
                   </span>
-                  <span className="text-xs font-medium text-text-secondary line-through">
-                    카페 후보 리스트업
+                  <span className="text-[11px] font-medium text-text-secondary">완료</span>
+                </MiniRow>
+              </>
+            }
+          />
+        </Reveal>
+        <Reveal index={1} className="md:flex-1">
+          <FeatureCard
+            icon={<CalendarIcon />}
+            iconBg="bg-accent-soft"
+            title="공유 캘린더"
+            desc="서로의 비어있는 시간을 겹쳐보아 단 3초 만에 최적의 모임 시간을 추천받습니다."
+            widget={
+              <>
+                <MiniRow>
+                  <span className="flex items-center gap-1.5">
+                    <svg viewBox="0 0 12.83 12.83" className="size-3 text-accent" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M10.5 4.66667L9.77083 3.0625L8.16667 2.33333L9.77083 1.60417L10.5 0L11.2292 1.60417L12.8333 2.33333L11.2292 3.0625L10.5 4.66667V4.66667M10.5 12.8333L9.77083 11.2292L8.16667 10.5L9.77083 9.77083L10.5 8.16667L11.2292 9.77083L12.8333 10.5L11.2292 11.2292L10.5 12.8333V12.8333M4.66667 11.0833L3.20833 7.875L0 6.41667L3.20833 4.95833L4.66667 1.75L6.125 4.95833L9.33333 6.41667L6.125 7.875L4.66667 11.0833V11.0833M4.66667 8.25417L5.25 7L6.50417 6.41667L5.25 5.83333L4.66667 4.57917L4.08333 5.83333L2.82917 6.41667L4.08333 7L4.66667 8.25417V8.25417"
+                      />
+                    </svg>
+                    <span className="text-xs font-bold text-text">추천 슬롯</span>
                   </span>
-                </span>
-                <span className="text-[11px] font-medium text-text-secondary">완료</span>
-              </MiniRow>
-            </>
-          }
-        />
-        <FeatureCard
-          icon={<CalendarIcon />}
-          iconBg="bg-accent-soft"
-          title="공유 캘린더"
-          desc="서로의 비어있는 시간을 겹쳐보아 단 3초 만에 최적의 모임 시간을 추천받습니다."
-          widget={
-            <>
-              <MiniRow>
-                <span className="flex items-center gap-1.5">
-                  <svg viewBox="0 0 12.83 12.83" className="size-3 text-accent" aria-hidden="true">
-                    <path
-                      fill="currentColor"
-                      d="M10.5 4.66667L9.77083 3.0625L8.16667 2.33333L9.77083 1.60417L10.5 0L11.2292 1.60417L12.8333 2.33333L11.2292 3.0625L10.5 4.66667V4.66667M10.5 12.8333L9.77083 11.2292L8.16667 10.5L9.77083 9.77083L10.5 8.16667L11.2292 9.77083L12.8333 10.5L11.2292 11.2292L10.5 12.8333V12.8333M4.66667 11.0833L3.20833 7.875L0 6.41667L3.20833 4.95833L4.66667 1.75L6.125 4.95833L9.33333 6.41667L6.125 7.875L4.66667 11.0833V11.0833M4.66667 8.25417L5.25 7L6.50417 6.41667L5.25 5.83333L4.66667 4.57917L4.08333 5.83333L2.82917 6.41667L4.08333 7L4.66667 8.25417V8.25417"
-                    />
-                  </svg>
-                  <span className="text-xs font-bold text-text">추천 슬롯</span>
-                </span>
-                <Badge variant="success">목 18:00 매칭완료</Badge>
-              </MiniRow>
-              <div className="flex gap-1.5">
-                <Badge>참여자 3명</Badge>
-                <Badge variant="success">겹침 0건</Badge>
-              </div>
-            </>
-          }
-        />
-        <FeatureCard
-          icon={<DiaryIcon />}
-          iconBg="bg-primary"
-          title="오늘의 일기"
-          desc="소중했던 만남의 순간과 일상을 감정 스티커와 함께 사진과 글로 아카이빙합니다."
-          widget={
-            <>
-              <MiniRow>
-                <span className="text-xs font-medium text-text">📸 연남동 모임 아카이브</span>
-                <span className="text-[11px] font-medium text-text-secondary">어제</span>
-              </MiniRow>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge>#행복가득</Badge>
-                <Badge>#맛집탐방</Badge>
-                <span className="text-xs font-medium text-text-secondary">🥰 3개의 기록</span>
-              </div>
-            </>
-          }
-        />
+                  <Badge variant="success">목 18:00 매칭완료</Badge>
+                </MiniRow>
+                <div className="flex gap-1.5">
+                  <Badge>참여자 3명</Badge>
+                  <Badge variant="success">겹침 0건</Badge>
+                </div>
+              </>
+            }
+          />
+        </Reveal>
+        <Reveal index={2} className="md:flex-1">
+          <FeatureCard
+            icon={<DiaryIcon />}
+            iconBg="bg-primary"
+            title="오늘의 일기"
+            desc="소중했던 만남의 순간과 일상을 감정 스티커와 함께 사진과 글로 아카이빙합니다."
+            widget={
+              <>
+                <MiniRow>
+                  <span className="text-xs font-medium text-text">📸 연남동 모임 아카이브</span>
+                  <span className="text-[11px] font-medium text-text-secondary">어제</span>
+                </MiniRow>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge>#행복가득</Badge>
+                  <Badge>#맛집탐방</Badge>
+                  <span className="text-xs font-medium text-text-secondary">🥰 3개의 기록</span>
+                </div>
+              </>
+            }
+          />
+        </Reveal>
       </div>
     </LandingSection>
   )
@@ -202,16 +211,15 @@ export function ProcessSection() {
       <SectionHeading badge="사용 방법" title="이렇게 해결해요" />
       <div className="mx-auto grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map((s, i) => (
-          <div
-            key={s.title}
-            className="flex flex-col gap-2 rounded-2xl border-2 border-border-strong bg-surface p-4 shadow-brutal-md"
-          >
-            <span className="flex size-10 items-center justify-center rounded-full border-2 border-border-strong bg-accent-soft font-display text-lg text-on-tint">
-              {String(i + 1).padStart(2, '0')}
-            </span>
-            <p className="text-[15px] font-bold">{s.title}</p>
-            <p className="text-[13px] font-medium text-text-secondary">{s.desc}</p>
-          </div>
+          <Reveal key={s.title} index={i} className="h-full">
+            <div className="flex h-full flex-col gap-2 rounded-2xl border-2 border-border-strong bg-surface p-4 shadow-brutal-md">
+              <span className="flex size-10 items-center justify-center rounded-full border-2 border-border-strong bg-accent-soft font-display text-lg text-on-tint">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <p className="text-[15px] font-bold">{s.title}</p>
+              <p className="text-[13px] font-medium text-text-secondary">{s.desc}</p>
+            </div>
+          </Reveal>
         ))}
       </div>
     </LandingSection>
@@ -222,21 +230,23 @@ export function ExampleSection() {
   return (
     <LandingSection tone="background">
       <SectionHeading badge="추천 예시" title="실제로 이렇게 추천돼요" />
-      <div className="mx-auto flex w-full max-w-115 flex-col gap-2.5 rounded-2xl border-3 border-border-strong bg-success-light px-6 py-4.5 shadow-brutal-accent text-on-tint">
-        <div className="flex items-center gap-2">
-          <Badge variant="success">추천도 100%</Badge>
-          <span className="text-sm font-bold text-on-tint">★ 최적의 선택</span>
+      <Reveal>
+        <div className="mx-auto flex w-full max-w-115 flex-col gap-2.5 rounded-2xl border-3 border-border-strong bg-success-light px-6 py-4.5 shadow-brutal-accent text-on-tint">
+          <div className="flex items-center gap-2">
+            <Badge variant="success">추천도 100%</Badge>
+            <span className="text-sm font-bold text-on-tint">★ 최적의 선택</span>
+          </div>
+          <p className="font-display text-[26px] leading-normal">5월 23일 금요일 19:00 – 21:00</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-on-tint/70">
+              참여 가능 4/4명 · 모두 비어있는 시간
+            </p>
+            <span className={buttonClasses({ variant: 'primary', size: 'md' })}>
+              이 시간으로 제안 보내기
+            </span>
+          </div>
         </div>
-        <p className="font-display text-[26px] leading-normal">5월 23일 금요일 19:00 – 21:00</p>
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-on-tint/70">
-            참여 가능 4/4명 · 모두 비어있는 시간
-          </p>
-          <span className={buttonClasses({ variant: 'primary', size: 'md' })}>
-            이 시간으로 제안 보내기
-          </span>
-        </div>
-      </div>
+      </Reveal>
     </LandingSection>
   )
 }

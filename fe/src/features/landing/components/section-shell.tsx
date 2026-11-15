@@ -54,12 +54,19 @@ export function SectionHeading({
 export function BrutalCard({
   title,
   desc,
+  className,
 }: {
   title: string
   desc: ReactNode
+  className?: string
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border-2 border-border-strong bg-surface px-5 pb-4 pt-5 shadow-brutal-md">
+    <div
+      className={cx(
+        'flex flex-col gap-2 rounded-2xl border-2 border-border-strong bg-surface px-5 pb-4 pt-5 shadow-brutal-md',
+        className,
+      )}
+    >
       <p className="font-bold">{title}</p>
       <p className="text-sm font-medium text-text-secondary">{desc}</p>
     </div>

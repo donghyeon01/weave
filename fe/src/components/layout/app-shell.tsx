@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Navigate, useLocation, useOutlet } from "react-router-dom";
+import { Navigate, useLocation, useMatches, useOutlet } from "react-router-dom";
 import { startStompClient, stopStompClient } from "../../lib/stomp";
 import { registerNotificationPush } from "../../features/notifications/stores/notification-push";
 import { useAuthStore } from "../../stores/auth-store";
@@ -14,6 +14,11 @@ export function AppShell() {
   const status = useAuthStore((s) => s.status);
   const outlet = useOutlet();
   const location = useLocation();
+  const matches = useMatches();
+  // 마지막 매치의 라우트 id를 key로 — 경로 "패턴" 단위라
+  // /app/chat/1 → /app/chat/2 같은 파라미터 이동에서는 리마운트되지 않아
+  // 입력 초안 등 로컬 state가 보존된다. 화면 종류가 바뀔 때만 재마운트+애니메이션.
+  const routeKey = matches[matches.length - 1]?.id ?? location.pathname;
 
   // STOMP는 authed 동안만 유지 — logout·탈퇴 시 해제해 좀비 연결을 막는다
   useEffect(() => {
@@ -44,8 +49,8 @@ export function AppShell() {
           <div className="flex min-w-0 flex-1 flex-col">
             <ContentHeader />
             <main className="mx-auto w-full max-w-280 px-4 py-8 sm:px-8">
-              {/* pathname key — 라우트 이동마다 리마운트돼 진입 애니메이션이 재생된다 */}
-              <div key={location.pathname} className="animate-page-in">
+              {/* routeKey — 화면 전환마다 리마운트돼 진입 애니메이션이 재생된다 */}
+              <div key={routeKey} className="animate-page-in">
                 {outlet ?? (
                   // 셸의 기본 빈 상태 — 자식 라우트가 아직 없는 동안만 표시된다
                   <div className="rounded-2xl border-2 border-dashed border-border bg-surface p-16 text-center">

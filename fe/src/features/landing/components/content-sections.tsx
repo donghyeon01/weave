@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import { Badge } from '../../../components/ui/badge'
 import { buttonClasses } from '../../../components/ui/button-styles'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { Reveal } from '../../../components/ui/reveal'
+import { cx } from '../../../utils/cx'
 import { BrutalCard, LandingSection, SectionHeading } from './section-shell'
 
 // Figma 151:1000·4:2379·151:1016·151:1043 — 문제 3카드 / 기능 3카드(아이콘+미니 위젯) / 과정 4스텝 / 추천 결과 카드.
@@ -74,7 +76,12 @@ function FeatureCard({
   widget: ReactNode
 }) {
   return (
-    <div className="flex h-full flex-1 flex-col gap-2 rounded-lg border border-border bg-surface p-6 shadow-card-md">
+    <div
+      className={cx(
+        'flex h-full flex-1 flex-col gap-2 rounded-lg border border-border bg-surface p-6 shadow-card-md',
+        cardClasses({ variant: 'clean' }),
+      )}
+    >
       <div
         className={`flex size-12 items-center justify-center rounded-lg border border-border-strong ${iconBg}`}
       >
@@ -212,7 +219,12 @@ export function ProcessSection() {
       <div className="mx-auto grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map((s, i) => (
           <Reveal key={s.title} index={i} className="h-full">
-            <div className="flex h-full flex-col gap-2 rounded-2xl border-2 border-border-strong bg-surface p-4 shadow-brutal-md">
+            <div
+              className={cx(
+                'flex h-full flex-col gap-2 rounded-2xl border-2 border-border-strong bg-surface p-4 shadow-brutal-md',
+                cardClasses({ variant: 'brutal' }),
+              )}
+            >
               <span className="flex size-10 items-center justify-center rounded-full border-2 border-border-strong bg-accent-soft font-display text-lg text-on-tint">
                 {String(i + 1).padStart(2, '0')}
               </span>
@@ -231,7 +243,12 @@ export function ExampleSection() {
     <LandingSection tone="background">
       <SectionHeading badge="추천 예시" title="실제로 이렇게 추천돼요" />
       <Reveal>
-        <div className="mx-auto flex w-full max-w-115 flex-col gap-2.5 rounded-2xl border-3 border-border-strong bg-success-light px-6 py-4.5 shadow-brutal-accent text-on-tint">
+        <div
+          className={cx(
+            'mx-auto flex w-full max-w-115 flex-col gap-2.5 rounded-2xl border-3 border-border-strong bg-success-light px-6 py-4.5 shadow-brutal-accent text-on-tint',
+            cardClasses({ variant: 'brutal-accent' }),
+          )}
+        >
           <div className="flex items-center gap-2">
             <Badge variant="success">추천도 100%</Badge>
             <span className="text-sm font-bold text-on-tint">★ 최적의 선택</span>

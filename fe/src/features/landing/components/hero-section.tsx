@@ -2,6 +2,8 @@ import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge } from '../../../components/ui/badge'
 import { buttonClasses } from '../../../components/ui/button-styles'
+import { cardClasses } from '../../../components/ui/card-styles'
+import { cx } from '../../../utils/cx'
 
 // Figma 4:2468 — pastel-blue(=primary) 히어로 + 도트 매트릭스 텍스처.
 // 좌: 배지·헤드라인(밑줄 강조)·서브·CTA·신뢰 배지 / 우: 주간 타임테이블 목업 카드.
@@ -19,7 +21,10 @@ function TimetableCard() {
   return (
     <div
       aria-hidden="true"
-      className="w-full max-w-128 overflow-clip rounded-xl border-3 border-border-strong bg-surface shadow-brutal-lg"
+      className={cx(
+        'w-full max-w-128 overflow-clip rounded-xl border-3 border-border-strong bg-surface shadow-brutal-lg',
+        cardClasses({ variant: 'brutal' }),
+      )}
     >
       <div className="flex items-center justify-between border-b-3 border-border-strong bg-accent-soft px-4 pb-2.5 pt-2">
         <div className="flex items-center gap-2">

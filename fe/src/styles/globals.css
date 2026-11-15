@@ -30,6 +30,9 @@
   ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    /* delay도 리셋 — stagger 등 지연형 애니메이션이 backwards fill로
+       최대 수백 ms 콘텐츠를 숨긴 채 두는 것을 막는다 */
+    animation-delay: 0.01ms !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }

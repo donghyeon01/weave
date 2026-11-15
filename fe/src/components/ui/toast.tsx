@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cx } from '../../utils/cx'
 
@@ -53,6 +53,18 @@ export function Toast({ variant = 'info', message, duration, onClose }: ToastPro
     },
     [],
   )
+
+  // 토스트 내용(variant·message)이 교체되면 이전 인스턴스의 퇴출 예약을 리셋한다 —
+  // keyless 호출부({cond && <Toast/>})에서 같은 위치의 새 토스트가 이전 퇴출 타이머에
+  // 제거되는 것을 막는다. layout effect라 교체 커밋의 첫 페인트부터 올바른 상태다.
+  useLayoutEffect(() => {
+    closingRef.current = false
+    if (exitTimer.current !== null) {
+      clearTimeout(exitTimer.current)
+      exitTimer.current = null
+    }
+    setExiting(false)
+  }, [variant, message])
 
   const alert = variant === 'danger'
   return createPortal(

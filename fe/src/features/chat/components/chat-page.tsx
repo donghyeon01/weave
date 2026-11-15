@@ -4,6 +4,7 @@ import { Badge } from '../../../components/ui/badge'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 import { useChatRooms } from '../api/use-chat'
 import type { ChatRoomSummary, RoomStatus } from '../types'
@@ -27,7 +28,10 @@ function RoomCard({ room }: { room: ChatRoomSummary }) {
     <li>
       <Link
         to={`/app/chat/${room.roomId}`}
-        className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-4 shadow-card transition duration-150 hover:bg-surface-muted/60"
+        className={cx(
+          'flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-4 shadow-card hover:bg-surface-muted/60',
+          cardClasses({ variant: 'clean' }),
+        )}
       >
         <div className="flex items-center justify-between gap-3">
           <p className="flex min-w-0 items-center gap-2">

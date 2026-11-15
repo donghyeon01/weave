@@ -7,6 +7,7 @@ import { SkeletonRow } from '../../../components/ui/skeleton-row'
 import { Switch } from '../../../components/ui/switch'
 import { Toast } from '../../../components/ui/toast'
 import { ApiError } from '../../../lib/api-client'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 import {
   useDeleteAccount,
@@ -104,8 +105,10 @@ export function ProfilePage() {
     })
   }
 
-  const cardClass =
-    'rounded-2xl border border-border bg-surface p-6 shadow-card-sm'
+  const cardClass = cx(
+    'rounded-2xl border border-border bg-surface p-6 shadow-card-sm',
+    cardClasses({ variant: 'clean' }),
+  )
   const cardHead =
     'flex items-center justify-between border-b border-border pb-4'
 

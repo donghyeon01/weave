@@ -2,11 +2,15 @@ import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 import type { AvailabilityScopeSummary } from '../types'
 import { periodLabel } from '../utils'
 
-const cardClass = 'rounded-2xl border border-border bg-surface p-6 shadow-card-sm'
+const cardClass = cx(
+  'rounded-2xl border border-border bg-surface p-6 shadow-card-sm',
+  cardClasses({ variant: 'clean' }),
+)
 
 function statusBadge(status: AvailabilityScopeSummary['status']) {
   switch (status) {

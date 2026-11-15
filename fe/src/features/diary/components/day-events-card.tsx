@@ -1,3 +1,5 @@
+import { cardClasses } from '../../../components/ui/card-styles'
+import { cx } from '../../../utils/cx'
 import { useDayEvents } from '../api/use-day-events'
 
 // 우측 레일 "연결된 일정" — 시안 4:366 Card 1: 당일 events를 읽기 전용 카드로 보여준다.
@@ -8,7 +10,12 @@ export function DayEventsCard({ date }: { date: string }) {
   if (eventsQuery.isPending || events.length === 0) return null
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5 shadow-card-sm">
+    <section
+      className={cx(
+        'rounded-2xl border border-border bg-surface p-5 shadow-card-sm',
+        cardClasses({ variant: 'clean' }),
+      )}
+    >
       <h3 className="font-display text-lg">연결된 일정</h3>
       <ul className="mt-3 flex flex-col gap-2">
         {events.map((e) => (

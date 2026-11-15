@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '../../../components/ui/button'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
 import { VisibilityModal } from '../../../components/share/visibility-modal'
 import { queryKeys } from '../../../lib/react-query'
+import { cx } from '../../../utils/cx'
 import type { UserResponse } from '../../../types/auth'
 import { useShareDetail, useSharePhotoUrl } from '../api/use-share'
 import type { SharedDiaryItem, SharedEventItem, ShareVisibility } from '../types'
@@ -55,7 +57,12 @@ function SharedPhoto({ shareId, photoId }: { shareId: number; photoId: number })
 
 function DiaryEmbed({ shareId, item }: { shareId: number; item: SharedDiaryItem }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
+    <div
+      className={cx(
+        'rounded-xl border border-border bg-surface p-5 shadow-card',
+        cardClasses({ variant: 'clean' }),
+      )}
+    >
       <div className="flex items-center gap-2">
         <span className="text-sm font-bold text-text">{diaryDateLine(item.date)}</span>
         {item.mood !== null && MOOD_LABEL[item.mood] !== undefined && (
@@ -86,7 +93,12 @@ function DiaryEmbed({ shareId, item }: { shareId: number; item: SharedDiaryItem 
 
 function EventEmbed({ item }: { item: SharedEventItem }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
+    <div
+      className={cx(
+        'rounded-xl border border-border bg-surface p-5 shadow-card',
+        cardClasses({ variant: 'clean' }),
+      )}
+    >
       <h2 className="text-lg font-bold text-text">{item.title}</h2>
       <p className="mt-2 text-sm text-text-secondary">{eventTimeLine(item)}</p>
       {item.location !== null && item.location !== '' && (

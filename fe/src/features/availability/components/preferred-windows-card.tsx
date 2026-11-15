@@ -4,12 +4,16 @@ import { InlineError } from '../../../components/ui/inline-error'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
 import { Toast } from '../../../components/ui/toast'
 import { ApiError } from '../../../lib/api-client'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 import { usePreferredWindows } from '../api/use-preferred-windows'
 import { usePutPreferredWindows } from '../api/use-put-preferred-windows'
 import type { PreferredWindow } from '../types'
 
-const cardClass = 'rounded-2xl border border-border bg-surface p-6 shadow-card-sm'
+const cardClass = cx(
+  'rounded-2xl border border-border bg-surface p-6 shadow-card-sm',
+  cardClasses({ variant: 'clean' }),
+)
 
 // 요일 선택지 — ISO 요일(월=1~일=7), 표시 순서 월~일 (계약 §3.12)
 const DAY_OPTIONS = [

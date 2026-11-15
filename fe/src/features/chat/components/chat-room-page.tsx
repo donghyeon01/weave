@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../../components/ui/button'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 import { SkeletonRow } from '../../../components/ui/skeleton-row'
 import { queryKeys } from '../../../lib/react-query'
+import { cx } from '../../../utils/cx'
 import { onStompConnect, onStompError, subscribeTopic } from '../../../lib/stomp'
 import type { UserResponse } from '../../../types/auth'
 import { ChatHeader } from './chat-page'
@@ -218,7 +220,12 @@ export function ChatRoomPage() {
     <div className="flex w-full flex-col">
       <ChatHeader />
 
-      <div className="mt-6 rounded-2xl border border-border bg-surface p-6 shadow-card">
+      <div
+        className={cx(
+          'mt-6 rounded-2xl border border-border bg-surface p-6 shadow-card',
+          cardClasses({ variant: 'clean' }),
+        )}
+      >
         <div className="flex items-center gap-3">
           <Link
             to="/app/chat"

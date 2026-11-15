@@ -1,8 +1,13 @@
+import { cardClasses } from '../../../components/ui/card-styles'
 import { Switch } from '../../../components/ui/switch'
+import { cx } from '../../../utils/cx'
 import { usePreferences } from '../api/use-preferences'
 import { usePutPreferences } from '../api/use-put-preferences'
 
-const cardClass = 'rounded-2xl border border-border bg-surface p-6 shadow-card-sm'
+const cardClass = cx(
+  'rounded-2xl border border-border bg-surface p-6 shadow-card-sm',
+  cardClasses({ variant: 'clean' }),
+)
 
 /** "환경 설정" 카드 — 캘린더 추론 opt-in (계약 §3.12 preferences) */
 export function PreferencesCard() {

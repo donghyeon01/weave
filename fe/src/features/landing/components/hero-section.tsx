@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge } from '../../../components/ui/badge'
 import { buttonClasses } from '../../../components/ui/button-styles'
@@ -127,8 +128,13 @@ export function HeroSection() {
       />
       <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-6 pb-12 pt-12 md:grid-cols-2">
         <div className="flex flex-col items-start gap-4">
-          <Badge variant="accent">✨ 스마트 일정 조율 솔루션</Badge>
-          <h1 className="font-display text-[44px] leading-13.75 text-on-tint">
+          <Badge variant="accent" className="animate-stagger-item" style={{ '--stagger-i': 0 } as CSSProperties}>
+            ✨ 스마트 일정 조율 솔루션
+          </Badge>
+          <h1
+            className="animate-stagger-item font-display text-[44px] leading-13.75 text-on-tint"
+            style={{ '--stagger-i': 1 } as CSSProperties}
+          >
             친구와 겹치는 시간을
             <br />
             <span className="text-accent-deep underline decoration-border-strong decoration-4 underline-offset-4">
@@ -137,11 +143,17 @@ export function HeroSection() {
             <br />
             스마트 일정 조율
           </h1>
-          <p className="max-w-128 text-base font-medium text-on-tint">
+          <p
+            className="animate-stagger-item max-w-128 text-base font-medium text-on-tint"
+            style={{ '--stagger-i': 2 } as CSSProperties}
+          >
             할 일, 캘린더, 일기, 친구까지 하나로 엮다. 복잡한 단톡방 조율 대신 Weave로 한
             번에 약속 시간을 찾아보세요.
           </p>
-          <div className="flex flex-wrap items-center gap-2 pt-2">
+          <div
+            className="animate-stagger-item flex flex-wrap items-center gap-2 pt-2"
+            style={{ '--stagger-i': 3 } as CSSProperties}
+          >
             <Link to="/login" className={buttonClasses({ variant: 'kakao', size: 'lg' })}>
               <svg viewBox="0 0 19 18.17" className="h-4.5 w-4.75" aria-hidden="true">
                 <path
@@ -161,12 +173,18 @@ export function HeroSection() {
               <span className="text-base font-bold">기능 둘러보기</span>
             </a>
           </div>
-          <div className="flex flex-wrap items-center gap-4 pt-2">
+          <div
+            className="animate-stagger-item flex flex-wrap items-center gap-4 pt-2"
+            style={{ '--stagger-i': 4 } as CSSProperties}
+          >
             <Badge>⚡️ 3초 만에 빈 시간 매칭</Badge>
             <Badge>🔒 안전한 일정 암호화</Badge>
           </div>
         </div>
-        <div className="flex justify-center">
+        <div
+          className="animate-stagger-item flex justify-center"
+          style={{ '--stagger-i': 2 } as CSSProperties}
+        >
           <TimetableCard />
         </div>
       </div>

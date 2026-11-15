@@ -23,6 +23,11 @@
   unicode-range: U+0000-00ff, U+0131, U+0152-0153, U+2000-206f, U+2074, U+20ac, U+2122, U+2191, U+2193, U+2212, U+2215, U+feff, U+fffd;
 }
 
+/* 앵커 이동 스무스 스크롤 — reduced-motion은 아래 미디어 규칙이 auto로 리셋 */
+html {
+  scroll-behavior: smooth;
+}
+
 /* 모션 최소화 설정 — 모든 전환·애니메이션 사실상 비활성 (접근성) */
 @media (prefers-reduced-motion: reduce) {
   *,

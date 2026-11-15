@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { cx } from '../../utils/cx'
 
 export type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'accent'
@@ -16,14 +16,17 @@ const VARIANTS: Record<BadgeVariant, string> = {
 export function Badge({
   variant = 'default',
   className,
+  style,
   children,
 }: {
   variant?: BadgeVariant
   className?: string
+  style?: CSSProperties
   children: ReactNode
 }) {
   return (
     <span
+      style={style}
       className={cx(
         'inline-flex items-center gap-1 rounded-full border-2 border-border px-3 py-1 text-sm font-bold',
         VARIANTS[variant],

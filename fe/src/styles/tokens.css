@@ -146,7 +146,7 @@
   --animate-toast-in: toast-in 200ms ease both;
   --animate-toast-out: toast-out 150ms ease both;
   --animate-page-in: page-in 200ms ease backwards;
-  --animate-stagger-item: stagger-item 200ms ease backwards;
+  --animate-stagger-item: stagger-item 200ms ease calc(var(--stagger-i, 0) * 40ms) backwards;
   --animate-fade-in: fade-in 200ms ease backwards;
   --animate-fade-out: fade-out 150ms ease both;
 }

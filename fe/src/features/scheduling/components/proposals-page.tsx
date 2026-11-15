@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '../../../lib/api-client'
@@ -207,12 +207,14 @@ export function ProposalsPage() {
 
       {items.length > 0 && (
         <ul className="mt-6 flex flex-col gap-3">
-          {items.map((p) => {
+          {items.map((p, i) => {
             const meta = STATUS_META[p.status]
             return (
               <li
                 key={p.id}
-                className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-card"
+                className="flex animate-stagger-item items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-card"
+                // stagger 지연은 --stagger-i × 40ms — 상한 7이면 8번째 항목부터 같은 시각에 나타난다
+                style={{ '--stagger-i': Math.min(i, 7) } as CSSProperties}
               >
                 <div className="flex min-w-0 flex-col gap-1.5">
                   <div className="flex items-center gap-2">

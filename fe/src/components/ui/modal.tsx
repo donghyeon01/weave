@@ -59,7 +59,8 @@ export function Modal({ open, onClose, title, titleClassName, children }: ModalP
 
   // open prop 전이를 phase로 변환 — 닫힘 요청 시 즉시 언마운트하지 않고
   // exiting(150ms) 후 closed로 내린다. 퇴출 중 재오픈하면 타이머를 해제하고 open 복귀.
-  useEffect(() => {
+  // useLayoutEffect — 페인트 전 동기 재렌더로 open→portal 표시가 1프레임 밀리지 않게 한다.
+  useLayoutEffect(() => {
     if (open) {
       if (exitTimer.current !== null) {
         clearTimeout(exitTimer.current)

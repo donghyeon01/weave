@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
@@ -28,14 +28,35 @@ describe('modal', () => {
     expect(document.body.style.overflow).toBe('hidden')
 
     await user.keyboard('{Escape}')
-    // 최상위(내부)만 닫히고 외부는 유지 — 잠금도 계속 걸린다
-    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    // 최상위(내부)만 닫힌다 — 퇴출 애니메이션(150ms) 동안 DOM에 남았다가 사라진다
+    await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1))
     expect(screen.getByText('외부')).toBeInTheDocument()
-    expect(screen.queryByText('내부')).not.toBeInTheDocument()
     expect(document.body.style.overflow).toBe('hidden')
 
     await user.keyboard('{Escape}')
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(document.body.style.overflow).toBe('')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(document.body.style.overflow).toBe(''))
+  })
+
+  it('닫힐 때 퇴출 애니메이션 동안 dialog가 유지되고 종료 후 사라진다', async () => {
+    function Harness() {
+      const [open, setOpen] = useState(true)
+      return (
+        <>
+          <button onClick={() => setOpen(false)}>닫기버튼</button>
+          <Modal open={open} onClose={() => setOpen(false)} title="테스트">
+            내용
+          </Modal>
+        </>
+      )
+    }
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByText('닫기버튼'))
+    // 퇴출 중에는 아직 dialog가 DOM에 남는다 (150ms)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), {
+      timeout: 1000,
+    })
   })
 })

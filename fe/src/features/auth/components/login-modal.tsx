@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '../../../components/ui/button'
 import { Modal } from '../../../components/ui/modal'
 import { Toast } from '../../../components/ui/toast'
@@ -12,11 +12,12 @@ import { buildKakaoAuthorizeUrl } from '../api/kakao'
 
 // Figma 4:2268 — 배지 + 브랜드 헤더 + 카카오 풀와이드 + 구분선 + ghost 데모 + 하위 링크 + 약관 풋노트.
 // /login 라우트에 마운트되는 route-backed 모달 — 닫기는 랜딩(/)으로의 네비게이션이다.
-// 약관·고객센터 링크는 목적지 부재로 비인터랙티브 텍스트 (SYSTEM.md 이탈 원장).
+// 소셜 로그인은 약관 동의 체크박스로 게이팅한다 — 데모는 실 개인정보 미수집이라 제외.
 export function LoginModal() {
   const navigate = useNavigate()
   const location = useLocation()
   const [submitting, setSubmitting] = useState(false)
+  const [agreed, setAgreed] = useState(false)
   // 카카오 콜백 실패 시 route state로 실어 보낸 오류를 초기 토스트로 표시한다
   const [error, setError] = useState<string | null>(
     () => (location.state as { error?: string } | null)?.error ?? null,
@@ -77,7 +78,46 @@ export function LoginModal() {
         }
       >
         <div className="mt-2 space-y-3">
-          <Button variant="kakao" size="lg" fullWidth className="h-14" onClick={handleKakao}>
+          {/* 링크는 label 바깥에 둬 클릭 시 체크박스 토글이 발생하지 않게 한다 */}
+          <div className="flex items-start gap-2 px-1 text-left">
+            <input
+              id="legal-consent"
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+            />
+            <p className="text-xs leading-5 text-text-secondary">
+              <Link
+                to="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary-dark underline"
+              >
+                이용약관
+              </Link>
+              {' 및 '}
+              <Link
+                to="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary-dark underline"
+              >
+                개인정보처리방침
+              </Link>
+              <label htmlFor="legal-consent" className="cursor-pointer">
+                에 동의합니다
+              </label>
+            </p>
+          </div>
+          <Button
+            variant="kakao"
+            size="lg"
+            fullWidth
+            className="h-14"
+            onClick={handleKakao}
+            disabled={submitting || !agreed}
+          >
             <svg viewBox="0 0 19 18.17" className="h-4.5 w-4.75" aria-hidden="true">
               <path
                 fill="currentColor"
@@ -86,7 +126,14 @@ export function LoginModal() {
             </svg>
             <span className="text-base font-bold">카카오로 시작하기</span>
           </Button>
-          <Button variant="google" size="lg" fullWidth className="h-14" onClick={handleGoogle}>
+          <Button
+            variant="google"
+            size="lg"
+            fullWidth
+            className="h-14"
+            onClick={handleGoogle}
+            disabled={submitting || !agreed}
+          >
             <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden="true">
               <path
                 className="fill-brand-google-blue"
@@ -123,11 +170,23 @@ export function LoginModal() {
         </div>
         <div className="mt-4 flex items-center justify-center gap-1 text-xs font-medium">
           <span className="text-text-secondary">로그인에 어려움이 있으신가요?</span>
-          <span className="text-primary-dark underline">고객센터 문의</span>
+          <Link
+            to="/contact"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary-dark underline"
+          >
+            고객센터 문의
+          </Link>
         </div>
         <div className="mt-6 border-t border-border pt-4 text-center text-xs text-text-muted">
-          가입하면 <span className="text-text-secondary underline">이용약관</span> 및{' '}
-          <span className="text-text-secondary underline">개인정보처리방침</span>에 동의하게 됩니다.
+          <Link to="/terms" target="_blank" rel="noopener noreferrer" className="underline">
+            이용약관
+          </Link>{' '}
+          ·{' '}
+          <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="underline">
+            개인정보처리방침
+          </Link>
         </div>
       </Modal>
       {error !== null && (

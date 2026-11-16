@@ -1,4 +1,12 @@
-// Figma 4:2561 — surface-muted + 2px 상단 경계. 링크는 목적지 부재로 비인터랙티브 (이탈 원장).
+import { Link } from 'react-router-dom'
+
+// Figma 4:2561 — surface-muted + 2px 상단 경계. 법적 링크는 실제 라우트로 연결된다.
+const FOOTER_LINKS = [
+  { label: '이용약관', to: '/terms' },
+  { label: '개인정보처리방침', to: '/privacy' },
+  { label: '문의하기', to: '/contact' },
+] as const
+
 export function LandingFooter() {
   return (
     <footer className="border-t-2 border-border-strong bg-surface-muted">
@@ -10,10 +18,14 @@ export function LandingFooter() {
           </p>
         </div>
         <nav className="flex items-center gap-4" aria-label="푸터">
-          {['이용약관', '개인정보처리방침', '문의하기'].map((label) => (
-            <span key={label} className="text-xs font-medium text-text-secondary">
-              {label}
-            </span>
+          {FOOTER_LINKS.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className="text-xs font-medium text-text-secondary"
+            >
+              {link.label}
+            </Link>
           ))}
         </nav>
       </div>

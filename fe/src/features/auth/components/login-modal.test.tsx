@@ -92,6 +92,9 @@ describe('login-modal', () => {
     renderModal()
 
     await userEvent.click(
+      screen.getByRole('checkbox', { name: '이용약관 및 개인정보처리방침에 동의합니다' }),
+    )
+    await userEvent.click(
       screen.getByRole('button', { name: 'Google로 시작하기' }),
     )
 
@@ -99,6 +102,62 @@ describe('login-modal', () => {
       'Google 로그인 설정이 아직 완료되지 않았어요.',
     )
     expect(useAuthStore.getState().status).toBe('guest')
+  })
+
+  it('약관 동의 전에는 소셜 버튼이 비활성이고 체크하면 활성화된다', async () => {
+    renderModal()
+
+    const kakao = screen.getByRole('button', { name: '카카오로 시작하기' })
+    const google = screen.getByRole('button', { name: 'Google로 시작하기' })
+    expect(kakao).toBeDisabled()
+    expect(google).toBeDisabled()
+
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: '이용약관 및 개인정보처리방침에 동의합니다' }),
+    )
+
+    expect(kakao).toBeEnabled()
+    expect(google).toBeEnabled()
+  })
+
+  it('데모 버튼은 약관 동의 체크와 무관하게 활성 상태다', () => {
+    renderModal()
+    expect(
+      screen.getByRole('button', { name: '데모로 둘러보기' }),
+    ).toBeEnabled()
+  })
+
+  it('약관·방침·문의 링크가 올바른 href를 가진다', () => {
+    renderModal()
+
+    const termsLinks = screen.getAllByRole('link', { name: '이용약관' })
+    expect(termsLinks.length).toBeGreaterThan(0)
+    for (const link of termsLinks) {
+      expect(link).toHaveAttribute('href', '/terms')
+      expect(link).toHaveAttribute('target', '_blank')
+    }
+    const privacyLinks = screen.getAllByRole('link', {
+      name: '개인정보처리방침',
+    })
+    for (const link of privacyLinks) {
+      expect(link).toHaveAttribute('href', '/privacy')
+    }
+    expect(screen.getByRole('link', { name: '고객센터 문의' })).toHaveAttribute(
+      'href',
+      '/contact',
+    )
+  })
+
+  it('약관 링크 클릭이 체크박스를 토글하지 않는다', async () => {
+    renderModal()
+
+    await userEvent.click(
+      screen.getAllByRole('link', { name: '이용약관' })[0],
+    )
+
+    expect(
+      screen.getByRole('checkbox', { name: '이용약관 및 개인정보처리방침에 동의합니다' }),
+    ).not.toBeChecked()
   })
 
   it('X 닫기가 랜딩(/)으로 돌아간다', async () => {

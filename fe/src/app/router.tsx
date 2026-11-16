@@ -43,6 +43,13 @@ const FriendProfileRoute = lazy(() =>
 const SharedRoute = lazy(() =>
   import('./routes/app/shared').then((m) => ({ default: m.SharedRoute })),
 )
+const TermsRoute = lazy(() => import('./routes/terms').then((m) => ({ default: m.TermsRoute })))
+const PrivacyRoute = lazy(() =>
+  import('./routes/privacy').then((m) => ({ default: m.PrivacyRoute })),
+)
+const ContactRoute = lazy(() =>
+  import('./routes/contact').then((m) => ({ default: m.ContactRoute })),
+)
 
 const routeFallback = (
   <div className="flex min-h-screen items-center justify-center bg-background">
@@ -66,6 +73,10 @@ export const router = createBrowserRouter([
   },
   { path: '/login/kakao/callback', element: lazyElement(<KakaoCallbackRoute />) },
   { path: '/login/google/callback', element: lazyElement(<GoogleCallbackRoute />) },
+  // 법적 고지 페이지는 독립 셸(legal-layout)이라 /와 /app의 형제인 top-level 라우트다
+  { path: '/terms', element: lazyElement(<TermsRoute />) },
+  { path: '/privacy', element: lazyElement(<PrivacyRoute />) },
+  { path: '/contact', element: lazyElement(<ContactRoute />) },
   {
     // id는 AppShell의 페이지 전환 key로도 쓰인다 — 파라미터가 아닌 화면 단위로 부여
     path: '/app',

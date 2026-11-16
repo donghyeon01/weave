@@ -4,6 +4,7 @@ import { buttonClasses } from '../../../components/ui/button-styles'
 import { cardClasses } from '../../../components/ui/card-styles'
 import { Reveal } from '../../../components/ui/reveal'
 import { cx } from '../../../utils/cx'
+import { formatKoDate, nextWeekdayISO } from '../../../utils/date'
 import { BrutalCard, LandingSection, SectionHeading } from './section-shell'
 
 // Figma 151:1000·4:2379·151:1016·151:1043 — 문제 3카드 / 기능 3카드(아이콘+미니 위젯) / 과정 4스텝 / 추천 결과 카드.
@@ -238,6 +239,9 @@ export function ProcessSection() {
   )
 }
 
+// 다음 금요일 — 모듈 레벨에서 1회 계산(렌더마다 신규 Date 생성 불필요)
+const exampleDate = formatKoDate(nextWeekdayISO(5))
+
 export function ExampleSection() {
   return (
     <LandingSection tone="background">
@@ -253,7 +257,7 @@ export function ExampleSection() {
             <Badge variant="success">추천도 100%</Badge>
             <span className="text-sm font-bold text-on-tint">★ 최적의 선택</span>
           </div>
-          <p className="font-display text-[26px] leading-normal">5월 23일 금요일 19:00 – 21:00</p>
+          <p className="font-display text-[26px] leading-normal">{exampleDate} 19:00 – 21:00</p>
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-on-tint/70">
               참여 가능 4/4명 · 모두 비어있는 시간

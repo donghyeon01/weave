@@ -67,9 +67,12 @@ def prep_scheduling(page):
             print(f'    scheduling: {state} 캡처')
             if has_best:
                 # 타임테이블 미리보기는 후보 카드 아래에 렌더되어 1280×800 뷰포트
-                # 밖에 있다 — 화면 안으로 스크롤한 뒤 위쪽 여백을 조금 더 확보한다
-                page.get_by_text('친구별 일정 겹침 타임테이블 미리보기').scroll_into_view_if_needed()
-                page.evaluate('window.scrollBy(0, -80)')
+                # 밖에 있다 — 화면 안으로 스크롤한 뒤 위쪽 여백을 조금 더 확보한다.
+                # DATE형 슬롯·멤버 0명 등으로 타임테이블이 없으면 스크롤 없이 둔다
+                timetable = page.get_by_text('친구별 일정 겹침 타임테이블 미리보기')
+                if timetable.count() > 0:
+                    timetable.scroll_into_view_if_needed()
+                    page.evaluate('window.scrollBy(0, -80)')
                 # 친구 블록·내 일정 쿼리가 비동기로 셀을 채운다 — 스켈레톤이
                 # 없어서 고정 대기로 채워질 시간을 준다
                 page.wait_for_timeout(1500)
@@ -80,7 +83,11 @@ def prep_scheduling(page):
             page.get_by_role('link', name='캘린더', exact=True).click()
             page.wait_for_timeout(800)
             page.get_by_role('link', name='일정 조율', exact=True).click()
-            page.wait_for_timeout(1200)
+            # 친구 목록은 스켈레톤 없이 EmptyState로 로딩된다 — 체크박스 등장까지 대기
+            try:
+                page.locator('form li label').first.wait_for(timeout=15000)
+            except PlaywrightTimeoutError:
+                pass
             check_friends(page)
     except PlaywrightTimeoutError as e:
         print(f'    warn: scheduling 준비 실패({e}) — 현재 상태로 캡처')

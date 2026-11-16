@@ -3,12 +3,16 @@ import type { FormEvent } from 'react'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { ApiError } from '../../../lib/api-client'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 import { useCreateScope } from '../api/use-scopes'
 import type { AvailabilityMode, AvailabilityScopeDetail } from '../types'
 import { todayYmd } from '../utils'
 
-const cardClass = 'rounded-2xl border border-border bg-surface p-6 shadow-card-sm'
+const cardClass = cx(
+  'rounded-2xl border border-border bg-surface p-6 shadow-card-sm',
+  cardClasses({ variant: 'clean' }),
+)
 
 interface ScopeCreateCardProps {
   onCreated: (scope: AvailabilityScopeDetail) => void

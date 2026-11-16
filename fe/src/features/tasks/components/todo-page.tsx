@@ -7,6 +7,7 @@ import { ConfirmModal } from '../../../components/ui/confirm-modal'
 import { Modal } from '../../../components/ui/modal'
 import { Toast } from '../../../components/ui/toast'
 import { ApiError } from '../../../lib/api-client'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 import { useMe } from '../../profile/api/use-profile'
 import { useCreateTask } from '../api/use-create-task'
@@ -219,7 +220,10 @@ export function TodoPage() {
           return (
             <li
               key={task.id}
-              className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-card-md"
+              className={cx(
+                'flex items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-card-md',
+                cardClasses({ variant: 'clean' }),
+              )}
             >
               <div className="flex min-w-0 items-center gap-3">
                 <button
@@ -306,7 +310,10 @@ export function TodoPage() {
       {/* 일일 달성도 통계 — 시안 하단 섹션: 진행률 바 + N% 달성 */}
       <section
         aria-label="할 일 통계"
-        className="mt-8 rounded-2xl border border-border bg-surface p-6 shadow-card-sm"
+        className={cx(
+          'mt-8 rounded-2xl border border-border bg-surface p-6 shadow-card-sm',
+          cardClasses({ variant: 'clean' }),
+        )}
       >
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl">일일 달성도 통계</h2>

@@ -330,7 +330,10 @@ export function FriendsPage() {
             {filteredFriends.map((f) => (
               <li
                 key={f.friendshipId}
-                className="flex flex-col justify-between rounded-lg border border-border bg-surface p-5 shadow-card-sm"
+                className={cx(
+                  'flex flex-col justify-between rounded-lg border border-border bg-surface p-5 shadow-card-sm',
+                  cardClasses({ variant: 'clean' }),
+                )}
               >
                 <div className="flex items-start justify-between">
                   <button

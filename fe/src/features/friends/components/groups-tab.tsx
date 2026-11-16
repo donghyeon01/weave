@@ -6,6 +6,7 @@ import { SkeletonRow } from '../../../components/ui/skeleton-row'
 import { Toast } from '../../../components/ui/toast'
 import { QueryErrorToast } from '../../../components/ui/query-error-toast'
 import { ApiError } from '../../../lib/api-client'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 import {
   useCreateGroup,
@@ -225,7 +226,10 @@ export function GroupsTab({ onToast }: { onToast: (message: string) => void }) {
             <button
               type="button"
               onClick={() => setFormTarget(g)}
-              className="flex w-full flex-col gap-2 rounded-lg border border-border bg-surface p-5 text-left shadow-card-sm transition duration-150 hover:bg-surface-muted/60"
+              className={cx(
+                'flex w-full flex-col gap-2 rounded-lg border border-border bg-surface p-5 text-left shadow-card-sm hover:bg-surface-muted/60',
+                cardClasses({ variant: 'clean' }),
+              )}
             >
               <span className="text-sm font-bold text-text">{g.name}</span>
               <span className="text-xs text-text-secondary">멤버 {g.memberIds.length}명</span>

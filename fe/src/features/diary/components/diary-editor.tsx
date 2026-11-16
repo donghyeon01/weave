@@ -4,6 +4,7 @@ import { VisibilityModal } from '../../../components/share/visibility-modal'
 import { Button } from '../../../components/ui/button'
 import { ConfirmModal } from '../../../components/ui/confirm-modal'
 import { Toast } from '../../../components/ui/toast'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 import { useDiary } from '../api/use-diary'
 import { useDeleteDiary } from '../api/use-delete-diary'
@@ -195,7 +196,12 @@ function DiaryEditorForm({
       )}
 
       {/* 작성 카드 — 시안 Main Writing Card: surface + border + soft shadow */}
-      <div className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-6 shadow-card-sm">
+      <div
+        className={cx(
+          'flex flex-col gap-5 rounded-2xl border border-border bg-surface p-6 shadow-card-sm',
+          cardClasses({ variant: 'clean' }),
+        )}
+      >
         <label className="flex flex-col gap-1.5 text-sm font-bold text-text">
           일기 제목
           <input

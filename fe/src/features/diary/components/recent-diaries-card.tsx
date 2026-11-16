@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useDiaryMonth } from '../api/use-diary-month'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 
 // 지난 일기 — 시안 4:366 우측 레일 Card 3: 최근 3건 + "전체보기"로 이번 달 전체 펼침.
@@ -17,7 +18,12 @@ export function RecentDiariesCard({
   const visible = expanded ? entries : entries.slice(0, 3)
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5 shadow-card-sm">
+    <section
+      className={cx(
+        'rounded-2xl border border-border bg-surface p-5 shadow-card-sm',
+        cardClasses({ variant: 'clean' }),
+      )}
+    >
       <div className="flex items-center justify-between">
         <h3 className="font-display text-lg">지난 일기</h3>
         {entries.length > 3 && (

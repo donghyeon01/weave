@@ -12,6 +12,7 @@ import { usePutBlocks } from '../api/use-put-blocks'
 import { useScope } from '../api/use-scope'
 import { useScopes } from '../api/use-scopes'
 import type { AvailabilityScopeSummary } from '../types'
+import { cardClasses } from '../../../components/ui/card-styles'
 import { cx } from '../../../utils/cx'
 import { PaintGrid } from './paint-grid'
 import { PreferencesCard } from './preferences-card'
@@ -30,7 +31,10 @@ import {
   type CellStep,
 } from '../utils'
 
-const cardClass = 'rounded-2xl border border-border bg-surface p-6 shadow-card-sm'
+const cardClass = cx(
+  'rounded-2xl border border-border bg-surface p-6 shadow-card-sm',
+  cardClasses({ variant: 'clean' }),
+)
 
 function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
   if (a.size !== b.size) return false

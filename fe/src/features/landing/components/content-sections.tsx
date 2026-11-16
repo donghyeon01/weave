@@ -63,6 +63,39 @@ function DiaryIcon() {
   )
 }
 
+function ScheduleIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-5 w-5 text-on-tint" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M8 1L9.7 6.3L15 8L9.7 9.7L8 15L6.3 9.7L1 8L6.3 6.3L8 1V1M15.5 11L16.4 13.6L19 14.5L16.4 15.4L15.5 18L14.6 15.4L12 14.5L14.6 13.6L15.5 11V11"
+      />
+    </svg>
+  )
+}
+
+function ChatIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-5 w-5 text-on-tint" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M10 1C4.9 1 1 4.5 1 9C1 11.5 2.4 13.7 4.5 15.1L3.8 19L7.4 17.5C8.2 17.7 9.1 17.8 10 17.8C15.1 17.8 19 14.3 19 9.4C19 4.9 15.1 1 10 1V1"
+      />
+    </svg>
+  )
+}
+
+function GridIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-5 w-5 text-on-tint" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M2 2H6.5V6.5H2V2M7.75 2H12.25V6.5H7.75V2M13.5 2H18V6.5H13.5V2M2 7.75H6.5V12.25H2V7.75M7.75 7.75H12.25V12.25H7.75V7.75M13.5 7.75H18V12.25H13.5V7.75M2 13.5H6.5V18H2V13.5M7.75 13.5H12.25V18H7.75V13.5M13.5 13.5H18V18H13.5V13.5"
+      />
+    </svg>
+  )
+}
+
 function FeatureCard({
   icon,
   iconBg,
@@ -118,6 +151,144 @@ export function ProblemSection() {
   )
 }
 
+const WEEK_DAYS = ['일', '월', '화', '수', '목', '금', '토'] as const
+
+const FEATURES: { icon: ReactNode; iconBg: string; title: string; desc: string; widget: ReactNode }[] = [
+  {
+    icon: <ScheduleIcon />,
+    iconBg: 'bg-accent-soft',
+    title: '스마트 일정 조율',
+    desc: '친구들의 비어있는 시간을 겹쳐 최적의 모임 시간을 자동으로 추천해요',
+    widget: (
+      <>
+        <MiniRow>
+          <span className="flex items-center gap-1.5">
+            <svg viewBox="0 0 12.83 12.83" className="size-3 text-accent" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M10.5 4.66667L9.77083 3.0625L8.16667 2.33333L9.77083 1.60417L10.5 0L11.2292 1.60417L12.8333 2.33333L11.2292 3.0625L10.5 4.66667V4.66667M10.5 12.8333L9.77083 11.2292L8.16667 10.5L9.77083 9.77083L10.5 8.16667L11.2292 9.77083L12.8333 10.5L11.2292 11.2292L10.5 12.8333V12.8333M4.66667 11.0833L3.20833 7.875L0 6.41667L3.20833 4.95833L4.66667 1.75L6.125 4.95833L9.33333 6.41667L6.125 7.875L4.66667 11.0833V11.0833M4.66667 8.25417L5.25 7L6.50417 6.41667L5.25 5.83333L4.66667 4.57917L4.08333 5.83333L2.82917 6.41667L4.08333 7L4.66667 8.25417V8.25417"
+              />
+            </svg>
+            <span className="text-xs font-bold text-text">추천 슬롯</span>
+          </span>
+          <Badge variant="success">토 19:00 매칭</Badge>
+        </MiniRow>
+        <div className="flex gap-1.5">
+          <Badge>참여자 4명</Badge>
+          <Badge variant="success">겹침 0건</Badge>
+        </div>
+      </>
+    ),
+  },
+  {
+    icon: <CalendarIcon />,
+    iconBg: 'bg-primary',
+    title: '공유 캘린더',
+    desc: '내 일정과 친구의 바쁜 시간을 한눈에 겹쳐서 확인해요',
+    widget: (
+      <MiniRow>
+        <div className="flex w-full gap-1">
+          {WEEK_DAYS.map((d, i) => (
+            <div
+              key={d}
+              className={`flex h-6 flex-1 items-center justify-center rounded border border-border text-[9px] font-medium ${
+                i === 4 || i === 5 ? 'bg-accent-soft text-on-tint' : 'text-text-secondary'
+              }`}
+            >
+              {d}
+            </div>
+          ))}
+        </div>
+      </MiniRow>
+    ),
+  },
+  {
+    icon: <ChatIcon />,
+    iconBg: 'bg-tint-mint',
+    title: '채팅',
+    desc: '약속이 잡히면 채팅방에서 바로 소통하고 지난 대화를 확인해요',
+    widget: (
+      <>
+        <MiniRow>
+          <span className="text-xs font-medium text-text">토요일 저녁 어때?</span>
+          <span className="text-[11px] font-medium text-text-secondary">지수 · 10:24</span>
+        </MiniRow>
+        <MiniRow>
+          <span className="text-xs font-medium text-text">좋아! 강남에서 보자</span>
+          <span className="text-[11px] font-medium text-text-secondary">나 · 10:31</span>
+        </MiniRow>
+      </>
+    ),
+  },
+  {
+    icon: <ChecklistIcon />,
+    iconBg: 'bg-primary',
+    title: '할 일 관리',
+    desc: '오늘 꼭 해야 할 투두와 데드라인을 체계적으로 정리하고 친구와 함께 공유합니다.',
+    widget: (
+      <>
+        <MiniRow>
+          <span className="flex items-center gap-1.5">
+            <span className="flex size-4 items-center justify-center rounded bg-accent-deep text-[10px] font-medium text-white">
+              ✓
+            </span>
+            <span className="text-xs font-medium text-text">모임 장소 예약하기</span>
+          </span>
+          <Badge variant="warning">D-1</Badge>
+        </MiniRow>
+        <MiniRow>
+          <span className="flex items-center gap-1.5">
+            <span className="flex size-4 items-center justify-center rounded bg-border text-[10px] font-medium text-text-secondary line-through">
+              ✓
+            </span>
+            <span className="text-xs font-medium text-text-secondary line-through">
+              카페 후보 리스트업
+            </span>
+          </span>
+          <span className="text-[11px] font-medium text-text-secondary">완료</span>
+        </MiniRow>
+      </>
+    ),
+  },
+  {
+    icon: <GridIcon />,
+    iconBg: 'bg-accent-soft',
+    title: '가능 시간',
+    desc: '페인트하듯 내 가능한 시간을 표시하고 범위별로 관리해요',
+    widget: (
+      <>
+        <MiniRow>
+          <span className="text-xs font-medium text-text">월 09:00–12:00</span>
+          <span className="h-2.5 w-16 rounded-full bg-accent-soft" />
+        </MiniRow>
+        <MiniRow>
+          <span className="text-xs font-medium text-text">수 18:00–21:00</span>
+          <span className="h-2.5 w-20 rounded-full bg-accent-soft" />
+        </MiniRow>
+      </>
+    ),
+  },
+  {
+    icon: <DiaryIcon />,
+    iconBg: 'bg-primary',
+    title: '오늘의 일기',
+    desc: '소중했던 만남의 순간과 일상을 감정 스티커와 함께 사진과 글로 아카이빙합니다.',
+    widget: (
+      <>
+        <MiniRow>
+          <span className="text-xs font-medium text-text">📸 연남동 모임 아카이브</span>
+          <span className="text-[11px] font-medium text-text-secondary">어제</span>
+        </MiniRow>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge>#행복가득</Badge>
+          <Badge>#맛집탐방</Badge>
+          <span className="text-xs font-medium text-text-secondary">🥰 3개의 기록</span>
+        </div>
+      </>
+    ),
+  },
+]
+
 export function FeaturesSection() {
   return (
     <LandingSection tone="background" id="features">
@@ -126,88 +297,18 @@ export function FeaturesSection() {
         title="바쁜 일상을 더 가볍게 엮어주는 기능들"
         sub="약속 조율부터 기록까지, Weave 하나로 완성됩니다."
       />
-      <div className="flex flex-col gap-6 md:flex-row">
-        <Reveal index={0} className="md:flex-1">
-          <FeatureCard
-            icon={<ChecklistIcon />}
-            iconBg="bg-primary"
-            title="할 일 관리"
-            desc="오늘 꼭 해야 할 투두와 데드라인을 체계적으로 정리하고 친구와 함께 공유합니다."
-            widget={
-              <>
-                <MiniRow>
-                  <span className="flex items-center gap-1.5">
-                    <span className="flex size-4 items-center justify-center rounded bg-accent-deep text-[10px] font-medium text-white">
-                      ✓
-                    </span>
-                    <span className="text-xs font-medium text-text">모임 장소 예약하기</span>
-                  </span>
-                  <Badge variant="warning">D-1</Badge>
-                </MiniRow>
-                <MiniRow>
-                  <span className="flex items-center gap-1.5">
-                    <span className="flex size-4 items-center justify-center rounded bg-border text-[10px] font-medium text-text-secondary line-through">
-                      ✓
-                    </span>
-                    <span className="text-xs font-medium text-text-secondary line-through">
-                      카페 후보 리스트업
-                    </span>
-                  </span>
-                  <span className="text-[11px] font-medium text-text-secondary">완료</span>
-                </MiniRow>
-              </>
-            }
-          />
-        </Reveal>
-        <Reveal index={1} className="md:flex-1">
-          <FeatureCard
-            icon={<CalendarIcon />}
-            iconBg="bg-accent-soft"
-            title="공유 캘린더"
-            desc="서로의 비어있는 시간을 겹쳐보아 단 3초 만에 최적의 모임 시간을 추천받습니다."
-            widget={
-              <>
-                <MiniRow>
-                  <span className="flex items-center gap-1.5">
-                    <svg viewBox="0 0 12.83 12.83" className="size-3 text-accent" aria-hidden="true">
-                      <path
-                        fill="currentColor"
-                        d="M10.5 4.66667L9.77083 3.0625L8.16667 2.33333L9.77083 1.60417L10.5 0L11.2292 1.60417L12.8333 2.33333L11.2292 3.0625L10.5 4.66667V4.66667M10.5 12.8333L9.77083 11.2292L8.16667 10.5L9.77083 9.77083L10.5 8.16667L11.2292 9.77083L12.8333 10.5L11.2292 11.2292L10.5 12.8333V12.8333M4.66667 11.0833L3.20833 7.875L0 6.41667L3.20833 4.95833L4.66667 1.75L6.125 4.95833L9.33333 6.41667L6.125 7.875L4.66667 11.0833V11.0833M4.66667 8.25417L5.25 7L6.50417 6.41667L5.25 5.83333L4.66667 4.57917L4.08333 5.83333L2.82917 6.41667L4.08333 7L4.66667 8.25417V8.25417"
-                      />
-                    </svg>
-                    <span className="text-xs font-bold text-text">추천 슬롯</span>
-                  </span>
-                  <Badge variant="success">목 18:00 매칭완료</Badge>
-                </MiniRow>
-                <div className="flex gap-1.5">
-                  <Badge>참여자 3명</Badge>
-                  <Badge variant="success">겹침 0건</Badge>
-                </div>
-              </>
-            }
-          />
-        </Reveal>
-        <Reveal index={2} className="md:flex-1">
-          <FeatureCard
-            icon={<DiaryIcon />}
-            iconBg="bg-primary"
-            title="오늘의 일기"
-            desc="소중했던 만남의 순간과 일상을 감정 스티커와 함께 사진과 글로 아카이빙합니다."
-            widget={
-              <>
-                <MiniRow>
-                  <span className="text-xs font-medium text-text">📸 연남동 모임 아카이브</span>
-                  <span className="text-[11px] font-medium text-text-secondary">어제</span>
-                </MiniRow>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge>#행복가득</Badge>
-                  <Badge>#맛집탐방</Badge>
-                  <span className="text-xs font-medium text-text-secondary">🥰 3개의 기록</span>
-                </div>
-              </>
-            }
-          />
-        </Reveal>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {FEATURES.map((f, i) => (
+          <Reveal key={f.title} index={i} className="h-full">
+            <FeatureCard
+              icon={f.icon}
+              iconBg={f.iconBg}
+              title={f.title}
+              desc={f.desc}
+              widget={f.widget}
+            />
+          </Reveal>
+        ))}
       </div>
     </LandingSection>
   )

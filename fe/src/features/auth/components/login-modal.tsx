@@ -85,6 +85,8 @@ export function LoginModal() {
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
+              aria-label="이용약관 및 개인정보처리방침에 동의합니다"
+              aria-required="true"
               className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
             />
             <p className="text-xs leading-5 text-text-secondary">

@@ -92,7 +92,7 @@ describe('login-modal', () => {
     renderModal()
 
     await userEvent.click(
-      screen.getByRole('checkbox', { name: '에 동의합니다' }),
+      screen.getByRole('checkbox', { name: '이용약관 및 개인정보처리방침에 동의합니다' }),
     )
     await userEvent.click(
       screen.getByRole('button', { name: 'Google로 시작하기' }),
@@ -113,7 +113,7 @@ describe('login-modal', () => {
     expect(google).toBeDisabled()
 
     await userEvent.click(
-      screen.getByRole('checkbox', { name: '에 동의합니다' }),
+      screen.getByRole('checkbox', { name: '이용약관 및 개인정보처리방침에 동의합니다' }),
     )
 
     expect(kakao).toBeEnabled()
@@ -156,7 +156,7 @@ describe('login-modal', () => {
     )
 
     expect(
-      screen.getByRole('checkbox', { name: '에 동의합니다' }),
+      screen.getByRole('checkbox', { name: '이용약관 및 개인정보처리방침에 동의합니다' }),
     ).not.toBeChecked()
   })
 

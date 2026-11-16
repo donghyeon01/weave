@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { AppPreviewSection } from './app-preview-section'
 import { CtaSection } from './cta-section'
 import {
   ExampleSection,
@@ -26,6 +27,7 @@ export function LandingScreen() {
         <FeaturesSection />
         <ProcessSection />
         <ExampleSection />
+        <AppPreviewSection />
         <CtaSection />
       </main>
       <LandingFooter />

@@ -21,14 +21,78 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / 'fe' / 'public' / 'landing'
 
 SHOTS = [
-    {'name': 'shot-scheduling', 'path': '/app/scheduling', 'nav': '일정 조율'},
-    {'name': 'shot-calendar', 'path': '/app/calendar', 'nav': '캘린더'},
-    {'name': 'shot-chat', 'path': '/app/chat', 'nav': '채팅'},
+    {'name': 'shot-scheduling', 'path': '/app/scheduling', 'nav': '일정 조율', 'prepare': 'scheduling'},
+    {'name': 'shot-calendar', 'path': '/app/calendar', 'nav': '캘린더', 'prepare': 'calendar'},
+    {'name': 'shot-chat', 'path': '/app/chat', 'nav': '채팅', 'prepare': 'chat'},
     {'name': 'shot-diary', 'path': '/app/diary', 'nav': '일기'},
 ]
 
 DEMO_LOGIN_TEXT = '데모로 둘러보기'
 BOOTING_TEXT = '세션을 복원하고 있어요'
+
+
+def check_friends(page, n=2):
+    # input을 label이 감싸고 있어 label 클릭이 더 안정적이다
+    labels = page.locator('form li label')
+    for i in range(min(n, labels.count())):
+        labels.nth(i).click()
+
+
+def prep_scheduling(page):
+    """3단계 위자드 — 친구 2명 선택 후 추천 실행. 실패 시 리셋 후 현재 상태를 캡처한다."""
+    try:
+        labels = page.locator('form li label')
+        if labels.count() == 0:
+            print('    warn: 친구 목록 없음 — 위자드 초기 상태로 캡처')
+            return
+        check_friends(page)
+        page.get_by_role('button', name='AI 추천 슬롯 찾기').click()
+        # 추천 결과·빈 결과·폼 에러 모두 종료 상태로 간주한다
+        done = (
+            page.get_by_text('BEST 추천 슬롯')
+            .or_(page.get_by_text('모두 가능한 시간이 없어요'))
+            .or_(page.locator('[role="alert"]'))
+            .first
+        )
+        try:
+            done.wait_for(timeout=60000)
+            state = '추천 결과' if page.get_by_text('BEST 추천 슬롯').count() > 0 else '빈 결과/폼 에러'
+            print(f'    scheduling: {state} 캡처')
+        except PlaywrightTimeoutError:
+            # 추천 무응답 — 캘린더→일정 조율로 SPA 왕복해 위자드를 리셋하고,
+            # 빈 위자드보다 낫도록 친구 2명을 다시 선택한 상태로 캡처한다
+            print('    warn: 추천 결과 타임아웃 — 위자드 리셋 후 친구 선택 상태로 캡처')
+            page.get_by_role('link', name='캘린더', exact=True).click()
+            page.wait_for_timeout(800)
+            page.get_by_role('link', name='일정 조율', exact=True).click()
+            page.wait_for_timeout(1200)
+            check_friends(page)
+    except PlaywrightTimeoutError as e:
+        print(f'    warn: scheduling 준비 실패({e}) — 현재 상태로 캡처')
+
+
+def prep_calendar(page):
+    """주간 뷰로 전환 — 탭 클릭 후 그리드 렌더 대기."""
+    page.get_by_role('tablist', name='캘린더 뷰').get_by_role('tab', name='주').click()
+    page.wait_for_timeout(800)
+
+
+def prep_chat(page):
+    """첫 채팅방 진입 — 방이 없으면 목록 상태를 그대로 캡처한다."""
+    room = page.locator('main a[href^="/app/chat/"]').first
+    if room.count() == 0:
+        print('    chat: 채팅방 없음 — 목록 상태로 캡처')
+        return
+    room.click()
+    page.wait_for_timeout(1500)
+    print('    chat: 채팅방 상세 캡처')
+
+
+PREPARE = {
+    'scheduling': prep_scheduling,
+    'calendar': prep_calendar,
+    'chat': prep_chat,
+}
 
 
 def main():
@@ -55,10 +119,7 @@ def main():
         page.get_by_text(BOOTING_TEXT).wait_for(state='hidden', timeout=15000)
         page.wait_for_timeout(2500)
 
-        for shot in SHOTS:
-            # 인증 화면 이동은 SPA nav 클릭 — page.goto의 풀 리로드는
-            # 인메모리 토큰 유실로 auth guard가 랜딩으로 튕긴다
-            page.get_by_role('link', name=shot['nav'], exact=True).click()
+        def wait_skeleton():
             # 스켈레톤(role=status)이 사라질 때까지 대기 — be 응답 지연 시
             # 로딩 상태가 마케팅 자산으로 저장되는 것을 막는다. 스켈레톤이
             # 없는 화면은 즉시 통과. websocket(STOMP) 영향 없는 DOM 대기 사용.
@@ -67,6 +128,16 @@ def main():
                 page.locator('[role="status"][aria-label="불러오는 중"]').first.wait_for(state='detached', timeout=10000)
             except PlaywrightTimeoutError:
                 pass
+
+        for shot in SHOTS:
+            # 인증 화면 이동은 SPA nav 클릭 — page.goto의 풀 리로드는
+            # 인메모리 토큰 유실로 auth guard가 랜딩으로 튕긴다
+            page.get_by_role('link', name=shot['nav'], exact=True).click()
+            wait_skeleton()
+            prepare = PREPARE.get(shot.get('prepare'))
+            if prepare is not None:
+                prepare(page)
+                wait_skeleton()
             page.wait_for_timeout(400)
             out = OUT_DIR / f"{shot['name']}.jpg"
             page.screenshot(path=str(out), type='jpeg', quality=85)

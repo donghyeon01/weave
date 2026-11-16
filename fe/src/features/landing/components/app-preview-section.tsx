@@ -6,17 +6,17 @@ import { LandingSection, SectionHeading } from './section-shell'
 const SHOTS = [
   {
     src: '/landing/shot-scheduling.jpg',
-    alt: '일정 조율 화면 — 친구별 가능 시간과 추천 슬롯',
+    alt: '일정 조율 화면 — AI 추천 슬롯 결과와 친구별 일정 겹침 타임테이블',
     label: '일정 조율',
   },
   {
     src: '/landing/shot-calendar.jpg',
-    alt: '캘린더 화면 — 내 일정과 친구의 바쁜 시간이 겹쳐진 주간 뷰',
-    label: '공유 캘린더',
+    alt: '캘린더 화면 — 내 일정이 표시된 주간 뷰',
+    label: '캘린더',
   },
   {
     src: '/landing/shot-chat.jpg',
-    alt: '채팅 화면 — 약속 관련 대화가 오가는 채팅방',
+    alt: '채팅 화면 — 확정을 준비 중인 약속의 단체 채팅방',
     label: '채팅',
   },
 ] as const
@@ -29,12 +29,12 @@ function ShotCard({ src, alt, label }: { src: string; alt: string; label: string
         cardClasses({ variant: 'brutal' }),
       )}
     >
-      <div className="flex items-center gap-1.5 border-b-2 border-border-strong bg-surface-muted px-4 py-2.5">
-        <span className="size-2.5 rounded-full bg-border-strong" />
-        <span className="size-2.5 rounded-full bg-border-strong" />
-        <span className="size-2.5 rounded-full bg-border-strong" />
+      <figcaption className="flex items-center gap-1.5 border-b-2 border-border-strong bg-surface-muted px-4 py-2.5">
+        <span aria-hidden="true" className="size-2.5 rounded-full bg-border-strong" />
+        <span aria-hidden="true" className="size-2.5 rounded-full bg-border-strong" />
+        <span aria-hidden="true" className="size-2.5 rounded-full bg-border-strong" />
         <span className="ml-2 text-xs font-bold text-text-secondary">{label}</span>
-      </div>
+      </figcaption>
       <img src={src} alt={alt} width={1280} height={800} loading="lazy" className="block w-full" />
     </figure>
   )

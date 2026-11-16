@@ -7,7 +7,7 @@ import { cx } from '../../../utils/cx'
 import { formatKoDate, nextWeekdayISO } from '../../../utils/date'
 import { BrutalCard, LandingSection, SectionHeading } from './section-shell'
 
-// Figma 151:1000·4:2379·151:1016·151:1043 — 문제 3카드 / 기능 3카드(아이콘+미니 위젯) / 과정 4스텝 / 추천 결과 카드.
+// Figma 151:1000·4:2379·151:1016·151:1043 — 문제 3카드 / 기능 6카드(아이콘+미니 위젯) / 과정 4스텝 / 추천 결과 카드.
 const PROBLEMS = [
   {
     title: '단톡방 스크롤 지옥',
@@ -183,8 +183,8 @@ const FEATURES: { icon: ReactNode; iconBg: string; title: string; desc: string; 
   {
     icon: <CalendarIcon />,
     iconBg: 'bg-primary',
-    title: '공유 캘린더',
-    desc: '내 일정과 친구의 바쁜 시간을 한눈에 겹쳐서 확인해요',
+    title: '캘린더',
+    desc: '월·주 단위로 내 일정을 한눈에 보고 관리해요',
     widget: (
       <MiniRow>
         <div className="flex w-full gap-1">
@@ -204,7 +204,7 @@ const FEATURES: { icon: ReactNode; iconBg: string; title: string; desc: string; 
   },
   {
     icon: <ChatIcon />,
-    iconBg: 'bg-tint-mint',
+    iconBg: 'bg-accent-soft',
     title: '채팅',
     desc: '약속이 잡히면 채팅방에서 바로 소통하고 지난 대화를 확인해요',
     widget: (
@@ -224,7 +224,7 @@ const FEATURES: { icon: ReactNode; iconBg: string; title: string; desc: string; 
     icon: <ChecklistIcon />,
     iconBg: 'bg-primary',
     title: '할 일 관리',
-    desc: '오늘 꼭 해야 할 투두와 데드라인을 체계적으로 정리하고 친구와 함께 공유합니다.',
+    desc: '오늘 꼭 해야 할 일과 데드라인을 한곳에서 체계적으로 관리해요',
     widget: (
       <>
         <MiniRow>
@@ -259,11 +259,11 @@ const FEATURES: { icon: ReactNode; iconBg: string; title: string; desc: string; 
       <>
         <MiniRow>
           <span className="text-xs font-medium text-text">월 09:00–12:00</span>
-          <span className="h-2.5 w-16 rounded-full bg-accent-soft" />
+          <span aria-hidden="true" className="h-2.5 w-16 rounded-full bg-accent-soft" />
         </MiniRow>
         <MiniRow>
           <span className="text-xs font-medium text-text">수 18:00–21:00</span>
-          <span className="h-2.5 w-20 rounded-full bg-accent-soft" />
+          <span aria-hidden="true" className="h-2.5 w-20 rounded-full bg-accent-soft" />
         </MiniRow>
       </>
     ),

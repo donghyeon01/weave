@@ -39,7 +39,7 @@ export function Reveal({
     <div
       ref={ref}
       className={cx(inView ? 'animate-stagger-item' : 'opacity-0', className)}
-      // stagger 지연은 --stagger-i × 40ms — 상한 7 (proposals-page 패턴)
+      // stagger 지연은 --stagger-i × --stagger-step(기본 40ms) — 상한 7 (proposals-page 패턴)
       style={{ '--stagger-i': Math.min(index, 7) } as CSSProperties}
     >
       {children}

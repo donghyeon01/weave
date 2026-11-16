@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { CtaSection } from './cta-section'
 import {
   ExampleSection,
@@ -13,7 +14,11 @@ import { LandingHeader } from './landing-header'
 // → Features(muted) → Process(white) → Example(muted) → CTA(white) → Footer
 export function LandingScreen() {
   return (
-    <div className="min-h-screen bg-background text-text">
+    // 랜딩 등장은 앱 공통 stagger(200ms/40ms)보다 느리게 — 히어로·스크롤 리빌 체감 속도 조절
+    <div
+      className="min-h-screen bg-background text-text"
+      style={{ '--stagger-dur': '400ms', '--stagger-step': '80ms' } as CSSProperties}
+    >
       <LandingHeader />
       <main>
         <HeroSection />

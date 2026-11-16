@@ -13,6 +13,18 @@ describe('nextWeekdayISO', () => {
     expect(d.getDay()).toBe(5)
     expect(d.getDate()).toBe(20)
   })
+  it('오늘이 토요일이면 6일 뒤 금요일을 반환한다', () => {
+    const d = nextWeekdayISO(5, new Date(2026, 10, 21)) // 토요일
+    expect(d.getDay()).toBe(5)
+    expect(d.getDate()).toBe(27)
+  })
+  it('연말 금요일이면 다음 해 1월 금요일을 반환한다', () => {
+    // 2026-12-25는 금요일 — 다음 금요일은 2027-01-01
+    const d = nextWeekdayISO(5, new Date(2026, 11, 25))
+    expect(d.getFullYear()).toBe(2027)
+    expect(d.getMonth()).toBe(0)
+    expect(d.getDate()).toBe(1)
+  })
 })
 
 describe('formatKoDate', () => {

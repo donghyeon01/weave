@@ -237,8 +237,11 @@ body {
 
 /* stagger-item은 @theme 토큰이 아니라 @utility — animation 단축 안의
  * calc(var(--stagger-i)*40ms)가 브라우저 파서에 버려져 delay가 0이 된다.
- * animation과 animation-delay를 분리 선언해야 longhand calc(var())가 해석된다. */
+ * animation과 animation-delay를 분리 선언해야 longhand calc(var())가 해석된다.
+ * --stagger-dur/--stagger-step은 상속 커스텀 프로퍼티 — 랜딩만 느리게
+ * 덮어쓰고(landing-screen) 나머지 사용처(proposals-page)는 기본값 유지. */
 @utility animate-stagger-item {
-  animation: stagger-item 200ms ease backwards;
-  animation-delay: calc(var(--stagger-i, 0) * 40ms);
+  animation: stagger-item ease backwards;
+  animation-duration: var(--stagger-dur, 200ms);
+  animation-delay: calc(var(--stagger-i, 0) * var(--stagger-step, 40ms));
 }

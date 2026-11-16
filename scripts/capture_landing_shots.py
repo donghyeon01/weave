@@ -14,6 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -31,6 +32,7 @@ BOOTING_TEXT = '세션을 복원하고 있어요'
 
 
 def main():
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     ap = argparse.ArgumentParser()
     ap.add_argument('--base-url', default='http://localhost:4173')
     ap.add_argument('--width', type=int, default=1280)
@@ -57,7 +59,15 @@ def main():
             # 인증 화면 이동은 SPA nav 클릭 — page.goto의 풀 리로드는
             # 인메모리 토큰 유실로 auth guard가 랜딩으로 튕긴다
             page.get_by_role('link', name=shot['nav'], exact=True).click()
-            page.wait_for_timeout(1500)
+            # 스켈레톤(role=status)이 사라질 때까지 대기 — be 응답 지연 시
+            # 로딩 상태가 마케팅 자산으로 저장되는 것을 막는다. 스켈레톤이
+            # 없는 화면은 즉시 통과. websocket(STOMP) 영향 없는 DOM 대기 사용.
+            page.wait_for_timeout(600)
+            try:
+                page.locator('[role="status"][aria-label="불러오는 중"]').first.wait_for(state='detached', timeout=10000)
+            except PlaywrightTimeoutError:
+                pass
+            page.wait_for_timeout(400)
             out = OUT_DIR / f"{shot['name']}.jpg"
             page.screenshot(path=str(out), type='jpeg', quality=85)
             print(f"  {shot['name']:16s} {shot['path']:18s} -> {out.relative_to(ROOT)} ({out.stat().st_size // 1024}KB)")

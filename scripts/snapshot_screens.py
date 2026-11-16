@@ -104,7 +104,8 @@ def main():
                 if '/login' in page.url or page.url.rstrip('/') == args.base_url:
                     page.goto(args.base_url + '/login', wait_until='load')
                     page.wait_for_timeout(800)
-                page.get_by_text(DEMO_LOGIN_TEXT).click()
+                # 랜딩 FAQ 본문에도 같은 문구가 있어 button role로 한정한다
+                page.get_by_role('button', name=DEMO_LOGIN_TEXT).click()
                 page.wait_for_url('**/app**', timeout=15000)
                 # 로그인 직후 STOMP의 ensureFreshToken이 refresh를 회전 중 —
                 # 끝나기 전에 리로드하면 구 토큰이 중복 전송돼 세션이 폐기된다

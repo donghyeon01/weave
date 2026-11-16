@@ -248,9 +248,9 @@ export function GroupsTab({ onToast }: { onToast: (message: string) => void }) {
             disabled={remaining <= 0}
             aria-disabled={remaining <= 0}
             className={cx(
-              'flex h-full w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border-strong p-5 text-center transition duration-150',
+              'flex h-full w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border-strong p-5 text-center',
               remaining > 0
-                ? 'text-text-secondary hover:bg-surface-muted/60'
+                ? cx(cardClasses({ variant: 'clean' }), 'text-text-secondary hover:bg-surface-muted/60')
                 : 'cursor-not-allowed text-text-muted opacity-60',
             )}
           >

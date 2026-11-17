@@ -149,7 +149,7 @@ def main():
 
         page.goto(args.base_url + '/login', wait_until='load')
         page.wait_for_timeout(800)
-        page.get_by_text('데모로 둘러보기').click()
+        page.get_by_role('button', name='데모로 둘러보기').click()
         page.wait_for_url('**/app**', timeout=15000)
         page.get_by_text('세션을 복원하고 있어요').wait_for(state='hidden', timeout=15000)
         page.wait_for_timeout(1500)

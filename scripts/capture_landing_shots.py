@@ -103,13 +103,19 @@ def prep_calendar(page):
 
 
 def prep_chat(page):
-    """첫 채팅방 진입 — 방이 없으면 목록 상태를 그대로 캡처한다."""
+    """메시지가 있는 채팅방 우선 진입 — 전부 비어 있으면 첫 방, 방이 없으면 목록 상태로 캡처한다."""
     try:
-        room = page.locator('main a[href^="/app/chat/"]').first
-        if room.count() == 0:
+        rooms = page.locator('main a[href^="/app/chat/"]')
+        if rooms.count() == 0:
             print('    chat: 채팅방 없음 — 목록 상태로 캡처')
             return
-        room.click()
+        target = rooms.first
+        for i in range(rooms.count()):
+            candidate = rooms.nth(i)
+            if '메시지가 없' not in candidate.inner_text():
+                target = candidate
+                break
+        target.click()
         page.wait_for_timeout(1500)
         print('    chat: 채팅방 상세 캡처')
     except PlaywrightTimeoutError as e:
@@ -142,7 +148,8 @@ def main():
             # 데모 로그인 — snapshot_screens.py와 동일 절차
             page.goto(args.base_url + '/login', wait_until='load')
             page.wait_for_timeout(800)
-            page.get_by_text(DEMO_LOGIN_TEXT).click()
+            # 랜딩 FAQ 본문에도 같은 문구가 있어 button role로 한정한다
+            page.get_by_role('button', name=DEMO_LOGIN_TEXT).click()
             page.wait_for_url('**/app**', timeout=15000)
             # 로그인 직후 refresh 회전이 끝나기 전에 이동·리로드하면 세션이 폐기된다
             page.get_by_text(BOOTING_TEXT).wait_for(state='hidden', timeout=15000)

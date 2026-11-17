@@ -69,7 +69,7 @@ def main():
             # ② 데모 로그인
             page.goto(args.base_url + '/login', wait_until='load')
             page.wait_for_timeout(800)
-            page.get_by_text(DEMO_LOGIN_TEXT).click()
+            page.get_by_role('button', name=DEMO_LOGIN_TEXT).click()
             page.wait_for_url('**/app**', timeout=15000)
             page.get_by_text(BOOTING_TEXT).wait_for(state='hidden', timeout=15000)
             page.wait_for_timeout(2000)
